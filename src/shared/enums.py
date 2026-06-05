@@ -284,3 +284,112 @@ class BrainTrigger(str, Enum):
     RECOVERABLE_ERROR = "recoverable_error"
     ERROR_RECOVERED = "error_recovered"
     ABORT = "abort"
+
+
+# ---------------------------------------------------------------------------
+# Interaction Layer enums (Source: L1-Interaction-Layer-Business-Requirements.md §2–§7)
+# ---------------------------------------------------------------------------
+
+
+class MatchStrategy(str, Enum):
+    KEYWORD = "keyword"
+    LLM_LABEL = "llm_label"
+    COMPOSITE = "composite"
+
+
+class InstructionType(str, Enum):
+    UPGRADE_STRATEGY = "upgrade_strategy"
+    DOWNGRADE_STRATEGY = "downgrade_strategy"
+    SET_STRATEGY = "set_strategy"
+    ADJUST_PARAMETER = "adjust_parameter"
+    OVERRIDE_THRESHOLD = "override_threshold"
+    SKIP_IMAGE = "skip_image"
+    MARK_FOR_REVIEW = "mark_for_review"
+    INSERT_EXTRA_STEP = "insert_extra_step"
+    ANNOTATE = "annotate"
+    REQUEST_EXPLANATION = "request_explanation"
+
+
+class InstructionStatus(str, Enum):
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    REVOKED = "revoked"
+    EXPIRED = "expired"
+    APPLIED = "applied"
+
+
+class ResponseType(str, Enum):
+    TEXT_REPLY = "text_reply"
+    CLARIFICATION_REQUEST = "clarification_request"
+    SESSION_CLOSED = "session_closed"
+    STRUCTURED_OUTPUT = "structured_output"
+    ERROR = "error"
+
+
+class SessionStatus(str, Enum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class DesignPhase(str, Enum):
+    COLLECTING = "collecting"
+    REFINING = "refining"
+    CONFIRMED = "confirmed"
+    PUBLISHED = "published"
+
+
+class InterventionGranularity(str, Enum):
+    CASE = "case"
+    IMAGE = "image"
+    STEP = "step"
+    PARAMETER = "parameter"
+
+
+class AnnotationType(str, Enum):
+    BBOX = "bbox"
+    POLYGON = "polygon"
+    LINE = "line"
+    POINT = "point"
+    HEATMAP = "heatmap"
+    MASK = "mask"
+
+
+class ResultLevel(str, Enum):
+    ROUTINE = "routine"
+    MARGINAL = "marginal"
+    ANOMALY = "anomaly"
+
+
+class SenderType(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+
+
+class ChatMessageType(str, Enum):
+    TEXT = "text"
+    INSPECTION_RESULT = "inspection_result"
+    IMAGE_ANNOTATED = "image_annotated"
+    LOG_ENTRY = "log_entry"
+    PROGRESS_UPDATE = "progress_update"
+    STRATEGY_CHANGE = "strategy_change"
+    ALERT = "alert"
+    KNOWLEDGE_ANSWER = "knowledge_answer"
+    CLARIFICATION = "clarification"
+    CONFIRMATION_REQUEST = "confirmation_request"
+    USER_TEXT = "user_text"
+    USER_SELECTION = "user_selection"
+    ERROR = "error"
+
+
+class UserActionType(str, Enum):
+    ZOOM_IN = "zoom_in"
+    EXPLAIN = "explain"
+    INTENSIFY = "intensify"
+    RECHECK = "recheck"
+    ESCALATE = "escalate"
+    MARK_REVIEW = "mark_review"
+    OVERRIDE = "override"
+    CONFIRM = "confirm"
+    CANCEL = "cancel"

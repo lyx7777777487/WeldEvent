@@ -1364,3 +1364,32 @@ class TestDeepAgentsDTOs:
             constraints=["max 30V"],
         )
         _roundtrip(SituationDescription, obj)
+
+
+def test_interaction_enums_exist():
+    from src.shared.enums import (
+        MatchStrategy,
+        InstructionType,
+        InstructionStatus,
+        ResponseType,
+        SessionStatus,
+        DesignPhase,
+        InterventionGranularity,
+        AnnotationType,
+        ResultLevel,
+        SenderType,
+        ChatMessageType,
+        UserActionType,
+    )
+    assert MatchStrategy.KEYWORD == "keyword"
+    assert InstructionType.UPGRADE_STRATEGY == "upgrade_strategy"
+    assert InstructionStatus.ACTIVE == "active"
+    assert ResponseType.TEXT_REPLY == "text_reply"
+    assert SessionStatus.ACTIVE == "active"
+    assert DesignPhase.COLLECTING == "collecting"
+    assert InterventionGranularity.IMAGE == "image"
+    assert AnnotationType.BBOX == "bbox"
+    assert ResultLevel.ROUTINE == "routine"
+    assert SenderType.SYSTEM == "system"
+    assert ChatMessageType.TEXT == "text"
+    assert UserActionType.ZOOM_IN == "zoom_in"

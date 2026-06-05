@@ -3,7 +3,7 @@
 Source: L1_Port_and_Contract_Design.md (Phase 4, Sections 8.1--8.6).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from src.shared.enums import PromotionStatus
@@ -41,7 +41,7 @@ class MemoryWriteAdapter(MemoryWritePort):
     async def write(self, input_data: MemoryWriteInput) -> MemoryWriteOutput:
         from src.shared.dto_memory import MemoryRecord
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         memory_id = MemoryId(value=uuid4())
         record = MemoryRecord(
             memory_id=memory_id,
@@ -104,7 +104,7 @@ class MemoryArchiveAdapter(MemoryArchivePort):
         await self._repo.archive(input_data.memory_id, input_data.reason)
         # Retrieve the record to get archived_at timestamp
         record = await self._repo.find_by_id(input_data.memory_id)
-        archived_at = record.archived_at if record else datetime.utcnow()
+        archived_at = record.archived_at if record else datetime.now(timezone.utc)
         return MemoryArchiveOutput(
             memory_id=input_data.memory_id,
             archived_at=archived_at,

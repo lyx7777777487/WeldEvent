@@ -3,7 +3,7 @@
 Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.3).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.shared.dto_memory import MemoryRecord, MemorySearchQuery, MemorySearchResult
 from src.shared.enums import PromotionStatus
@@ -83,7 +83,7 @@ class InMemoryMemoryRepository(MemoryRepository):
         record = self._store.get(key)
         if record is None:
             return
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         self._store[key] = record.model_copy(
             update={
                 "promotion_status": PromotionStatus.ARCHIVED,

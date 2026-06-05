@@ -44,3 +44,15 @@ class CaseId(BaseModel):
 
 class EventId(BaseModel):
     value: UUID
+
+
+class ImageId(BaseModel):
+    value: str = Field(min_length=1, max_length=256)
+
+
+class InstructionId(BaseModel):
+    value: UUID
+
+
+class OperatorId(BaseModel):
+    value: str = Field(min_length=1, max_length=128)

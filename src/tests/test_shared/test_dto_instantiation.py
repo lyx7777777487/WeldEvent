@@ -1393,3 +1393,14 @@ def test_interaction_enums_exist():
     assert SenderType.SYSTEM == "system"
     assert ChatMessageType.TEXT == "text"
     assert UserActionType.ZOOM_IN == "zoom_in"
+
+
+def test_interaction_types_exist():
+    from src.shared.types import ImageId, InstructionId, OperatorId
+    from uuid import uuid4
+    img = ImageId(value="IMG-CASE001-003")
+    assert img.value == "IMG-CASE001-003"
+    inst = InstructionId(value=uuid4())
+    assert str(inst.value)
+    op = OperatorId(value="zhangsan")
+    assert op.value == "zhangsan"

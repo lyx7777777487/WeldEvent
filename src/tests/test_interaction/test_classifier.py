@@ -77,7 +77,8 @@ class TestIntentClassifierKeywordMode:
     def setup_method(self):
         reset_llm()
 
-    def test_classify_knowledge_query(self):
+    @pytest.mark.asyncio
+    async def test_classify_knowledge_query(self):
         registry = _make_registry()
         classifier = IntentClassifier(registry)
         msg = UserMessage(
@@ -86,11 +87,12 @@ class TestIntentClassifierKeywordMode:
             timestamp=datetime.now(timezone.utc),
         )
         ctx = ActiveContext(operator_id="zhangsan")
-        result = classifier.classify(msg, ctx)
+        result = await classifier.classify(msg, ctx)
         assert result.primary_intent == "cognitive.knowledge_query"
         assert result.confidence > 0.0
 
-    def test_classify_unknown_returns_low_confidence(self):
+    @pytest.mark.asyncio
+    async def test_classify_unknown_returns_low_confidence(self):
         registry = _make_registry()
         classifier = IntentClassifier(registry)
         msg = UserMessage(
@@ -99,7 +101,7 @@ class TestIntentClassifierKeywordMode:
             timestamp=datetime.now(timezone.utc),
         )
         ctx = ActiveContext(operator_id="zhangsan")
-        result = classifier.classify(msg, ctx)
+        result = await classifier.classify(msg, ctx)
         assert result.confidence < 0.3
 
 
@@ -109,7 +111,8 @@ class TestIntentClassifierLLMMode:
     def setup_method(self):
         reset_llm()
 
-    def test_llm_classification_uses_provider(self):
+    @pytest.mark.asyncio
+    async def test_llm_classification_uses_provider(self):
         init_llm(MockLLMProvider(
             canned_json={
                 "primary_intent": "cognitive.knowledge_query",
@@ -125,11 +128,12 @@ class TestIntentClassifierLLMMode:
             timestamp=datetime.now(timezone.utc),
         )
         ctx = ActiveContext(operator_id="zhangsan")
-        result = classifier.classify(msg, ctx)
+        result = await classifier.classify(msg, ctx)
         assert result.primary_intent == "cognitive.knowledge_query"
         assert result.confidence == 0.92
 
-    def test_llm_fallback_to_keyword_on_error(self):
+    @pytest.mark.asyncio
+    async def test_llm_fallback_to_keyword_on_error(self):
         init_llm(MockLLMProvider(default_response="error"))
         registry = _make_registry()
         classifier = IntentClassifier(registry)
@@ -139,6 +143,5 @@ class TestIntentClassifierLLMMode:
             timestamp=datetime.now(timezone.utc),
         )
         ctx = ActiveContext(operator_id="zhangsan")
-        # When LLM returns unparseable output, classifier falls back to keyword
-        result = classifier.classify(msg, ctx)
+        result = await classifier.classify(msg, ctx)
         assert result.primary_intent == "cognitive.knowledge_query"

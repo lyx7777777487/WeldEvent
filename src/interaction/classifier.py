@@ -37,7 +37,7 @@ class IntentClassifier:
     def __init__(self, registry: ModeRegistry) -> None:
         self._registry = registry
 
-    def classify(
+    async def classify(
         self, message: UserMessage, context: ActiveContext
     ) -> IntentClassification:
         """Classify the user message into a mode intent."""
@@ -46,7 +46,7 @@ class IntentClassifier:
             from src.interaction.llm import get_llm
 
             provider = get_llm()
-            return self._classify_llm(message, context, provider)
+            return await self._classify_llm(message, context, provider)
         except RuntimeError:
             # LLM not initialized, use keyword mode
             return self._classify_keyword(message, context)
@@ -54,15 +54,13 @@ class IntentClassifier:
             # LLM failed, fall back to keyword
             return self._classify_keyword(message, context)
 
-    def _classify_llm(
+    async def _classify_llm(
         self,
         message: UserMessage,
         context: ActiveContext,
         provider,
     ) -> IntentClassification:
         """Classify using LLM function calling."""
-        import asyncio
-
         from src.interaction.llm.provider import LLMRequest
         from src.interaction.llm.prompts.intent_classifier import (
             INTENT_CLASSIFIER_SYSTEM_PROMPT,
@@ -96,11 +94,7 @@ class IntentClassifier:
         )
 
         try:
-            loop = asyncio.new_event_loop()
-            try:
-                resp = loop.run_until_complete(provider.complete(request))
-            finally:
-                loop.close()
+            resp = await provider.complete(request)
             if resp.parsed_object is not None:
                 return resp.parsed_object
             return self._classify_keyword(message, context)

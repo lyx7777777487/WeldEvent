@@ -5,8 +5,6 @@ IntentClassifier -> SessionRouter -> KnowledgeQueryMode -> ModeResponse.
 Tests both keyword-only and LLM-enhanced flows.
 """
 
-import asyncio
-
 import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -71,7 +69,7 @@ class TestE2EKeywordMode:
 
         # Classify
         ctx = context_resolver.resolve("zhangsan")
-        classification = classifier.classify(msg, ctx)
+        classification = await classifier.classify(msg, ctx)
         assert classification.primary_intent == "cognitive.knowledge_query"
 
         # Enrich + route
@@ -89,13 +87,7 @@ class TestE2EKeywordMode:
 
 
 class TestE2ELLMMode:
-    """E2E with LLM-enhanced IntentClassifier (MockLLMProvider).
-
-    Uses synchronous test methods because IntentClassifier._classify_llm
-    creates its own event loop via asyncio.new_event_loop().run_until_complete(),
-    which conflicts with the already-running pytest-asyncio event loop.
-    The async routing step is invoked via asyncio.run() instead.
-    """
+    """E2E with LLM-enhanced IntentClassifier (MockLLMProvider)."""
 
     def setup_method(self):
         reset_llm()
@@ -103,7 +95,8 @@ class TestE2ELLMMode:
     def teardown_method(self):
         reset_llm()
 
-    def test_knowledge_query_llm_flow(self):
+    @pytest.mark.asyncio
+    async def test_knowledge_query_llm_flow(self):
         init_llm(MockLLMProvider(
             canned_json={
                 "primary_intent": "cognitive.knowledge_query",
@@ -128,13 +121,13 @@ class TestE2ELLMMode:
             timestamp=datetime.now(timezone.utc),
         )
 
-        # Classify (LLM mode) — synchronous, works outside async context
+        # Classify (LLM mode)
         ctx = context_resolver.resolve("zhangsan")
-        classification = classifier.classify(msg, ctx)
+        classification = await classifier.classify(msg, ctx)
         assert classification.primary_intent == "cognitive.knowledge_query"
         assert classification.confidence == 0.95
 
-        # Enrich + route — async, run in a fresh event loop
+        # Enrich + route
         classified_msg = msg.model_copy(
             update={
                 "intent_label": classification.primary_intent,
@@ -142,6 +135,6 @@ class TestE2ELLMMode:
                 "extracted_entities": classification.extracted_entities,
             }
         )
-        response = asyncio.run(router.route(classified_msg))
+        response = await router.route(classified_msg)
         assert response.mode_id == "cognitive.knowledge_query"
         assert "100°C" in response.text_reply

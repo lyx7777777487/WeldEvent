@@ -32,16 +32,11 @@ class KnowledgeQueryMode(ModeProtocol):
         IntentPattern(
             match_strategy=MatchStrategy.KEYWORD,
             patterns=[
-                "多少",
-                "温度",
-                "参数",
-                "标准",
-                "规定",
-                "要求",
-                "什么是",
-                "怎么算",
-                "合格",
-                "不合格",
+                "多少", "温度", "参数", "标准", "规定", "要求", "什么是", "怎么算",
+                "合格", "不合格", "测量", "验收", "缺陷", "判定", "规范", "T型",
+                "角焊", "焊缝", "厚度", "材质", "材料", "工艺", "电流", "电压",
+                "速度", "案例", "历史", "统计", "夹渣", "未熔合", "气孔", "裂纹",
+                "预热", "层间", "热处理",
             ],
             priority=50,
             confidence_threshold=0.3,
@@ -57,6 +52,26 @@ class KnowledgeQueryMode(ModeProtocol):
     required_ports = ["RAGQueryPort"]
     creates_session = False
     session_data_schema = None
+
+    def _select_best_result(self, query: str, results: list) -> object | None:
+        """Select the most relevant result based on keyword matching."""
+        if not results:
+            return None
+
+        keyword_groups = [
+            (["预热", "温度", "层间", "热处理"], 0),
+            (["夹渣", "夹杂物"], 1),
+            (["未熔合", "未融合"], 2),
+            (["参数", "电流", "电压", "速度", "GMAW", "角焊", "工艺"], 3),
+            (["案例", "历史", "统计", "类似"], 4),
+        ]
+
+        for keywords, index in keyword_groups:
+            if any(kw in query for kw in keywords):
+                if index < len(results):
+                    return results[index]
+
+        return results[0] if results else None
 
     async def handle(
         self, message: UserMessage, deps: ModeDependencies
@@ -75,8 +90,11 @@ class KnowledgeQueryMode(ModeProtocol):
         ports_accessed = ["RAGQueryPort"]
 
         if output.results:
-            top = output.results[0]
-            reply = f"{top.content}\n\n来源: {top.source_reference}"
+            top = self._select_best_result(message.raw_text, output.results)
+            if top:
+                reply = f"{top.content}\n\n来源: {top.source_reference}"
+            else:
+                reply = "未找到相关知识，请尝试更具体的描述。"
         else:
             reply = "未找到相关知识，请尝试更具体的描述。"
 

@@ -95,3 +95,75 @@ class TestKnowledgeQueryMode:
         mode = registry.get("cognitive.knowledge_query")
         assert mode is not None
         assert isinstance(mode, KnowledgeQueryMode)
+
+    @pytest.mark.asyncio
+    async def test_handle_returns_preheat_answer(self):
+        """问预热温度 → 返回预热温度相关答案"""
+        from src.shared.ports.knowledge import RAGQueryInput, RAGQueryOutput
+        from src.shared.dto_knowledge import KnowledgeResult, KnowledgeType
+        from src.shared.types import KnowledgeId
+
+        class FakeRAGPort:
+            async def query(self, input_data):
+                return RAGQueryOutput(results=[
+                    KnowledgeResult(
+                        knowledge_id=KnowledgeId(value=uuid4()),
+                        knowledge_type=KnowledgeType.STANDARD,
+                        content="Q345R 22mm 预热温度要求 ≥100°C",
+                        source_reference="NB/T47014",
+                        relevance_score=0.95,
+                    ),
+                    KnowledgeResult(
+                        knowledge_id=KnowledgeId(value=uuid4()),
+                        knowledge_type=KnowledgeType.STANDARD,
+                        content="夹渣验收标准: 单个夹渣长度 ≤ t/3",
+                        source_reference="NB/T47014-2011",
+                        relevance_score=0.92,
+                    ),
+                ])
+
+        mode = KnowledgeQueryMode()
+        deps = ModeDependencies(RAGQueryPort=FakeRAGPort())
+        msg = UserMessage(
+            raw_text="Q345R预热温度多少",
+            operator_id="zhangsan",
+            timestamp=datetime.now(timezone.utc),
+        )
+        response = await mode.handle(msg, deps)
+        assert "100°C" in response.text_reply
+
+    @pytest.mark.asyncio
+    async def test_handle_returns_slag_answer(self):
+        """问夹渣 → 返回夹渣相关答案"""
+        from src.shared.ports.knowledge import RAGQueryInput, RAGQueryOutput
+        from src.shared.dto_knowledge import KnowledgeResult, KnowledgeType
+        from src.shared.types import KnowledgeId
+
+        class FakeRAGPort:
+            async def query(self, input_data):
+                return RAGQueryOutput(results=[
+                    KnowledgeResult(
+                        knowledge_id=KnowledgeId(value=uuid4()),
+                        knowledge_type=KnowledgeType.STANDARD,
+                        content="Q345R 22mm 预热温度要求 ≥100°C",
+                        source_reference="NB/T47014",
+                        relevance_score=0.95,
+                    ),
+                    KnowledgeResult(
+                        knowledge_id=KnowledgeId(value=uuid4()),
+                        knowledge_type=KnowledgeType.STANDARD,
+                        content="夹渣验收标准: 单个夹渣长度 ≤ t/3",
+                        source_reference="NB/T47014-2011",
+                        relevance_score=0.92,
+                    ),
+                ])
+
+        mode = KnowledgeQueryMode()
+        deps = ModeDependencies(RAGQueryPort=FakeRAGPort())
+        msg = UserMessage(
+            raw_text="夹渣验收标准是什么",
+            operator_id="zhangsan",
+            timestamp=datetime.now(timezone.utc),
+        )
+        response = await mode.handle(msg, deps)
+        assert "夹渣" in response.text_reply

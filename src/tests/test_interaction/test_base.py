@@ -14,6 +14,7 @@ from src.interaction.base import (
     UserAction,
     UserMessage,
 )
+from src.interaction.dependencies import ModeDependencies, PortProvider
 from src.shared.enums import MatchStrategy, SessionStatus
 from src.shared.types import CaseId, DecisionId, SessionId
 
@@ -109,3 +110,41 @@ class TestModeProtocolAbstract:
     def test_cannot_instantiate(self):
         with pytest.raises(TypeError):
             ModeProtocol()
+
+
+class TestModeDependencies:
+    def test_get_port(self):
+        deps = ModeDependencies(RAGQueryPort="fake_rag")
+        assert deps.get("RAGQueryPort") == "fake_rag"
+
+    def test_get_missing_raises(self):
+        deps = ModeDependencies()
+        try:
+            deps.get("MissingPort")
+            assert False, "Should have raised KeyError"
+        except KeyError:
+            pass
+
+    def test_has_port(self):
+        deps = ModeDependencies(RAGQueryPort="fake_rag")
+        assert deps.has("RAGQueryPort") is True
+        assert deps.has("MissingPort") is False
+
+    def test_available_ports(self):
+        deps = ModeDependencies(RAGQueryPort="a", KnowledgePort="b")
+        assert set(deps.available_ports) == {"RAGQueryPort", "KnowledgePort"}
+
+
+class TestPortProvider:
+    def test_register_and_build(self):
+        provider = PortProvider()
+        provider.register("RAGQueryPort", "fake_rag")
+        deps = provider.build(["RAGQueryPort"])
+        assert deps.get("RAGQueryPort") == "fake_rag"
+
+    def test_build_with_missing_ports(self):
+        provider = PortProvider()
+        provider.register("RAGQueryPort", "fake_rag")
+        deps = provider.build(["RAGQueryPort", "MissingPort"])
+        assert deps.has("RAGQueryPort") is True
+        assert deps.has("MissingPort") is False

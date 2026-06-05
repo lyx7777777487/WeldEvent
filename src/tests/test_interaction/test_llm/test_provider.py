@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.interaction.llm.mock_provider import MockLLMProvider
 from src.interaction.llm.provider import (
     LLMProvider,
     LLMRequest,
@@ -69,3 +70,29 @@ class TestLLMProviderABC:
     def test_cannot_instantiate(self):
         with pytest.raises(TypeError):
             LLMProvider()
+
+
+class TestGetLlm:
+    def test_get_llm_raises_when_not_initialized(self):
+        from src.interaction.llm import reset_llm
+        reset_llm()
+        from src.interaction.llm import get_llm
+        with pytest.raises(RuntimeError, match="未初始化"):
+            get_llm()
+
+    def test_init_llm_with_mock(self):
+        from src.interaction.llm import init_llm, get_llm, reset_llm
+        reset_llm()
+        init_llm(MockLLMProvider(default_response="test"))
+        provider = get_llm()
+        assert provider.health_check() is True
+        reset_llm()
+
+    def test_reset_llm_clears_provider(self):
+        from src.interaction.llm import init_llm, get_llm, reset_llm
+        reset_llm()
+        init_llm(MockLLMProvider())
+        assert get_llm() is not None
+        reset_llm()
+        with pytest.raises(RuntimeError):
+            get_llm()

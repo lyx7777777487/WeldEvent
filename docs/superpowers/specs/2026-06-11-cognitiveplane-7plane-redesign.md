@@ -1,7 +1,7 @@
 # CognitivePlane Architecture Redesign — Aligned with WeldEvent 6-Layer System
 
 **Date:** 2026-06-11
-**Status:** Draft v4 (ReAct + borrowed patterns from OpenHands/Letta/Cline source research)
+**Status:** Draft v5 (Full technology fusion: LangGraph/DSPy/Instructor/NATS/Milvus/MLLM/Langfuse)
 **Scope:** L1 Cognitive Plane internal restructuring per IAOS V4.1 (advice.md)
 **System Context:** WeldEvent 6-Layer Architecture (L1–L6)
 
@@ -1972,3 +1972,440 @@ This section maps specific techniques discovered through source code research of
 | P2 | apply_patch diff | Fine-grained decision modification | Medium |
 | P3 | RRF hybrid search | Search quality improvement for memory/knowledge | Medium |
 | P3 | Conversation-as-Runtime (stateless orchestrator) | Architecture cleanliness, testability | Low |
+
+---
+
+## 17. Extended Technology Fusion — Architecture Doc Commitments + Advanced RAG/LLM/Messaging
+
+This section integrates findings from 7 additional technology research tracks beyond the OpenHands/Letta/Cline patterns in Section 16. Each track was chosen because: (a) the architecture doc explicitly names it, (b) it closes a critical design gap, or (c) it significantly improves an existing subsystem.
+
+### 17.1 Dependency Decision Summary
+
+| Technology | Decision | Rationale |
+|-----------|----------|-----------|
+| **LangGraph** | **Depend** | StateGraph + ToolNode + PostgresSaver + interrupt/resume replaces hand-built ReActEngine + CheckpointManager. Already transitively installed via langchain. |
+| **DSPy** | **Depend (partial)** | Signature + Predict + ChatAdapter for prompt engineering. BootstrapFewShot for safe optimization. Do NOT use MIPROv2 (instruction rewriting risky for safety-critical prompts). |
+| **Instructor** | **Depend** | Pydantic model enforcement + retry on parse failure. Replaces manual _try_parse(). Supports DeepSeek via Mode.JSON. |
+| **NATS JetStream** | **Depend** | Event backbone for Brain→Temporal, escalations, HITL feedback. Replaces InMemoryEventBus. Architecture doc specifies NATS at L6. |
+| **Milvus** | **Depend** | Vector search for case library + knowledge base. Architecture doc specifies Milvus at L5. HNSW index, hybrid search, RRF. |
+| **Langfuse** | **Depend** | LLM observability: traces, prompt management, cost tracking. Replaces LLMCallTracker. |
+| **LlamaIndex** | **Borrow patterns** | Hybrid search, re-ranking, auto-merging, query decomposition — implement as port adapters. Do NOT depend on the library (heavy, abstraction mismatch). |
+| **Guardrails AI** | **Borrow OnFailAction pattern** | OnFailAction enum (REASK/FIX/FILTER/REFRAIN) enriches ValidationPipeline. Do NOT depend on the library (too heavy, overlaps ValidationPipeline). |
+| **MLLM Vision** | **Borrow Hybrid pattern** | Option C: thumbnail for context + CV tool for detail. ROUTINE=text-only, ADAPTIVE=hybrid, EXPLORATORY=full image. |
+| **DeepAgents** | **Borrow middleware pattern** | DeepAgents = create_react_agent + middleware stack. Borrow composable middleware concept. Do NOT depend (domain-specific to coding agents). |
+| **Event Sourcing + CAS** | **Borrow + implement** | WeldMap is already Event Sourced (architecture doc). Implement CAS via Redis Lua script. Materialized views for fast read. |
+
+### 17.2 LangGraph — ReAct Engine + Checkpointing
+
+**Key findings from source code research:**
+
+| LangGraph Feature | What It Does | WeldEvent Replacement |
+|------------------|-------------|----------------------|
+| `StateGraph` | Directed graph with typed state, nodes, conditional edges | Replaces hand-built ReActEngine loop |
+| `ToolNode` + `tools_condition()` | Auto-execute LLM tool calls, route between agent and tools | Replaces ToolRegistry.execute() in ReAct loop |
+| `PostgresSaver` | PG-backed checkpointing with version history | Replaces hand-built CheckpointManager |
+| `interrupt()` / `Command(resume=...)` | Pause execution for human approval, resume later | Replaces request_confirmation tool + WebSocket |
+| `astream()` with stream modes | values/updates/messages/custom/tasks/checkpoints/debug | Replaces hand-built streaming |
+| `Send` API | Parallel fan-out to sub-graphs | For future parallel tool execution |
+| Middleware (from DeepAgents) | Composable pre/post hooks around model calls and tool execution | Complements BeforeToolHook system |
+
+**Integration architecture:**
+
+```python
+from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.checkpoint.postgres import PostgresSaver
+
+class BrainReActState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]
+    brain_state: BrainStateType           # BrainStateMachine state
+    context: ContextSnapshot
+    decision: BrainDecision | None
+    event_log: list[dict]                 # Append-only event trail
+
+def build_react_graph(tools, checkpointer, interrupts=None):
+    builder = StateGraph(BrainReActState)
+
+    # Agent node: LLM reasons + decides tool calls
+    builder.add_node("agent", agent_node)
+    # Tool node: executes tool calls with beforeTool hooks
+    builder.add_node("tools", ToolNode(tools))
+
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", "__end__": END})
+    builder.add_edge("tools", "agent")
+
+    return builder.compile(
+        checkpointer=checkpointer,
+        interrupt_before=interrupts or [],  # e.g. ["tools"] for approval
+    )
+```
+
+**Phase plan:**
+- Phase 1: Replace ReActEngine with LangGraph StateGraph + ToolNode. Replace CheckpointManager with PostgresSaver. Replace request_confirmation with interrupt/resume.
+- Phase 2: Refactor BrainOrchestrator pipeline as a separate StateGraph (each step = node, transitions = edges).
+- Phase 3: Compose orchestrator graph + react graph as sub-graphs.
+
+### 17.3 DSPy — Declarative Prompt Engineering
+
+**Key findings:**
+
+| DSPy Feature | What It Does | WeldEvent Use |
+|-------------|-------------|---------------|
+| `dspy.Signature` | Typed I/O contract (Pydantic-based) with docstring instructions | Replace hand-written prompts for IntentClassifier, KnowledgeQuery, Explanation |
+| `dspy.Predict` + `ChatAdapter` | Auto-generate prompt from Signature, auto-parse response | Replace manual _inject_json_hint() + _try_parse() |
+| `dspy.ReAct` | Built-in ReAct loop with tool calling | Superseded by LangGraph StateGraph — do NOT use |
+| `BootstrapFewShot` | Safe optimization: only adds few-shot examples, never modifies instructions | Auto-discover effective examples from successful runs |
+| `dspy.Assert`/`Suggest` | Output validation with retry | REMOVED in current DSPy version — use Instructor instead |
+| `dspy.Evaluate` | Metric-based evaluation | Evaluate prompt quality on curated test set |
+
+**Signature example for WeldEvent:**
+
+```python
+class IntentClassify(dspy.Signature):
+    """Classify user intent in an industrial welding inspection system.
+    Rules:
+    - If casual conversation, set primary_intent to "cognitive.free_chat"
+    - Only classify to professional modes when explicitly relevant
+    - When uncertain, prefer "cognitive.free_chat"
+    """
+    user_message: str = dspy.InputField(desc="Raw user text input")
+    context_summary: str = dspy.InputField(desc="Active session context")
+    primary_intent: str = dspy.OutputField(desc="Mode ID, e.g. cognitive.knowledge_query")
+    confidence: float = dspy.OutputField(desc="0.0-1.0", ge=0.0, le=1.0)
+    extracted_entities: dict = dspy.OutputField(desc="Structured entities from user text")
+```
+
+**What NOT to DSPy-ify:** BrainOrchestrator (deterministic), ValidationPipeline (rule-based), keyword fallback tier (no LLM).
+
+### 17.4 Instructor — LLM Output Format Enforcement
+
+**Key findings:**
+
+| Instructor Feature | What It Does | WeldEvent Use |
+|-------------------|-------------|---------------|
+| `Mode.JSON` | Enforce Pydantic output via response_format=json_object | DeepSeek primary — replaces _inject_json_hint() + _try_parse() |
+| `Mode.TOOLS` | Enforce output via function calling | Tier 1 fallback — auto-retry on validation error |
+| `max_retries` | Auto re-prompt with validation error context | Currently _try_parse() silently returns None on failure |
+| `Maybe[T]` | Graceful degradation: result or error+message | For non-critical extractions where failure is acceptable |
+| Streaming partials | Incremental Pydantic model construction | For WebSocket streaming of structured responses |
+
+**Integration: format validation → domain validation pipeline:**
+
+```
+LLM output → [Instructor: format validation + retry] → valid Pydantic model
+                                                           │
+                                                           ▼
+                              [ValidationPipeline: domain validation] → ValidationResult
+```
+
+**From Guardrails, borrow the OnFailAction pattern:**
+
+```python
+class OnFailAction(Enum):
+    REASK = "reask"      # Re-prompt LLM with error context (Instructor handles this)
+    FIX = "fix"           # Auto-fix if possible (e.g., clamp values to range)
+    FILTER = "filter"     # Remove invalid field, continue
+    REFRAIN = "refrain"   # Return empty/null result
+    ESCALATE = "escalate"  # Escalate to human
+```
+
+### 17.5 NATS JetStream — Event Backbone
+
+**Architecture doc specifies NATS at L6.** Currently L1 uses InMemoryEventBus (asyncio.Queue dict) — no durability, no cross-process communication.
+
+**Stream design for WeldEvent:**
+
+| Stream | Subjects | Retention | Consumer Pattern | Purpose |
+|--------|----------|-----------|-----------------|---------|
+| `DECISIONS` | `weldevent.L1.cognitive.decision.*` | LIMITS (7 days) | Durable pull | Brain→Bridge→Temporal trigger |
+| `ESCALATIONS` | `weldevent.L1.cognitive.validation.escalation` | LIMITS (1 day) | Durable push | Urgent safety alerts |
+| `WORKFLOW_TRIGGERS` | `weldevent.L2.control.trigger.*` | WORK_QUEUE | Durable pull | Exactly-once workflow launch |
+| `HITL_SIGNALS` | `weldevent.L1.cognitive.feedback.human` | LIMITS (7 days) | Durable push | Human feedback → Temporal Signal |
+
+**Key integration points:**
+- `gateway/weldmap_client.py`: publish decision → `js.publish("weldevent.L1.cognitive.decision.{point}")` with dedup
+- Bridge: `js.pull_subscribe()` with `AckPolicy.EXPLICIT`, `backoff=[10,30,60,120,300]`
+- Escalation handler: `js.subscribe()` push consumer with `flow_control=True`
+- Config hot-reload: JetStream KV store with `kv.watch("brain.*")`
+
+**Subject namespace:**
+```
+weldevent.L1.cognitive.decision.{decision_point}
+weldevent.L1.cognitive.validation.escalation
+weldevent.L1.cognitive.feedback.human
+weldevent.L2.control.workflow.{workflow_id}.status
+weldevent.L3.execution.agent.{agent_type}.report
+weldevent.L5.weldmap.change.{entity_type}
+```
+
+### 17.6 Milvus — Vector Search
+
+**Architecture doc specifies Milvus at L5.** Currently marked "Phase2 pgvector placeholder".
+
+**Collection design:**
+
+| Collection | Vector Fields | Scalar Fields | Partition Key | Index |
+|-----------|--------------|---------------|---------------|-------|
+| `case_library` | text_vector(768), image_vector(512) | material, thickness, defect_type, verdict, standard_ref | material | HNSW (M=16, efConstruction=256) |
+| `knowledge_standards` | text_vector(768) | standard_id, clause_number, topic, keywords | topic | HNSW |
+| `memory_cases` | text_vector(768) | case_id, memory_type, confidence, promotion_status | memory_type | HNSW |
+| `memory_experience` | text_vector(768), measurement_vector(64) | domain, confidence, validation_count | domain | HNSW |
+
+**Hybrid search (vector + scalar filter):**
+```python
+results = client.search(
+    collection_name="case_library",
+    data=[query_embedding],
+    filter='material == "Q235" AND thickness == 12.0',
+    limit=20,
+    search_params={"metric_type": "COSINE", "params": {"ef": 128}},
+)
+```
+
+**Multi-vector search with RRF:**
+```python
+from pymilvus import AnnSearchRequest, RRFRanker
+
+req_text = AnnSearchRequest(data=[text_emb], anns_field="text_vector", param={...}, limit=50)
+req_image = AnnSearchRequest(data=[image_emb], anns_field="image_vector", param={...}, limit=50)
+results = client.hybrid_search("case_library", reqs=[req_text, req_image], ranker=RRFRanker(k=60), limit=20)
+```
+
+**Consistency:** Bounded (default) for case library; Strong for decision-critical queries.
+
+**PG-Milvus sync:** Dual-write (PG first = source of truth, Milvus best-effort) + periodic CDC reconciliation. Already designed in `memory/dual_write.py`.
+
+### 17.7 Event Sourcing + CAS for WeldMap
+
+**Architecture doc states: "Event Sourcing + CAS 乐观锁".** Current `InMemoryWeldMapClient` implements basic CAS; production needs Redis-backed Event Sourcing.
+
+**Domain events:**
+
+```python
+class WeldMapEventType(str, Enum):
+    DECISION_MADE = "decision_made"                # Cognitive Plane writes
+    DECISION_OVERRIDDEN = "decision_overridden"     # Human override
+    ESCALATION_RAISED = "escalation_raised"
+    WORKFLOW_TRIGGERED = "workflow_triggered"       # Brain → Temporal
+    HUMAN_FEEDBACK_RECEIVED = "human_feedback_received"
+    # ... plus workflow/image/mask/annotation/rendering/spc events
+```
+
+**CAS implementation: Redis Lua script (atomic, single round-trip):**
+```python
+CAS_WRITE_LUA = """
+local key_data = KEYS[1]
+local key_version = KEYS[2]
+local key_events = KEYS[3]
+local expected_version = tonumber(ARGV[1])
+local new_data = ARGV[2]
+local new_version = tonumber(ARGV[3])
+local event_data = ARGV[4]
+
+if expected_version >= 0 then
+    local current = tonumber(redis.call('GET', key_version) or '0')
+    if current ~= expected_version then
+        return {0, current}
+    end
+end
+
+redis.call('SET', key_data, new_data)
+redis.call('SET', key_version, new_version)
+redis.call('XADD', key_events, '*', 'data', event_data)
+return {1, new_version}
+"""
+```
+
+**Materialized views for fast read + snapshot on PUBLISHED for recovery.**
+
+**CognitiveGateway → Event-Sourced WeldMap:**
+- Write: CAS write → event appended → materialized view updated → NATS notify
+- Read: query materialized view (fast) or replay events (audit/time-travel)
+
+### 17.8 MLLM — Multimodal Reasoning
+
+**Recommended: Option C (Hybrid — thumbnail + CV tool):**
+
+| Reasoning Mode | Image Strategy | Cost | When |
+|---------------|----------------|------|------|
+| ROUTINE | CV tool only (no image to LLM) | Text tokens only | Known defect patterns |
+| ADAPTIVE | Low-detail thumbnail (85 tokens) + CV tool | Low | Context awareness + detail from tool |
+| EXPLORATORY | High-detail image + CV tool | High | Novel situations requiring visual reasoning |
+
+**Implementation:** Extend `LLMRequest` to support `image_url` content blocks. Add `vision_analysis` tool. ROUTINE/ADAPTIVE/EXPLORATORY paths naturally map to different image strategies.
+
+**Provider support:** DeepSeek-VL2 (OpenAI-compatible format, self-hosted), GPT-4o (API, high-detail), Claude (API). Use existing `OpenAIProvider` transport — zero changes needed for image_url messages.
+
+### 17.9 Advanced RAG Patterns (from LlamaIndex research)
+
+**Priority order:**
+
+| Priority | Pattern | Implementation | Benefit |
+|----------|---------|---------------|---------|
+| P0 | Hybrid Search (BM25 + dense + RRF) | `rank_bm25` + embedding + RRF fusion in port adapter | Exact match for standards IDs + semantic for context |
+| P0 | Re-ranking (BGE-reranker-v2-m3) | `RerankPort` between retrieval and synthesis | Critical for distinguishing "preheat temperature" vs "interpass temperature" |
+| P1 | LLM-based Router | Intent classifier returns `target_knowledge_type` | Replace keyword `_detect_category()` with LLM routing |
+| P1 | Auto-merging (hierarchical chunks) | `parent_chunk_id` metadata on `KnowledgeResult` | Multiple clause matches → return full section |
+| P2 | Query decomposition | `asyncio.gather()` for parallel multi-port queries | Complex cross-domain questions |
+
+**Do NOT depend on LlamaIndex.** WeldEvent's port architecture is cleaner. Implement patterns as port adapters.
+
+### 17.10 Langfuse — LLM Observability
+
+**Replace `LLMCallTracker` with Langfuse.**
+
+| Langfuse Feature | WeldEvent Use |
+|-----------------|---------------|
+| `langfuse.openai` wrapper | 1-line change to OpenAIProvider — auto-traces all LLM calls |
+| `@observe()` decorator | Full pipeline tracing (retrieval → reasoning → validation) |
+| Prompt management | Externalize prompts from code → domain experts iterate without deployment |
+| Cost tracking | Per-model token counting, cost dashboards, anomaly detection |
+| Sessions | Group traces by `SessionId` — matches existing session model |
+| Evaluation | Score-based quality tracking for LLM outputs |
+
+**Integration:** `langfuse.openai.AsyncOpenAI` replaces raw `AsyncOpenAI` in `_bootstrap_llm()`. Keep `LLMCallTracker` as offline fallback for air-gapped environments.
+
+### 17.11 DeepAgents — Middleware Pattern
+
+**Key finding: DeepAgents is NOT a separate graph engine.** It is `create_react_agent()` + composable middleware stack:
+
+| Middleware | DeepAgents | WeldEvent Adaptation |
+|-----------|-----------|---------------------|
+| TodoListMiddleware | `write_todos` tool for task tracking | Borrow for `design_workflow` tool decomposition |
+| SubAgentMiddleware | `task` tool spawns sub-agent graph | Borrow for Sub-Agent delegation in BrainCore |
+| SummarizationMiddleware | Auto-compact when token threshold exceeded | Already implemented as ContextCompactor (from Letta) |
+| HumanInTheLoopMiddleware | Pause on specified tool calls | Already implemented as PolicyHook + interrupt (from LangGraph) |
+| FilesystemMiddleware | File operations with permissions | Not applicable — industrial domain uses different tools |
+
+**Do NOT depend on DeepAgents.** Borrow the middleware composition pattern — each middleware wraps model calls and tool execution with pre/post hooks.
+
+### 17.12 Updated Package Structure (v5)
+
+New files added by this section:
+
+```
+cognitiveplane/
+├── interaction/
+│   ├── api/
+│   │   └── chat.py          # Updated: LangGraph StateGraph integration
+│   └── multimodal.py        # Updated: image_url support for MLLM
+├── governance/
+│   ├── tool_policy.py       # (already in v4)
+│   └── on_fail.py           # 🆕 OnFailAction enum (from Guardrails)
+├── control/
+│   ├── react.py             # Updated: LangGraph StateGraph + ToolNode
+│   ├── hooks.py             # Updated: LangGraph interrupt integration
+│   ├── checkpoint.py        # Updated: Delegated to LangGraph PostgresSaver
+│   ├── dspy_signatures.py   # 🆕 DSPy Signatures for prompt engineering
+│   └── dspy_optimize.py     # 🆕 BootstrapFewShot optimizer
+├── gateway/
+│   ├── events.py            # (already in v4)
+│   └── nats_publisher.py    # 🆕 NATS JetStream publisher (replaces InMemoryEventBus)
+├── knowledge/
+│   ├── rerank.py            # 🆕 BGE-reranker-v2-m3 re-ranking port
+│   ├── hybrid_search.py     # 🆕 BM25 + dense + RRF hybrid search
+│   └── decomposition.py     # 🆕 Query decomposition for multi-port search
+├── memory/
+│   ├── blocks.py            # (already in v4)
+│   ├── dual_write.py        # Updated: Milvus integration in dual-write
+│   └── milvus_client.py     # 🆕 Milvus collection management + hybrid search
+├── capability/
+│   ├── provider.py          # Updated: Instructor Mode.JSON integration
+│   ├── instructor_adapter.py # 🆕 Instructor wrapper for format validation + retry
+│   └── vision.py            # 🆕 MLLM vision adapter (thumbnail/full/CV-tool)
+├── adapters/
+│   ├── nats/                # 🆕 NATS JetStream adapter
+│   │   ├── __init__.py
+│   │   ├── connection.py    # Connection management + lifecycle
+│   │   ├── streams.py       # Stream creation (DECISIONS, ESCALATIONS, etc.)
+│   │   └── kv_config.py     # JetStream KV for config hot-reload
+│   ├── milvus/              # 🆕 Milvus adapter
+│   │   ├── __init__.py
+│   │   ├── collections.py   # Collection schema + index management
+│   │   └── sync.py          # PG→Milvus CDC reconciliation
+│   ├── langfuse/            # 🆕 Langfuse observability adapter
+│   │   ├── __init__.py
+│   │   └── tracing.py       # @observe decorator + langfuse.openai wrapper
+│   └── weldmap/
+│       ├── weldmap_http.py  # Updated: Event Sourcing + CAS via Lua script
+│       └── event_sourcing.py # 🆕 CAS Lua script + materialized views + replay
+└── shared/
+    └── dto/
+        ├── context.py       # Updated: WeldMapDomainEvent (Event Sourcing)
+        └── events.py        # 🆕 WeldMapEventType enum + domain event models
+```
+
+### 17.13 Updated CognitiveDependencies
+
+```python
+@dataclass
+class CognitiveDependencies:
+    """All L1 Cognitive Plane dependencies. Assembled only in composition root."""
+
+    # Capability
+    llm_provider: LLMProvider
+    instructor: InstructorClient          # 🆕 format validation + retry
+    vision: VisionAdapter                 # 🆕 MLLM vision (thumbnail/full/CV)
+
+    # Control
+    orchestrator: BrainOrchestrator
+    react_graph: CompiledStateGraph       # 🆕 LangGraph compiled graph
+    react_checkpointer: PostgresSaver     # 🆕 LangGraph checkpointing
+    supervisor: SupervisorCenter
+    tool_policy: ToolPolicy
+    hooks: list[BeforeToolHook]
+    dspy_signatures: dict[str, dspy.Signature]  # 🆕 DSPy signatures
+
+    # Knowledge
+    rag_query: RAGQueryPort
+    standards_query: StandardsQueryPort
+    case_library: CaseLibraryQueryPort
+    process_knowledge: ProcessKnowledgePort
+    reranker: RerankPort                  # 🆕 BGE-reranker
+    hybrid_search: HybridSearchPort       # 🆕 BM25 + dense + RRF
+
+    # Memory
+    memory_search: MemorySearchPort
+    memory_read: MemoryReadPort
+    memory_write: MemoryWritePort
+    memory_promotion: MemoryPromotionPort
+    memory_confidence: MemoryConfidencePort
+    block_manager: BlockManager
+    compactor: ContextCompactor
+    dual_write: DualWriteMemoryService
+    milvus: MilvusKnowledgeAdapter        # 🆕 Milvus vector search
+
+    # Gateway
+    gateway_read: CognitiveGatewayReadPort
+    gateway_write: CognitiveGatewayWritePort
+    nats_publisher: NATSPublisher         # 🆕 NATS JetStream event backbone
+
+    # Governance
+    validation_pipeline: ValidationPipelinePort
+    review_repository: HumanReviewRequestRepository
+    tool_policy: ToolPolicy
+
+    # Copilot
+    copilot: IndustrialCopilot
+
+    # Interaction
+    context_resolver: ContextResolver
+
+    # Observability
+    langfuse: LangfuseClient              # 🆕 LLM observability
+```
+
+### 17.14 Architecture Doc Alignment — Final Checklist
+
+| Architecture Doc Commitment | Implementation | Status |
+|----------------------------|---------------|--------|
+| DeepAgents (LangGraph封装) | LangGraph StateGraph + ToolNode + middleware pattern | ✅ Depend on LangGraph, borrow DeepAgents middleware |
+| Temporal (L2) | CognitiveGateway → NATS JetStream → Temporal Signal | ✅ Event-driven, durable |
+| DSPy + Guardrails (L4) | DSPy Signatures + Instructor + OnFailAction | ✅ DSPy for prompts, Instructor for format, Guardrails pattern for validation |
+| NATS JetStream (L6) | 4 streams + KV config + subject namespace | ✅ Durable, exactly-once, backpressure |
+| Milvus (L5) | HNSW index, hybrid search, dual-write PG+Milvus | ✅ Not Phase2 placeholder anymore |
+| Event Sourcing + CAS (L5) | Redis Lua CAS + Streams + materialized views | ✅ Production-grade |
+| MLLM + CV (L3/L4) | Hybrid vision (thumbnail + CV tool) per reasoning mode | ✅ Cost-controlled |
+| Langfuse (new) | LLM observability replacing LLMCallTracker | ✅ Production-grade |
+| LlamaIndex (borrowed) | Hybrid search + re-ranking + auto-merging + decomposition | ✅ Patterns, not dependency |

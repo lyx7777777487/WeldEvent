@@ -21,11 +21,12 @@ L6 Infrastructure   ← K8s/NATS/OTel — 运行支撑
 ```
 
 **核心原则（来自架构方案）：**
+- **Human-Governed决策模型**：Agent→Suggest, Human→Decide, System→Execute。Brain永远只提供建议，关键判定须经人工确认才能生效。这不是实现细节，是工业安全的架构底线。
 - 确定性优先：规则引擎与Temporal负责确定性执行，Brain永远在执行循环之外
 - 职责分离：Brain只做认知决策，Temporal只做执行保证，Agent只响应调度
 - 单一真相来源：所有层的状态读写必须经过WeldMap，禁止Agent间直接通信
 - 最小耦合：各层通过Port接口通信
-- 人在回路：关键判定节点保留人工审查通道，Brain建议须经人工确认才能生效
+- Knowledge vs Memory边界：Knowledge = 客观事实（标准、规范、知识图谱），Memory = 系统经验（历史案例、执行记录、人工反馈）。两者存储、检索、晋升规则完全不同，禁止混用。
 
 ---
 
@@ -111,7 +112,8 @@ P0问题**不需要重构就能修**，应立即独立完成：
 @dataclass
 class CapabilityDeps:
     llm_provider: LLMProvider
-    instructor: InstructorClient       # Phase 2
+    instructor: InstructorClient            # Phase 2b: format validation + retry
+    vision: VisionAdapter                   # Phase 2h: MLLM vision
 
 @dataclass
 class ControlDeps:
@@ -119,7 +121,7 @@ class ControlDeps:
     supervisor: SupervisorCenter
     tool_policy: ToolPolicy
     hooks: list[BeforeToolHook]
-    react_graph: CompiledStateGraph     # Phase 2: LangGraph
+    react_graph: CompiledStateGraph         # Phase 2a: LangGraph
 
 @dataclass
 class KnowledgeDeps:
@@ -127,6 +129,8 @@ class KnowledgeDeps:
     standards_query: StandardsQueryPort
     case_library: CaseLibraryQueryPort
     process_knowledge: ProcessKnowledgePort
+    reranker: RerankPort                    # Phase 2g: BGE-reranker
+    hybrid_search: HybridSearchPort         # Phase 2g: BM25 + dense + RRF
 
 @dataclass
 class MemoryDeps:
@@ -135,17 +139,20 @@ class MemoryDeps:
     write: MemoryWritePort
     block_manager: BlockManager
     compactor: ContextCompactor
+    dual_write: DualWriteMemoryService      # Phase 2e: PG + Milvus
+    milvus: MilvusKnowledgeAdapter          # Phase 2e: vector search
 
 @dataclass
 class GatewayDeps:
     read: CognitiveGatewayReadPort
     write: CognitiveGatewayWritePort
+    nats_publisher: NATSPublisher           # Phase 2d: NATS JetStream
 
 @dataclass
 class GovernanceDeps:
     validation: ValidationPipelinePort
     review_repo: HumanReviewRequestRepository
-    tool_policy: ToolPolicy             # shared with ControlDeps
+    tool_policy: ToolPolicy                 # shared with ControlDeps
 
 @dataclass
 class CognitiveDependencies:
@@ -384,7 +391,7 @@ Instead of one 30-field dataclass (untestable composition root), dependencies ar
 # → composed into CognitiveDependencies(capability, control, knowledge, memory, gateway, governance)
 ```
 
-### Before vs After
+### Before vs After [Phase 1]
 
 ```python
 # BEFORE: dict[str, Any] + global singleton
@@ -411,7 +418,7 @@ class BrainOrchestrator:
         # No more _has_port checks
 ```
 
-### Composition Root
+### Composition Root [Phase 1]
 
 ```python
 def create_app() -> FastAPI:
@@ -568,6 +575,7 @@ OpenHands核心设计：Agent是冻结的Pydantic model（无mutable state），
 **应用到WeldEvent：** BrainOrchestrator是无状态的——每次请求创建新的DecisionContext，所有中间状态存入EventLog。Session持有per-operator的可变状态。
 
 ```python
+# [Phase 1] Orchestrator core — stateless, event-driven
 # Orchestrator is stateless — no mutable fields
 class BrainOrchestrator:
     """Stateless decision executor. All mutable state in EventLog/Session."""
@@ -589,7 +597,7 @@ OpenHands使用ActionEvent↔ObservationEvent配对，增量View投影。每个A
 **应用到WeldEvent：** Brain每次状态转换、Tool调用、Validation结果都追加为事件。支持完整审计追踪和时间旅行调试。
 
 ```python
-# control/event_log.py
+# [Phase 1] control/event_log.py
 @dataclass
 class BrainEvent:
     timestamp: datetime
@@ -636,7 +644,7 @@ OpenHands: SecurityAnalyzer评估风险等级，beforeTool hooks可skip/stop/mod
 **应用到WeldEvent：** ValidationPipeline和ToolPolicy在Tool执行前拦截。高风险Tool（adjust_parameter, escalate）需要额外审批；修改类Tool可被hook修改参数。
 
 ```python
-# control/hooks.py
+# [Phase 1] control/hooks.py
 from enum import Enum
 from dataclasses import dataclass
 
@@ -686,7 +694,7 @@ class PolicyHook(BeforeToolHook):
 Cline的createCheckpoint配置允许在关键操作前保存状态快照，出错时回滚。WeldEvent的Decision pipeline需要在Validation失败或人工拒绝时恢复到安全状态。
 
 ```python
-# control/checkpoint.py
+# [Phase 1] control/checkpoint.py — Phase 2: replace with LangGraph PostgresSaver
 @dataclass
 class DecisionCheckpoint:
     checkpoint_id: str
@@ -749,7 +757,7 @@ class CheckpointManager:
         ...
 ```
 
-### Orchestrator Rewrite (with EventLog + Hooks)
+### Orchestrator Rewrite (with EventLog + Hooks) [Phase 1]
 
 ```python
 class BrainOrchestrator:
@@ -865,7 +873,7 @@ Key fixes:
 - **SubAgentDelegator** — Delegation to specialized sub-agents
 - **SupervisorCenter** — Health Check, Loop Detection, Timeout Detection, Fallback
 
-### DecisionFactory (Multi-Output-Type)
+### DecisionFactory (Multi-Output-Type) [Phase 1]
 
 ```python
 class DecisionFactory:
@@ -883,14 +891,14 @@ class DecisionFactory:
 
 ## 6. Gateway — CognitiveGateway (L1→WeldMap)
 
-### Action/Observation Event Pairs (from OpenHands)
+### Action/Observation Event Pairs (from OpenHands) [Phase 1]
 
 OpenHands核心设计：ActionEvent↔ObservationEvent配对。每次Action（如tool call）产生对应Observation（tool result）。EventLog是append-only的，View从事件流增量投影。
 
 **应用到WeldEvent：** CognitiveGateway的每次write操作是一个ActionEvent，WeldMap返回结果是ObservationEvent。配对关系通过correlation_id链接，支持审计追踪。
 
 ```python
-# gateway/events.py
+# [Phase 1] gateway/events.py
 @dataclass
 class GatewayActionEvent:
     """Action: CognitiveGateway initiates a write to WeldMap."""
@@ -917,7 +925,7 @@ class GatewayObservationEvent:
 Brain永远在执行循环之外。所有跨层状态通过WeldMap共享。CognitiveGateway是Brain写WeldMap的**唯一出口**。
 
 ```python
-# gateway/ports.py
+# [Phase 1] gateway/ports.py
 
 class CognitiveGatewayWritePort(ABC):
     """Brain's only write interface to WeldMap.
@@ -968,7 +976,7 @@ class CognitiveGatewayReadPort(ABC):
     async def read_case_data(self, case_id: CaseId) -> CaseData | None: ...
 ```
 
-### WeldMap Client Adapter
+### WeldMap Client Adapter [Phase 1]
 
 ```python
 # adapters/weldmap/weldmap_http.py
@@ -1056,7 +1064,7 @@ User Input
 [Response] — Natural language + structured data back to user
 ```
 
-### ReAct Engine Implementation (with Hooks + Compaction)
+### ReAct Engine Implementation (with Hooks + Compaction) [Phase 1 — hand-built; Phase 2 — LangGraph]
 
 ```python
 class ReActEngine:
@@ -1180,7 +1188,7 @@ class ReActEngine:
         return await self._dispatch_by_path(path, user_input, context, session)
 ```
 
-### Tool Registry
+### Tool Registry [Phase 1]
 
 ```python
 class ToolRegistry:
@@ -1223,7 +1231,7 @@ class ToolRegistry:
         return await tool.execute(**arguments)
 ```
 
-### BrainTool ABC
+### BrainTool ABC [Phase 1]
 
 ```python
 class BrainTool(ABC):
@@ -1260,7 +1268,7 @@ class BrainTool(ABC):
         return f"{self.name}: {self.description}"
 ```
 
-### Example Tool: RequestConfirmation (Agent→Human)
+### Example Tool: RequestConfirmation (Agent→Human) [Phase 1]
 
 ```python
 class RequestConfirmationTool(BrainTool):
@@ -1307,7 +1315,7 @@ class RequestConfirmationTool(BrainTool):
         return ToolResult(data=confirmation.to_dict())
 ```
 
-### System→Human Push Notifications
+### System→Human Push Notifications [Phase 1]
 
 ```python
 # interaction/api/notifications.py
@@ -1394,7 +1402,7 @@ ORM models use SQLAlchemy async with `postgresql+asyncpg://`.
 
 ## 9. Governance Plane
 
-### ValidationPipeline Fix (P2-12)
+### ValidationPipeline Fix (P2-12) [Phase 1]
 
 ```python
 # BEFORE: Pipeline holds cross-layer ports and does its own I/O
@@ -1414,7 +1422,7 @@ class ValidationPipeline:
         # Consistency validator receives pre-fetched data, not ports
 ```
 
-### EscalationTracker Fix (P1-7)
+### EscalationTracker Fix (P1-7) [Phase 1]
 
 ```python
 # BEFORE: single _case_id, concurrent cases overwrite each other
@@ -1442,14 +1450,14 @@ class EscalationTracker:
         return EscalationAction.CONTINUE
 ```
 
-### ToolPolicy (from Cline)
+### ToolPolicy (from Cline) [Phase 1]
 
 Cline核心设计：ToolPolicy {enabled, autoApprove}支持通配符 `*` + per-tool覆盖。beforeTool hooks在Tool执行前拦截。
 
 **应用到WeldEvent：** 治理层定义哪些Tool需要人工审批，哪些可自动执行。高风险Tool（adjust_parameter, escalate）默认autoApprove=false，查询类Tool默认autoApprove=true。
 
 ```python
-# governance/tool_policy.py
+# [Phase 1] governance/tool_policy.py
 @dataclass
 class ToolRule:
     """Per-tool execution policy (from Cline ToolPolicy)."""
@@ -1505,7 +1513,7 @@ class ToolPolicy:
         ...
 ```
 
-### ApprovalService (Cline Plan/Approve/Execute)
+### ApprovalService (Cline Plan/Approve/Execute) [Phase 1]
 
 ```python
 class ApprovalService:
@@ -1520,14 +1528,14 @@ class ApprovalService:
 
 ## 10. Memory Plane — Industrial Memory L0-L5
 
-### Block-Based Working Memory (from Letta)
+### Block-Based Working Memory (from Letta) [Phase 1]
 
 Letta核心设计：Working memory由多个Block组成，每个Block有label/value/limit/read_only/tags。Block编译为XML注入System Prompt。Block有version history，支持checkpoint/undo/redo和乐观锁。
 
 **应用到WeldEvent：** L0/L1工作内存使用Block模型——每个决策上下文、案例状态、操作员偏好为独立Block。Block版本历史支持决策回滚。标签过滤支持精准检索。
 
 ```python
-# memory/blocks.py
+# [Phase 1] memory/blocks.py
 @dataclass
 class MemoryBlock:
     """A versioned, tagged block of working memory (from Letta)."""
@@ -1597,14 +1605,14 @@ class BlockManager:
         return [b for b in self._blocks.values() if any(t in b.tags for t in tags)]
 ```
 
-### Dual-Write Persistence (from Letta)
+### Dual-Write Persistence (from Letta) [Phase 1 — PG+Redis; Phase 2 — PG+Milvus]
 
 Letta：Archival memory使用dual-write——同时写入SQL和Turbopuffer向量DB。Shareable Archives通过junction table实现跨Agent共享。
 
 **应用到WeldEvent：** L2-L5持久内存使用dual-write——同时写入PostgreSQL（结构化查询）和Redis/Milvus（向量检索）。写入链确保双存储一致性。
 
 ```python
-# memory/dual_write.py
+# [Phase 1] memory/dual_write.py — Phase 2: replace redis vector with Milvus
 class DualWriteMemoryService:
     """Write to both PG (structured) and Redis/Milvus (vector) simultaneously."""
 
@@ -1665,14 +1673,14 @@ class DualWriteMemoryService:
         return sorted(seen.values(), key=lambda r: scores.get(str(r.record_id), 0.0), reverse=True)
 ```
 
-### Context Compaction (from Letta)
+### Context Compaction (from Letta) [Phase 1]
 
 Letta：Compaction fallback chain: sliding_window → all → self_compact。当context window接近上限时，按链式降级执行压缩。
 
 **应用到WeldEvent：** ReAct Engine的迭代上下文需要压缩策略——长对话轮次时，老消息被压缩为摘要，保留关键推理链和决策点。
 
 ```python
-# memory/compaction.py
+# [Phase 1] memory/compaction.py
 class CompactionStrategy(Enum):
     SLIDING_WINDOW = "sliding_window"  # Keep last N messages + summary
     FULL_SUMMARY = "full_summary"      # Summarize all history
@@ -1742,7 +1750,7 @@ Letta：Agent主动调用archival_memory_insert()将重要信息从working memor
 **应用到WeldEvent：** BrainCore通过Tool调用控制记忆归档。search_memory Tool在搜索时也触发潜在的记忆提升。agent决定何时将L1 Working Memory提升到L2 Case Memory。
 
 ```python
-# 在 control/tools/ 中增加 archive_memory Tool
+# [Phase 1] control/tools/archive_memory.py
 class ArchiveMemoryTool(BrainTool):
     """Agent-controlled memory archival (from Letta)."""
     name = "archive_memory"
@@ -1780,7 +1788,7 @@ class ArchiveMemoryTool(BrainTool):
 | L2 → L3 | Confidence > 0.8 + 3+ validations | Human review |
 | L3 → L4 | Confidence > 0.95 + committee approval | Formal review |
 
-### Memory Write Chain Fix (P0-3, P0-4)
+### Memory Write Chain Fix (P0-3, P0-4) [Phase 0]
 
 ```python
 # P0-3: Wire MemoryWritePort in Orchestrator
@@ -1796,7 +1804,7 @@ class MemorySearchService:
     DEFAULT_STATUSES = [PromotionStatus.VALIDATED, PromotionStatus.PROMOTED]
 ```
 
-### Memory Confidence Fix (P2-14)
+### Memory Confidence Fix (P2-14) [Phase 1]
 
 ```python
 # BEFORE: constant 0.5
@@ -2106,6 +2114,7 @@ This section integrates findings from 7 additional technology research tracks be
 **Integration architecture:**
 
 ```python
+# [Phase 2a] LangGraph StateGraph replacing hand-built ReActEngine
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -2156,6 +2165,7 @@ def build_react_graph(tools, checkpointer, interrupts=None):
 **Signature example for WeldEvent:**
 
 ```python
+# [Phase 2c] DSPy Signature replacing hand-written prompt
 class IntentClassify(dspy.Signature):
     """Classify user intent in an industrial welding inspection system.
     Rules:
@@ -2196,6 +2206,7 @@ LLM output → [Instructor: format validation + retry] → valid Pydantic model
 **From Guardrails, borrow the OnFailAction pattern:**
 
 ```python
+# [Phase 1] governance/on_fail.py — borrowed pattern, not dependency
 class OnFailAction(Enum):
     REASK = "reask"      # Re-prompt LLM with error context (Instructor handles this)
     FIX = "fix"           # Auto-fix if possible (e.g., clamp values to range)
@@ -2248,6 +2259,7 @@ weldevent.L5.weldmap.change.{entity_type}
 
 **Hybrid search (vector + scalar filter):**
 ```python
+# [Phase 2e] Milvus hybrid search
 results = client.search(
     collection_name="case_library",
     data=[query_embedding],
@@ -2259,6 +2271,7 @@ results = client.search(
 
 **Multi-vector search with RRF:**
 ```python
+# [Phase 2e] Milvus multi-vector RRF
 from pymilvus import AnnSearchRequest, RRFRanker
 
 req_text = AnnSearchRequest(data=[text_emb], anns_field="text_vector", param={...}, limit=50)
@@ -2277,6 +2290,7 @@ results = client.hybrid_search("case_library", reqs=[req_text, req_image], ranke
 **Domain events:**
 
 ```python
+# [Phase 1] shared/events.py — Phase 2: add NATS notification
 class WeldMapEventType(str, Enum):
     DECISION_MADE = "decision_made"                # Cognitive Plane writes
     DECISION_OVERRIDDEN = "decision_overridden"     # Human override
@@ -2288,6 +2302,7 @@ class WeldMapEventType(str, Enum):
 
 **CAS implementation: Redis Lua script (atomic, single round-trip):**
 ```python
+# [Phase 1] adapters/weldmap/event_sourcing.py — Phase 2: add NATS notifications
 CAS_WRITE_LUA = """
 local key_data = KEYS[1]
 local key_version = KEYS[2]
@@ -2430,53 +2445,19 @@ cognitiveplane/
         └── events.py        # 🆕 WeldMapEventType enum + domain event models
 ```
 
-### 17.13 Updated CognitiveDependencies (Per-Plane Groups)
+### 17.13 CognitiveDependencies — Phase 2 Additions
 
-See Section 0.5 for the base per-plane groups. Phase 2 technology additions extend specific plane groups only:
+Section 0.5 contains the canonical per-plane group definitions with Phase 2 fields already annotated (e.g. `# Phase 2a: LangGraph`). No duplicate definition needed here. Phase 2 technology additions affect only their corresponding plane group:
 
-```python
-# Phase 2 additions to existing plane groups (not new top-level deps)
-
-@dataclass
-class CapabilityDeps:   # Phase 2 additions
-    llm_provider: LLMProvider
-    instructor: InstructorClient          # 🆕 format validation + retry
-    vision: VisionAdapter                 # 🆕 MLLM vision
-
-@dataclass
-class ControlDeps:      # Phase 2 additions
-    orchestrator: BrainOrchestrator
-    supervisor: SupervisorCenter
-    tool_policy: ToolPolicy
-    hooks: list[BeforeToolHook]
-    react_graph: CompiledStateGraph       # 🆕 LangGraph
-    dspy_signatures: dict[str, dspy.Signature]  # 🆕 DSPy
-
-@dataclass
-class KnowledgeDeps:    # Phase 2 additions
-    rag_query: RAGQueryPort
-    standards_query: StandardsQueryPort
-    case_library: CaseLibraryQueryPort
-    process_knowledge: ProcessKnowledgePort
-    reranker: RerankPort                  # 🆕 BGE-reranker
-    hybrid_search: HybridSearchPort       # 🆕 BM25 + dense + RRF
-
-@dataclass
-class MemoryDeps:       # Phase 2 additions
-    search: MemorySearchPort
-    read: MemoryReadPort
-    write: MemoryWritePort
-    block_manager: BlockManager
-    compactor: ContextCompactor
-    dual_write: DualWriteMemoryService    # 🆕 PG+Milvus
-    milvus: MilvusKnowledgeAdapter        # 🆕 Milvus vector search
-
-@dataclass
-class GatewayDeps:      # Phase 2 additions
-    read: CognitiveGatewayReadPort
-    write: CognitiveGatewayWritePort
-    nats_publisher: NATSPublisher         # 🆕 NATS JetStream
-```
+| Phase | Technology | Plane Group | Added Fields |
+|-------|-----------|-------------|-------------|
+| 2a | LangGraph | ControlDeps | `react_graph` |
+| 2b | Instructor | CapabilityDeps | `instructor` |
+| 2c | DSPy | (used via Signatures in ControlDeps tools) | — |
+| 2d | NATS | GatewayDeps | `nats_publisher` |
+| 2e | Milvus | MemoryDeps | `dual_write`, `milvus` |
+| 2g | Reranker + Hybrid | KnowledgeDeps | `reranker`, `hybrid_search` |
+| 2h | MLLM Vision | CapabilityDeps | `vision` |
 
 ### 17.14 Architecture Doc Alignment — Final Checklist
 

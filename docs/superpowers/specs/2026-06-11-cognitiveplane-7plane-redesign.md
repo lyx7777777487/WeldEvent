@@ -1,7 +1,7 @@
 # CognitivePlane Architecture Redesign — Aligned with WeldEvent 6-Layer System
 
 **Date:** 2026-06-11
-**Status:** Draft v5 (Full technology fusion: LangGraph/DSPy/Instructor/NATS/Milvus/MLLM/Langfuse)
+**Status:** Draft v5 (Phased execution + LangGraph/DSPy/Instructor/NATS/Milvus/MLLM/Langfuse)
 **Scope:** L1 Cognitive Plane internal restructuring per IAOS V4.1 (advice.md)
 **System Context:** WeldEvent 6-Layer Architecture (L1–L6)
 
@@ -26,6 +26,142 @@ L6 Infrastructure   ← K8s/NATS/OTel — 运行支撑
 - 单一真相来源：所有层的状态读写必须经过WeldMap，禁止Agent间直接通信
 - 最小耦合：各层通过Port接口通信
 - 人在回路：关键判定节点保留人工审查通道，Brain建议须经人工确认才能生效
+
+---
+
+## 0.5 Phased Execution — 这不是全量重写
+
+本spec描述的是**理想终态**，不是一次性交付计划。执行分三阶段，严格有序：
+
+### Phase 0: 紧急修复（不改结构，改几行代码）
+
+P0问题**不需要重构就能修**，应立即独立完成：
+
+| # | P0 Issue | Fix | 改动量 |
+|---|---------|-----|--------|
+| 1 | InterventionMode None crash | 加 `if port is None` 前置检查 | 1行 |
+| 2 | UrgencyLevel enum mismatch | 修正为 ROUTINE/URGENT/CRITICAL | 2行 |
+| 3 | Memory write chain broken | BrainOrchestrator.execute() 末尾加 `await self._memory_write.store(...)` | 5行 |
+| 4 | Memory search status_filter | 写入时 `promotion_status=VALIDATED`; 默认filter加VALIDATED | 3行 |
+
+### Phase 1: 结构重组（本spec核心）
+
+**只做包结构重组 + DI改造 + 删死代码**，不引入新技术：
+
+- 7-plane包结构重组（brain/→control/, 删deepagents/, modes/, 等）
+- CognitiveDependencies替代dict[str, Any]
+- 删除死代码（commands.py, queries.py, 未使用的DTO）
+- ReAct Engine替换5个Mode类（手写版本，不用LangGraph）
+- CognitiveGateway写端口（手写版本，不用NATS）
+- P1-P2问题修复（EscalationTracker per-case, ValidationPipeline纯计算, etc.）
+
+### Phase 2: 技术引入（按价值/风险排序）
+
+逐个引入，每引入一个都确保全部测试通过后再引入下一个：
+
+| 顺序 | 技术 | 替代什么 | 前置条件 |
+|------|------|---------|---------|
+| 2a | LangGraph | 手写ReActEngine + CheckpointManager | Phase 1 ReAct Engine可工作 |
+| 2b | Instructor | 手写_try_parse() | Phase 1 LLMProvider可工作 |
+| 2c | DSPy Signatures | 手写Prompt | Phase 1 IntentClassifier可工作 |
+| 2d | NATS JetStream | InMemoryEventBus | Phase 1 CognitiveGateway可工作 |
+| 2e | Milvus | pgvector占位 | Phase 1 DualWrite可工作 |
+| 2f | Langfuse | LLMCallTracker | Phase 1 observability可工作 |
+| 2g | Reranker + Hybrid Search | StubKnowledgeAdapter | Phase 1 knowledge ports可工作 |
+| 2h | MLLM Vision | 无多模态 | Phase 1 multimodal.py可工作 |
+
+**每个技术都可以独立回退。** 如果LangGraph在某场景下表现不佳，回退到手写ReAct即可。
+
+### Orchestrator vs ReAct Engine：明确的职责边界
+
+```
+用户输入 "设计Q345R 22mm的检测方案"
+  │
+  ▼
+[ReAct Engine] — 外层交互循环（LangGraph StateGraph，Phase 2引入）
+  │  LLM思考: "用户要设计检测方案，需要查标准和历史案例"
+  │  调用 search_standards("Q345R 22mm")
+  │  观察: 标准要求...
+  │  调用 design_workflow(objective, constraints, context)
+  │     │
+  │     ▼
+  │  [BrainOrchestrator] — 内层决策管线（纯决策逻辑，不是StateGraph）
+  │     persona→knowledge→memory→reasoning→validation→publish
+  │     返回: BrainDecision
+  │     │
+  │  观察: 决策结果...
+  │  LLM思考: "方案已生成，需要向工程师确认"
+  │  调用 request_confirmation("是否采用此方案?")
+  │  ...
+  ▼
+[Response] — 最终回复用户
+```
+
+**关键约束：**
+- ReAct Engine是唯一的外层循环，BrainCore的LLM推理在此发生
+- BrainOrchestrator是design_workflow Tool的内部实现，不是独立执行引擎
+- Orchestrator不接受用户输入，不与LLM直接交互，只做确定性决策管线
+- Orchestrator不需要是StateGraph——它是Tool内部的步骤序列，由ReAct循环驱动
+
+### CognitiveDependencies 拆分：按Plane分组
+
+30+字段的巨型dataclass是设计坏味道。拆分为按Plane分组的小容器，composition root只组装顶层：
+
+```python
+@dataclass
+class CapabilityDeps:
+    llm_provider: LLMProvider
+    instructor: InstructorClient       # Phase 2
+
+@dataclass
+class ControlDeps:
+    orchestrator: BrainOrchestrator
+    supervisor: SupervisorCenter
+    tool_policy: ToolPolicy
+    hooks: list[BeforeToolHook]
+    react_graph: CompiledStateGraph     # Phase 2: LangGraph
+
+@dataclass
+class KnowledgeDeps:
+    rag_query: RAGQueryPort
+    standards_query: StandardsQueryPort
+    case_library: CaseLibraryQueryPort
+    process_knowledge: ProcessKnowledgePort
+
+@dataclass
+class MemoryDeps:
+    search: MemorySearchPort
+    read: MemoryReadPort
+    write: MemoryWritePort
+    block_manager: BlockManager
+    compactor: ContextCompactor
+
+@dataclass
+class GatewayDeps:
+    read: CognitiveGatewayReadPort
+    write: CognitiveGatewayWritePort
+
+@dataclass
+class GovernanceDeps:
+    validation: ValidationPipelinePort
+    review_repo: HumanReviewRequestRepository
+    tool_policy: ToolPolicy             # shared with ControlDeps
+
+@dataclass
+class CognitiveDependencies:
+    """Top-level container. Each plane assembles its own deps internally."""
+    capability: CapabilityDeps
+    control: ControlDeps
+    knowledge: KnowledgeDeps
+    memory: MemoryDeps
+    gateway: GatewayDeps
+    governance: GovernanceDeps
+```
+
+**好处：**
+- 各Plane的deps可独立测试
+- 新技术引入只影响对应Plane的deps（如Instructor只改CapabilityDeps）
+- composition root的组装逻辑更清晰（6步而非30步）
 
 ---
 
@@ -238,54 +374,14 @@ cognitiveplane/
 
 Current code uses `get_llm()`/`init_llm()` global singleton, accessed by 4+ modules via deferred imports. This is a service locator anti-pattern.
 
-### Solution: Typed Dependency Container + Constructor Injection
+### Solution: Per-Plane Dependency Groups + Constructor Injection
+
+Instead of one 30-field dataclass (untestable composition root), dependencies are grouped by Plane. Each Plane receives only its own deps. See Section 0.5 for the full type definitions.
 
 ```python
-@dataclass
-class CognitiveDependencies:
-    """All L1 Cognitive Plane dependencies. Assembled only in composition root."""
-
-    # Capability
-    llm_provider: LLMProvider
-
-    # Control
-    orchestrator: BrainOrchestrator
-    react_engine: ReActEngine
-    supervisor: SupervisorCenter
-    tool_policy: ToolPolicy
-    hooks: list[BeforeToolHook]
-    checkpoint_mgr: CheckpointManager
-
-    # Knowledge
-    rag_query: RAGQueryPort
-    standards_query: StandardsQueryPort
-    case_library: CaseLibraryQueryPort
-    process_knowledge: ProcessKnowledgePort
-
-    # Memory
-    memory_search: MemorySearchPort
-    memory_read: MemoryReadPort
-    memory_write: MemoryWritePort
-    memory_promotion: MemoryPromotionPort
-    memory_confidence: MemoryConfidencePort
-    block_manager: BlockManager          # 🆕 from Letta
-    compactor: ContextCompactor          # 🆕 from Letta
-    dual_write: DualWriteMemoryService   # 🆕 from Letta
-
-    # Gateway (CognitiveGateway — Brain's write port to WeldMap)
-    gateway_read: CognitiveGatewayReadPort
-    gateway_write: CognitiveGatewayWritePort
-
-    # Governance
-    validation_pipeline: ValidationPipelinePort
-    review_repository: HumanReviewRequestRepository
-    tool_policy: ToolPolicy              # 🆕 from Cline
-
-    # Copilot
-    copilot: IndustrialCopilot
-
-    # Interaction
-    context_resolver: ContextResolver
+# Full type definitions in Section 0.5
+# CapabilityDeps, ControlDeps, KnowledgeDeps, MemoryDeps, GatewayDeps, GovernanceDeps
+# → composed into CognitiveDependencies(capability, control, knowledge, memory, gateway, governance)
 ```
 
 ### Before vs After
@@ -297,28 +393,21 @@ class BrainOrchestrator:
         if self._has_port(ports, "RAGQueryPort"):
             rag_port: RAGQueryPort = ports["RAGQueryPort"]
 
-# AFTER: typed constructor injection + hooks + checkpoint
+# AFTER: typed constructor injection — Orchestrator receives only what it needs
 class BrainOrchestrator:
     def __init__(
         self,
-        rag_query: RAGQueryPort,
-        memory_search: MemorySearchPort,
-        memory_write: MemoryWritePort,     # Fix P0-3: Memory write chain
-        reasoning: ReasoningPort,
-        planning: PlanningPort,
-        reflection: ReflectionPort,
-        validation: ValidationPipelinePort,
-        gateway_write: CognitiveGatewayWritePort,
+        knowledge: KnowledgeDeps,    # All knowledge ports
+        memory: MemoryDeps,           # All memory ports
+        governance: GovernanceDeps,   # Validation + policy
+        gateway: GatewayDeps,         # Write port
         decision_repo: BrainDecisionRepository,
         supervisor: SupervisorCenter,
-        hooks: list[BeforeToolHook],       # 🆕 from OpenHands/Cline
-        checkpoint_mgr: CheckpointManager, # 🆕 from Cline
     ):
-        self._rag_query = rag_query
-        self._memory_search = memory_search
-        self._memory_write = memory_write
-        self._hooks = hooks
-        self._checkpoint_mgr = checkpoint_mgr
+        self._knowledge = knowledge
+        self._memory = memory
+        self._governance = governance
+        self._gateway = gateway
         # No more _has_port checks
 ```
 
@@ -335,74 +424,79 @@ def create_app() -> FastAPI:
     return app
 
 def _build_dependencies() -> CognitiveDependencies:
-    # 1. Adapters to L5/L6
+    # 1. Adapters to L5/L6 (shared infrastructure)
     db_engine = create_db_engine(DatabaseConfig.from_env())
     redis = RedisCache(RedisConfig.from_env())
     minio = MinioStorage(MinioConfig.from_env())
     weldmap = WeldMapHTTPClient(WeldMapConfig.from_env())
     setup_tracing(TelemetryConfig.from_env())
 
-    # 2. LLM Capability
-    llm_provider = _bootstrap_llm()
+    # 2. Per-Plane assembly
+    capability = _build_capability()
+    gateway = _build_gateway(weldmap)
+    knowledge = _build_knowledge(db_engine)
+    memory = _build_memory(redis, db_engine)
+    governance = _build_governance(db_engine)
+    control = _build_control(capability, knowledge, memory, governance, gateway)
 
-    # 3. Port Adapters
-    decision_repo = PostgreSQLDecisionRepository(db_engine)
-    memory_repo = HybridMemoryRepository(redis, db_engine)
-    knowledge_rag = PostgreSQLRAGAdapter(db_engine)
-    review_repo = PostgreSQLReviewRepository(db_engine)
-    gateway_read = WeldMapReadGateway(weldmap)
-    gateway_write = WeldMapWriteGateway(weldmap)
+    return CognitiveDependencies(
+        capability=capability,
+        control=control,
+        knowledge=knowledge,
+        memory=memory,
+        gateway=gateway,
+        governance=governance,
+    )
 
-    # 4. Memory (Letta-inspired)
-    block_manager = BlockManager()  # L0/L1 working memory blocks
-    dual_write = DualWriteMemoryService(pg_repo=memory_repo, vector_store=redis)
-    compactor = ContextCompactor(llm_provider=llm_provider)
+def _build_capability() -> CapabilityDeps:
+    return CapabilityDeps(llm_provider=_bootstrap_llm())
 
-    # 5. Governance (Cline-inspired)
-    tool_policy = ToolPolicy()  # Default rules + per-tool overrides
-    validation_pipeline = ValidationPipeline(...)
-    escalation_tracker = EscalationTracker()  # Per-case isolation
+def _build_gateway(weldmap) -> GatewayDeps:
+    return GatewayDeps(
+        read=WeldMapReadGateway(weldmap),
+        write=WeldMapWriteGateway(weldmap),
+    )
 
-    # 6. Control (BrainCore) — Hooks assembled first
-    hooks = [
-        SafetyHook(),                 # Block on safety status
-        PolicyHook(tool_policy),      # Enforce ToolPolicy
-    ]
-    supervisor = SupervisorCenter()
-    checkpoint_mgr = CheckpointManager(memory_write=memory_repo)
+def _build_knowledge(db) -> KnowledgeDeps:
+    return KnowledgeDeps(
+        rag_query=PostgreSQLRAGAdapter(db),
+        standards_query=PostgreSQLStandardsAdapter(db),
+        case_library=PostgreSQLCaseLibraryAdapter(db),
+        process_knowledge=PostgreSQLProcessAdapter(db),
+    )
+
+def _build_memory(redis, db) -> MemoryDeps:
+    memory_repo = HybridMemoryRepository(redis, db)
+    return MemoryDeps(
+        search=memory_repo,
+        read=memory_repo,
+        write=memory_repo,           # Fix P0-3: wire Memory write
+        block_manager=BlockManager(),
+        compactor=ContextCompactor(),
+    )
+
+def _build_governance(db) -> GovernanceDeps:
+    tool_policy = ToolPolicy()
+    return GovernanceDeps(
+        validation=ValidationPipeline(...),
+        review_repo=PostgreSQLReviewRepository(db),
+        tool_policy=tool_policy,
+    )
+
+def _build_control(cap, know, mem, gov, gw) -> ControlDeps:
+    tool_policy = gov.tool_policy
+    hooks = [SafetyHook(), PolicyHook(tool_policy)]
     orchestrator = BrainOrchestrator(
-        rag_query=knowledge_rag,
-        memory_search=memory_repo,
-        memory_write=memory_repo,       # Fix P0-3: wire Memory write
-        reasoning=LLMReasoningPort(llm_provider),
-        planning=LLMPlanningPort(llm_provider),
-        reflection=LLMReflectionPort(llm_provider),
-        validation=validation_pipeline,
-        gateway_write=gateway_write,
-        decision_repo=decision_repo,
-        supervisor=supervisor,
-        hooks=hooks,                    # 🆕 beforeTool hooks
-        checkpoint_mgr=checkpoint_mgr,  # 🆕 checkpoint/rollback
+        knowledge=know, memory=mem, governance=gov, gateway=gw,
+        decision_repo=PostgreSQLDecisionRepository(db_engine),
+        supervisor=SupervisorCenter(),
     )
-
-    # 7. ReAct Engine
-    tool_registry = ToolRegistry(deps)  # Registers 9 + archive_memory = 10 tools
-    react_engine = ReActEngine(
-        llm_provider=llm_provider,
-        tool_registry=tool_registry,
-        state_machine=BrainStateMachine(),
-        supervisor=supervisor,
+    return ControlDeps(
+        orchestrator=orchestrator,
+        supervisor=SupervisorCenter(),
+        tool_policy=tool_policy,
         hooks=hooks,
-        compactor=compactor,
     )
-
-    # 8. Copilot
-    copilot = IndustrialCopilot(...)
-
-    # 9. Interaction
-    context_resolver = ContextResolver()
-
-    return CognitiveDependencies(...)
 ```
 
 ---
@@ -2336,28 +2430,30 @@ cognitiveplane/
         └── events.py        # 🆕 WeldMapEventType enum + domain event models
 ```
 
-### 17.13 Updated CognitiveDependencies
+### 17.13 Updated CognitiveDependencies (Per-Plane Groups)
+
+See Section 0.5 for the base per-plane groups. Phase 2 technology additions extend specific plane groups only:
 
 ```python
-@dataclass
-class CognitiveDependencies:
-    """All L1 Cognitive Plane dependencies. Assembled only in composition root."""
+# Phase 2 additions to existing plane groups (not new top-level deps)
 
-    # Capability
+@dataclass
+class CapabilityDeps:   # Phase 2 additions
     llm_provider: LLMProvider
     instructor: InstructorClient          # 🆕 format validation + retry
-    vision: VisionAdapter                 # 🆕 MLLM vision (thumbnail/full/CV)
+    vision: VisionAdapter                 # 🆕 MLLM vision
 
-    # Control
+@dataclass
+class ControlDeps:      # Phase 2 additions
     orchestrator: BrainOrchestrator
-    react_graph: CompiledStateGraph       # 🆕 LangGraph compiled graph
-    react_checkpointer: PostgresSaver     # 🆕 LangGraph checkpointing
     supervisor: SupervisorCenter
     tool_policy: ToolPolicy
     hooks: list[BeforeToolHook]
-    dspy_signatures: dict[str, dspy.Signature]  # 🆕 DSPy signatures
+    react_graph: CompiledStateGraph       # 🆕 LangGraph
+    dspy_signatures: dict[str, dspy.Signature]  # 🆕 DSPy
 
-    # Knowledge
+@dataclass
+class KnowledgeDeps:    # Phase 2 additions
     rag_query: RAGQueryPort
     standards_query: StandardsQueryPort
     case_library: CaseLibraryQueryPort
@@ -2365,35 +2461,21 @@ class CognitiveDependencies:
     reranker: RerankPort                  # 🆕 BGE-reranker
     hybrid_search: HybridSearchPort       # 🆕 BM25 + dense + RRF
 
-    # Memory
-    memory_search: MemorySearchPort
-    memory_read: MemoryReadPort
-    memory_write: MemoryWritePort
-    memory_promotion: MemoryPromotionPort
-    memory_confidence: MemoryConfidencePort
+@dataclass
+class MemoryDeps:       # Phase 2 additions
+    search: MemorySearchPort
+    read: MemoryReadPort
+    write: MemoryWritePort
     block_manager: BlockManager
     compactor: ContextCompactor
-    dual_write: DualWriteMemoryService
+    dual_write: DualWriteMemoryService    # 🆕 PG+Milvus
     milvus: MilvusKnowledgeAdapter        # 🆕 Milvus vector search
 
-    # Gateway
-    gateway_read: CognitiveGatewayReadPort
-    gateway_write: CognitiveGatewayWritePort
-    nats_publisher: NATSPublisher         # 🆕 NATS JetStream event backbone
-
-    # Governance
-    validation_pipeline: ValidationPipelinePort
-    review_repository: HumanReviewRequestRepository
-    tool_policy: ToolPolicy
-
-    # Copilot
-    copilot: IndustrialCopilot
-
-    # Interaction
-    context_resolver: ContextResolver
-
-    # Observability
-    langfuse: LangfuseClient              # 🆕 LLM observability
+@dataclass
+class GatewayDeps:      # Phase 2 additions
+    read: CognitiveGatewayReadPort
+    write: CognitiveGatewayWritePort
+    nats_publisher: NATSPublisher         # 🆕 NATS JetStream
 ```
 
 ### 17.14 Architecture Doc Alignment — Final Checklist

@@ -1,5 +1,22 @@
 """BrainOrchestrator -- full Brain decision pipeline executor.
 
+DEAD CODE NOTICE (2026-06-22):
+This module is wired into composition root (app.py: BrainOrchestrator())
+but has ZERO callers in the runtime path. Chat traffic goes through
+ReActEngine (control/react.py) + analyze_image tool, NOT through
+BrainOrchestrator.execute().
+
+This is acknowledged historical debt — the orchestrator was built ahead
+of phase 5. It will be activated in phase 5 when the system needs the
+full 12-state pipeline. Until then:
+- Do NOT extend orchestrator logic without confirming phase 5 scope
+- Do NOT assume changes here affect runtime behavior — they don't
+- Tests in test_orchestrator.py verify the orchestrator in isolation,
+  not as part of a live request path
+
+See: docs/superpowers/plans/2026-06-15-capability-loops-redesign.md §5.3
+     scripts/check_phase_discipline.py (warns on import as grandfathered)
+
 Chains: Persona selection -> Reasoning mode -> Knowledge retrieval ->
 Memory search -> Reasoning/Planning -> Decision -> Validation -> Publish.
 

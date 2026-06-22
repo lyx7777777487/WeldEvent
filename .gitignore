@@ -18,3 +18,13 @@ build/
 
 # OS
 Thumbs.db
+
+# Test fixtures — real weld images are test material, not source code.
+# Keep directory structure (.gitkeep) but ignore actual image files.
+cognitiveplane/tests/fixtures/weld_images/**/*.jpg
+cognitiveplane/tests/fixtures/weld_images/**/*.jpeg
+cognitiveplane/tests/fixtures/weld_images/**/*.png
+cognitiveplane/tests/fixtures/weld_images/**/*.tif
+cognitiveplane/tests/fixtures/weld_images/**/*.tiff
+cognitiveplane/tests/fixtures/weld_images/**/*.bmp
+cognitiveplane/tests/fixtures/weld_images/**/*.webp

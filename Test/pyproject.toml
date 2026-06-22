@@ -1,0 +1,20 @@
+[project]
+name = "weldevent-test"
+version = "0.1.0"
+description = "L1 linear agent over IQA annotation MCP — self-contained test"
+requires-python = ">=3.11"
+dependencies = [
+    "temporalio>=1.7",
+    "openai>=1.0",
+    "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

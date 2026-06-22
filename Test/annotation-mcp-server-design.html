@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标注平台服务暴露给 AI Agent — 方案讨论总结</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #1a1a1a;
+    --text-secondary: #666;
+    --border: #e5e5e5;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --warn: #f59e0b;
+    --warn-light: #fffbeb;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --radius: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  h2 { font-size: 20px; margin: 36px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 16px; margin: 24px 0 12px; color: var(--accent); }
+
+  .meta { color: var(--text-secondary); font-size: 13px; margin-bottom: 32px; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+
+  p { margin-bottom: 12px; }
+  ul, ol { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 6px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; font-size: 13px; }
+  td { vertical-align: top; }
+
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; background: #f4f4f5; padding: 2px 6px; border-radius: 4px; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 16px 20px; border-radius: var(--radius); overflow-x: auto; margin: 12px 0; font-size: 13px; line-height: 1.6; }
+
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .badge-yes { background: var(--success-light); color: var(--success); }
+  .badge-no { background: var(--danger-light); color: var(--danger); }
+  .badge-warn { background: var(--warn-light); color: var(--warn); }
+
+  .decision { border-left: 3px solid var(--accent); padding-left: 16px; margin: 16px 0; }
+  .decision .label { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+  .decision .content { margin-top: 4px; }
+
+  .diagram {
+    background: #fafbfc; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; margin: 16px 0; font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 12px; line-height: 1.8; white-space: pre; overflow-x: auto;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>标注平台服务暴露给 AI Agent</h1>
+<p class="meta">讨论时间：2026-06-15 ~ 2026-06-16 &nbsp;|&nbsp; 上下文：标注平台服务如何暴露给 AI Agent 调用</p>
+
+<!-- ============ 1. 背景 ============ -->
+<h2>1. 当前架构</h2>
+
+<div class="card">
+  <table>
+    <tr><th style="width:140px">服务</th><th>端口</th><th>技术栈</th><th>职责</th></tr>
+    <tr><td>nginx</td><td>8079</td><td>nginx</td><td>反向代理 / 静态文件 / auth_request 鉴权关卡</td></tr>
+    <tr><td>auth-server</td><td>8082</td><td>Spring Boot 4.1</td><td>登录 / JWT 签发 / URL 权限验证 / 用户管理</td></tr>
+    <tr><td>annotation-server</td><td>8081</td><td>Spring Boot 4.1</td><td>标注业务：数据集、作业、任务、AI 标注编排、结果存储</td></tr>
+    <tr><td>agent-service</td><td>3001</td><td>Node.js + LangChain</td><td>AI 标注执行：调用火山引擎 Ark API 看图分类</td></tr>
+    <tr><td>Label Studio</td><td>8080</td><td>Python / Django</td><td>人工标注 UI，通过 sub_filter 嵌入 iframe</td></tr>
+    <tr><td>MySQL</td><td>3306</td><td>—</td><td>业务数据 + Label Studio 数据</td></tr>
+    <tr><td>MinIO</td><td>9000</td><td>—</td><td>图片存储</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">鉴权链路</h3>
+  <div class="diagram">
+请求 → nginx (8079)
+         │
+         ├─ /api/auth/* → 直达 auth-server (放行)
+         │
+         └─ /api/* → auth_request /api/auth/verify
+                   │
+                   ├─ 提取 JWT (Cookie/Header)
+                   ├─ 验签 + 查 url_permission 表
+                   ├─ 通过 → 返回 X-User-Id header
+                   └─ 失败 → 401/403
+                   │
+                   ├─ /api/annotation/* → proxy_pass → annotation-server :8081
+                   └─ /api/(users|roles|...) → proxy_pass → auth-server :8082
+  </div>
+  <p style="font-size:13px; color:var(--text-secondary);">RBAC 基于 <code>url_permission</code> 表，用 AntPathMatcher 匹配 URL 模式 + HTTP 方法，关联 permission code。nginx 通过 <code>auth_request</code> 模块实现统一鉴权，后端服务无需感知 Spring Security。</p>
+</div>
+
+<!-- ============ 2. MCP Server 方案设计 ============ -->
+<h2>2. MCP Server 方案设计</h2>
+
+<h3>2.1 要不要做</h3>
+<div class="card">
+  <p><strong>结论：要。</strong></p>
+  <p>将 annotation-server 的核心 API 封装为 MCP Tools，让 DeerFlow 等 AI Agent 能通过自然语言操控标注平台。例如："查一下数据集 123 的标注进度"、"把未完成的任务重新分配"。</p>
+  <p><strong>原则：</strong>不是把整个 annotation-server 搬过去，只挑几个核心 Tool，保持 MCP Server 轻量。只做调用转发，不内嵌业务逻辑。</p>
+</div>
+
+<h3>2.2 走不走 nginx</h3>
+<div class="card">
+  <div class="decision">
+    <div class="label">决策</div>
+    <div class="content">MCP Server <strong>必须走 nginx</strong>，和浏览器客户端完全一致。</div>
+  </div>
+
+  <table>
+    <tr><th>方案</th><th>鉴权方式</th><th>问题</th></tr>
+    <tr>
+      <td style="color:var(--danger)">直接调 8081</td>
+      <td>UserContextFilter 只解码 JWT payload，<strong>不验签</strong></td>
+      <td>任何伪造的 JWT 都能通过，等同于裸奔</td>
+    </tr>
+    <tr>
+      <td style="color:var(--success)">走 nginx 8079</td>
+      <td>完整 auth_request 链路：验签 + url_permission 鉴权</td>
+      <td>无。和浏览器请求走同一套安全机制</td>
+    </tr>
+  </table>
+
+  <div class="decision" style="margin-top:12px;">
+    <div class="label">优点</div>
+    <div class="content">
+      Agent 用户就是一个普通业务账号（如 <code>agent-bot</code>），通过 <code>url_permission</code> 表精确控制它可调用的 API，权限、审计、限流全部复用现有链路。
+    </div>
+  </div>
+</div>
+
+<h3>2.3 传输协议：SSE 还是 Streamable HTTP</h3>
+<div class="card">
+  <div class="decision">
+    <div class="label">决策：Streamable HTTP</div>
+    <div class="content">
+      每次 Tool 调用是独立的 HTTP POST 请求，每次都走完整的 nginx → auth_request → verify 链路。<br>
+      Token 过期 → 401，权限不足 → 403。和浏览器请求一模一样，零额外 nginx 配置。
+    </div>
+  </div>
+
+  <table>
+    <tr><th style="width:140px"></th><th>SSE</th><th>Streamable HTTP</th></tr>
+    <tr>
+      <td>连接模型</td>
+      <td>一条长连接 GET /sse</td>
+      <td>每次调用独立 POST</td>
+    </tr>
+    <tr>
+      <td>auth_request</td>
+      <td><span class="badge badge-no">只建连时触发一次</span></td>
+      <td><span class="badge badge-yes">每次请求都触发</span></td>
+    </tr>
+    <tr>
+      <td>token 过期后</td>
+      <td>连接仍存活，无感知</td>
+      <td>下次请求直接 401</td>
+    </tr>
+    <tr>
+      <td>nginx 配置</td>
+      <td>需额外配 proxy_buffering off + 长超时</td>
+      <td>零改动</td>
+    </tr>
+    <tr>
+      <td>权限变更生效</td>
+      <td>下次重连才生效</td>
+      <td>即时生效</td>
+    </tr>
+  </table>
+</div>
+
+<h3>2.4 暴露哪些 API 为 MCP Tool</h3>
+<div class="card">
+  <p>从 annotation-server 的 16 个端点中选取 8 个核心操作：</p>
+  <table>
+    <tr><th>Tool 名称</th><th>对应 API</th><th>用途</th></tr>
+    <tr><td><code>list_datasets</code></td><td>GET /api/datasets</td><td>分页列出数据集</td></tr>
+    <tr><td><code>get_dataset</code></td><td>GET /api/datasets/{id} + GET /api/datasets/{id}/images</td><td>数据集详情 + 图片列表</td></tr>
+    <tr><td><code>create_job</code></td><td>POST /api/jobs</td><td>创建标注作业</td></tr>
+    <tr><td><code>list_jobs</code></td><td>GET /api/datasets/{id}/jobs</td><td>按数据集列作业</td></tr>
+    <tr><td><code>get_job</code></td><td>GET /api/jobs/{id}</td><td>作业详情 + 进度</td></tr>
+    <tr><td><code>list_tasks</code></td><td>GET /api/jobs/{id}/tasks</td><td>按作业列子任务</td></tr>
+    <tr><td><code>create_task</code></td><td>POST /api/tasks</td><td>创建标注任务</td></tr>
+    <tr><td><code>trigger_ai</code></td><td>POST /api/agent/trigger</td><td>触发 AI 标注</td></tr>
+    <tr><td><code>assign_task</code></td><td>PUT /api/tasks/{taskId}/assign</td><td>分配标注员</td></tr>
+  </table>
+  <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">不包括 Agent 内部调用（start-task、report-progress、manual-annotation），这些是 agent-service 和 annotation-server 之间的内部协议，不应暴露给外部 Agent。</p>
+</div>
+
+<h3>2.5 技术选型</h3>
+<div class="card">
+  <table>
+    <tr><th>项</th><th>选择</th><th>理由</th></tr>
+    <tr><td>语言</td><td>Node.js + TypeScript</td><td>MCP Server 只做 HTTP 转发，不需要 Spring Boot 的笨重；MCP TypeScript SDK 生态成熟，和 agent-service 技术栈统一</td></tr>
+    <tr><td>传输</td><td>Streamable HTTP</td><td>见 2.3 节分析</td></tr>
+    <tr><td>部署位置</td><td>172.16.11.11</td><td>和其他服务同一机器，内网延迟最低</td></tr>
+    <tr><td>认证</td><td>Streamable HTTP 每次请求带 JWT</td><td>Agent 用户用自己身份登录，和浏览器走同一套 auth_request 链路，无需固定 service account</td></tr>
+    <tr><td>扩展性</td><td>无状态，支持多实例</td><td>Streamable HTTP stateless 模式下每个请求独立，MCP Server 不持有会话状态。流量上来时启动多实例，nginx upstream 负载均衡即可</td></tr>
+  </table>
+</div>
+
+<!-- ============ 3. 完整架构图 ============ -->
+<h2>3. 引入 MCP Server 后的架构</h2>
+<div class="diagram">
+                          ┌──────────────────────┐
+                          │   AI Agent (DeerFlow) │
+                          └──────────┬───────────┘
+                                     │ MCP 协议 (Streamable HTTP)
+                                     │ POST /api/mcp 携带 JWT
+                                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  nginx :8079                                                │
+│                                                             │
+│  /api/mcp  → 不做 auth_request → proxy_pass 127.0.0.1:3002  │
+│                                                             │
+│  /api/annotation/* → auth_request /api/auth/verify          │
+│                      ├─ 验签 JWT                            │
+│                      ├─ 查 url_permission 表                 │
+│                      ├─ 通过 → X-User-Id header              │
+│                      └─ 失败 → 401/403                       │
+│                      │                                      │
+│                      → proxy_pass http://127.0.0.1:8081      │
+│  /api/auth/*        → proxy_pass http://127.0.0.1:8082      │
+└─────────────────────────────────────────────────────────────┘
+          │
+          │ /api/mcp → MCP Server
+          │ /api/annotation/* → annotation-server
+          ▼
+┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐
+│  MCP Server :3002    │ │ annotation-server    │ │   auth-server :8082  │
+│  Node.js + TypeScript│ │       :8081          │ │   登录 / JWT / RBAC  │
+│  监听 127.0.0.1      │ │                      │ └──────────────────────┘
+│  无鉴权(信任nginx)    │ │  标注业务             │
+└──────┬───────────────┘ │  ├─ Label Studio     │
+       │                 │  ├─ agent-service    │
+       │ 出站调 annotation│  ├─ MySQL :3306      │
+       │ 通过 nginx 8079  │  └─ MinIO :9000      │
+       └────────────────→└──────────────────────┘
+</div>
+
+<!-- ============ 4. 待澄清问题 ============ -->
+<h2>4. 实施前待澄清</h2>
+
+<div class="card">
+  <p>无。核心决策已在讨论中达成一致。</p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">已确定的决策</h3>
+  <table>
+    <tr><th style="width:200px">问题</th><th>结论</th></tr>
+    <tr><td>MCP Server 是否走 nginx</td><td>是，和浏览器客户端统一走 auth_request 鉴权</td></tr>
+    <tr><td>MCP Server 本身要不要鉴权</td><td>不需要。通过 nginx /api/mcp location 访问（不配 auth_request），监听 127.0.0.1，无状态无密钥</td></tr>
+    <tr><td>鉴权在哪里做</td><td>MCP Server 透传 Agent 的 JWT 到 nginx :8079 /api/annotation/*，在 nginx auth_request 层统一鉴权</td></tr>
+    <tr><td>传输协议</td><td>Streamable HTTP，每次请求独立鉴权</td></tr>
+  </table>
+</div>
+
+<!-- ============ 5. 讨论过程中排除的方案 ============ -->
+<h2>5. 讨论过程中排除的方案</h2>
+
+<div class="card">
+  <table>
+    <tr><th>方案</th><th>结论</th><th>排除原因</th></tr>
+    <tr>
+      <td>直接调 annotation-server 8081</td>
+      <td><span class="badge badge-no">不采用</span></td>
+      <td>UserContextFilter 不验 JWT 签名，安全隐患</td>
+    </tr>
+    <tr>
+      <td>SSE 传输</td>
+      <td><span class="badge badge-no">不采用</span></td>
+      <td>长连接模型与 auth_request 不兼容，token 过期无感知</td>
+    </tr>
+  </table>
+</div>
+
+</div>
+</body>
+</html>

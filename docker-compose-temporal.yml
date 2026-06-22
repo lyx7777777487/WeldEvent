@@ -1,0 +1,50 @@
+# Temporal Server — 一键启动配置
+# 用于 WeldEvent Control Plane 开发测试
+# 访问 Web UI: http://localhost:8233
+
+services:
+  temporal:
+    image: temporalio/auto-setup:1.25.0
+    container_name: weldevent-temporal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_DB=temporal
+      - POSTGRES_SEEDS=postgres
+      # 开发环境禁用 Elasticsearch 和 metrics
+      - ENABLE_Elasticsearch=false
+    ports:
+      - "7233:7233"   # gRPC (Worker 连接用)
+      - "8233:8233"   # Web UI (管理界面)
+    volumes:
+      - temporal-data:/var/lib/temporalio
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "localhost:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: weldevent-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  temporal-data:
+  pgdata:

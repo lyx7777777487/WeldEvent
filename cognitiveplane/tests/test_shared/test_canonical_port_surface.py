@@ -33,13 +33,31 @@ def test_governance_ports_exposes_spec_mandated_abcs():
     from cognitiveplane.governance import ports as governance_ports
 
     for name in (
-        "ValidationPipelinePort",
         "ApprovalServicePort",
         "HumanReviewRequestRepository",
         "ValidationResultRepository",
     ):
         cls = getattr(governance_ports, name, None)
         assert cls is not None, f"governance/ports.py is missing {name}"
+        assert inspect.isclass(cls)
+
+
+def test_shared_ports_exposes_validation_abcs():
+    """B1.1: ValidationPipelinePort canonical home is shared/ports/validation.py,
+    not governance/ports.py. Spec §4 line 546-553 — the pipeline is a Gateway
+    concern (pre-publish gate), not Governance."""
+    from cognitiveplane.shared.ports import validation as validation_ports
+
+    for name in (
+        "ValidationPipelinePort",
+        "SafetyValidatorPort",
+        "RuleValidatorPort",
+        "ShadowValidatorPort",
+        "ConsistencyValidatorPort",
+        "EscalationTrackerPort",
+    ):
+        cls = getattr(validation_ports, name, None)
+        assert cls is not None, f"shared/ports/validation.py is missing {name}"
         assert inspect.isclass(cls)
 
 

@@ -13,11 +13,14 @@ class ToolResult:
     """Result of a tool execution."""
     output: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+    error_type: str | None = None  # "vision_unavailable" | "vision_transient" | "invalid_image" | None
 
     def to_json(self) -> dict[str, Any]:
         result: dict[str, Any] = {"output": self.output}
         if self.error is not None:
             result["error"] = self.error
+        if self.error_type is not None:
+            result["error_type"] = self.error_type
         return result
 
 

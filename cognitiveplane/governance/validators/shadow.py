@@ -82,4 +82,3 @@ class ShadowValidator(ShadowValidatorPort):
 
 
 # Keep stub as alias for backward compat
-StubShadowValidator = ShadowValidator

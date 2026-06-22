@@ -14,8 +14,8 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
-# 自动加载 .env 文件
-_env_file = Path(__file__).parent / ".env"
+# 自动加载 .env 文件 (仓库根目录)
+_env_file = Path(__file__).resolve().parent.parent / ".env"
 if _env_file.exists():
     try:
         from dotenv import load_dotenv
@@ -60,11 +60,11 @@ from cognitiveplane.shared.dto_decision.outputs import Constraint, ParameterSet
 from cognitiveplane.shared.enums import KnowledgeType
 from cognitiveplane.shared.types import KnowledgeId
 from cognitiveplane.governance.escalation import EscalationTracker
-from cognitiveplane.governance.pipeline import ValidationPipeline
-from cognitiveplane.governance.validators.consistency import StubConsistencyValidator
-from cognitiveplane.governance.validators.rule import StubRuleValidator
-from cognitiveplane.governance.validators.safety import StubSafetyValidator
-from cognitiveplane.governance.validators.shadow import StubShadowValidator
+from cognitiveplane.gateway.pipeline import ValidationPipeline
+from cognitiveplane.governance.validators.consistency import ConsistencyValidator
+from cognitiveplane.governance.validators.rule import RuleValidator
+from cognitiveplane.governance.validators.safety import SafetyValidator
+from cognitiveplane.governance.validators.shadow import ShadowValidator
 
 
 # ---------------------------------------------------------------------------
@@ -699,10 +699,10 @@ def _build_dependencies(llm_available: bool) -> "CognitiveDependencies":
 
     # Governance
     validation_pipeline = ValidationPipeline(
-        safety=StubSafetyValidator(),
-        rule=StubRuleValidator(),
-        shadow=StubShadowValidator(),
-        consistency=StubConsistencyValidator(),
+        safety=SafetyValidator(),
+        rule=RuleValidator(),
+        shadow=ShadowValidator(),
+        consistency=ConsistencyValidator(),
         escalation=EscalationTracker(),
     )
     governance_deps = GovernanceDeps(

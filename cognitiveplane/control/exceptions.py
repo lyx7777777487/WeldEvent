@@ -100,6 +100,43 @@ class LLMUnavailableError(Exception):
         super().__init__(f"LLM provider unavailable: {provider}")
 
 
+class VisionUnavailableError(LLMUnavailableError):
+    """Vision model endpoint unavailable — 404/400/invalid endpoint.
+
+    The configured vision endpoint does not exist, is not activated, or
+    is bound to a non-vision model. LLM should degrade to text-only
+    conversation. Not retriable without config change.
+    """
+
+    def __init__(self, detail: str = "", provider: str = "vision") -> None:
+        self.detail = detail
+        super().__init__(provider=provider)
+        self.args = (f"Vision endpoint unavailable: {detail}" if detail else "Vision endpoint unavailable",)
+
+
+class VisionTransientError(Exception):
+    """Vision model transient failure — network/timeout/5xx.
+
+    Retriable. Caller may retry with backoff or fall back to text mode.
+    """
+
+    def __init__(self, detail: str = "") -> None:
+        self.detail = detail
+        super().__init__(f"Vision transient error: {detail}" if detail else "Vision transient error")
+
+
+class InvalidImageError(Exception):
+    """Image format/size rejected by vision model — 400 image-related.
+
+    Not retriable with same input. Caller should request a different image
+    or inform the user.
+    """
+
+    def __init__(self, detail: str = "") -> None:
+        self.detail = detail
+        super().__init__(f"Invalid image: {detail}" if detail else "Invalid image")
+
+
 class CheckpointNotFoundError(Exception):
     """Raised when a checkpoint_id does not exist."""
 

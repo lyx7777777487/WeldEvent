@@ -4,6 +4,9 @@ Canonical Phase 1 surface. Existing governance code currently imports
 from `shared.ports.validation` and `shared.ports.collaboration`; this
 module re-exports the same contracts under their final home so new
 callers can adopt the spec layout without waiting on the legacy delete.
+
+ValidationPipelinePort lives in shared/ports/validation.py — the Pipeline
+implementation moved to gateway/pipeline.py per spec v5.1 §9.
 """
 
 from __future__ import annotations
@@ -17,24 +20,6 @@ from cognitiveplane.shared.ports.validation import (
 )
 
 
-class ValidationPipelinePort(ABC):
-    """Pure-computation validation orchestrator (spec §9 lines 1555-1562).
-
-    Pre-fetched memory and gateway context are passed in; the pipeline
-    must NOT perform side-effectful retrieval.
-    """
-
-    @abstractmethod
-    async def validate(
-        self,
-        decision: Any,
-        context: Any,
-        memory_context: Any | None = None,
-        gateway_context: Any | None = None,
-    ) -> Any:
-        ...
-
-
 class ApprovalServicePort(ABC):
     """Approval routing — synchronous for CRITICAL/URGENT, async for ROUTINE."""
 
@@ -45,6 +30,5 @@ class ApprovalServicePort(ABC):
 __all__ = [
     "ApprovalServicePort",
     "HumanReviewRequestRepository",
-    "ValidationPipelinePort",
     "ValidationResultRepository",
 ]

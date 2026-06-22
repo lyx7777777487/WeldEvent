@@ -97,7 +97,36 @@ class AnalyzeImageTool(BrainTool):
                 "model": getattr(response, "model", "unknown"),
             })
         except Exception as e:
-            return ToolResult(error=f"Image analysis failed: {e}")
+            error_type, message = self._classify_vision_error(e)
+            return ToolResult(error=message, error_type=error_type)
+
+    @staticmethod
+    def _classify_vision_error(exc: Exception) -> tuple[str, str]:
+        """Map vision_complete exceptions to structured error_type.
+
+        Returns (error_type, user_message). error_type values:
+        - "vision_unavailable": 404/401/invalid endpoint — not retriable, degrade to text
+        - "vision_transient": network/timeout/5xx — retriable
+        - "invalid_image": 400 image-related — not retriable with same input
+        - "vision_unknown": unclassified — log + escalate
+        """
+        exc_name = type(exc).__name__
+        exc_msg = str(exc).lower()
+
+        # openai-sdk error class names (works without importing openai directly)
+        if exc_name in ("NotFoundError", "AuthenticationError", "PermissionDeniedError"):
+            return "vision_unavailable", f"Vision endpoint unavailable: {exc}"
+        if exc_name in ("APIConnectionError", "APITimeoutError", "RateLimitError", "InternalServerError"):
+            return "vision_transient", f"Vision transient error: {exc}"
+        if exc_name == "BadRequestError":
+            # BadRequestError covers both invalid image and invalid model config
+            if any(k in exc_msg for k in ("image", "format", "size", "resolution")):
+                return "invalid_image", f"Invalid image: {exc}"
+            return "vision_unavailable", f"Vision endpoint misconfigured: {exc}"
+        # Network errors from underlying http libs
+        if exc_name in ("ConnectError", "TimeoutError", "ConnectionError", "OSError"):
+            return "vision_transient", f"Network error: {exc}"
+        return "vision_unknown", f"Image analysis failed ({exc_name}): {exc}"
 
     @staticmethod
     def _resolve_image_ref(image_data: str) -> str | None:

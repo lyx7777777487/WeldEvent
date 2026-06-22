@@ -46,7 +46,3 @@ class RuleValidator(RuleValidatorPort):
             violated_rules=violated,
             timestamp=datetime.now(timezone.utc),
         )
-
-
-# Keep stub as alias for backward compat
-StubRuleValidator = RuleValidator

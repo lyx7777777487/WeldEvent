@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from cognitiveplane.control.tools import BrainTool, ToolResult
 
 if TYPE_CHECKING:
-    from cognitiveplane.governance.ports import ValidationPipelinePort
+    from cognitiveplane.shared.ports.validation import ValidationPipelinePort
     from cognitiveplane.gateway.ports import CognitiveGatewayWritePort
 
 

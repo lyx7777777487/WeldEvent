@@ -38,11 +38,11 @@ from cognitiveplane.shared.enums import (
 )
 from cognitiveplane.shared.types import CaseId, ValidationId
 from cognitiveplane.governance.escalation import EscalationTracker
-from cognitiveplane.governance.pipeline import ValidationPipeline
-from cognitiveplane.governance.validators.consistency import StubConsistencyValidator
-from cognitiveplane.governance.validators.rule import StubRuleValidator
-from cognitiveplane.governance.validators.safety import StubSafetyValidator
-from cognitiveplane.governance.validators.shadow import StubShadowValidator
+from cognitiveplane.gateway.pipeline import ValidationPipeline
+from cognitiveplane.governance.validators.consistency import ConsistencyValidator
+from cognitiveplane.governance.validators.rule import RuleValidator
+from cognitiveplane.governance.validators.safety import SafetyValidator
+from cognitiveplane.governance.validators.shadow import ShadowValidator
 
 
 # ---------------------------------------------------------------------------
@@ -70,10 +70,10 @@ def _make_context(
 
 def _make_validation_pipeline() -> ValidationPipeline:
     return ValidationPipeline(
-        safety=StubSafetyValidator(),
-        rule=StubRuleValidator(),
-        shadow=StubShadowValidator(),
-        consistency=StubConsistencyValidator(),
+        safety=SafetyValidator(),
+        rule=RuleValidator(),
+        shadow=ShadowValidator(),
+        consistency=ConsistencyValidator(),
         escalation=EscalationTracker(),
     )
 

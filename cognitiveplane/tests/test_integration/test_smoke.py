@@ -17,7 +17,7 @@ from cognitiveplane.knowledge.adapters.stub import StubKnowledgeAdapter
 from cognitiveplane.knowledge.repositories.in_memory import InMemoryKnowledgeRepository
 from cognitiveplane.memory.repositories.in_memory import InMemoryMemoryRepository
 from cognitiveplane.memory.adapters.port_adapters import MemorySearchAdapter
-from cognitiveplane.governance.pipeline import ValidationPipeline
+from cognitiveplane.gateway.pipeline import ValidationPipeline
 from cognitiveplane.governance.escalation import EscalationTracker
 from cognitiveplane.governance.validators.safety import SafetyValidator
 from cognitiveplane.governance.validators.rule import RuleValidator

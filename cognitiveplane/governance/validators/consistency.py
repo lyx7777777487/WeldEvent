@@ -86,4 +86,3 @@ class ConsistencyValidator(ConsistencyValidatorPort):
 
 
 # Keep stub as alias for backward compat
-StubConsistencyValidator = ConsistencyValidator

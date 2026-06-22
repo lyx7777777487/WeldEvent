@@ -54,7 +54,3 @@ class SafetyValidator(SafetyValidatorPort):
             checked_rules=checked_rules,
             timestamp=datetime.now(timezone.utc),
         )
-
-
-# Keep stub as alias for backward compat with existing test fixtures
-StubSafetyValidator = SafetyValidator

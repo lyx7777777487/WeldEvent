@@ -1,9 +1,29 @@
 # CognitivePlane Architecture Redesign — Aligned with WeldEvent 6-Layer System
 
-**Date:** 2026-06-11
-**Status:** Draft v5 (Phased execution + LangGraph/DSPy/Instructor/NATS/Milvus/MLLM/Langfuse)
+**Date:** 2026-06-11 (revised 2026-06-12 — source-verified)
+**Status:** Draft v5.1 (Source-verified external framework references)
 **Scope:** L1 Cognitive Plane internal restructuring per IAOS V4.1 (advice.md)
 **System Context:** WeldEvent 6-Layer Architecture (L1–L6)
+
+### Source Verification Policy
+
+**原则：设计中任何引用外部框架的技术点，必须基于实际源码研究，而不是训练数据印象。**
+
+本 spec 中所有标注 "inspired by" 的外部框架引用均经过源码验证。验证结果以块引用形式标注在相关章节。
+
+验证分类：
+- **verified from source** — 通过实际读取 GitHub 源码文件确认
+- **corrected from source** — 原描述不准确，已根据源码修正
+- **WeldEvent own design** — WeldEvent 自研设计，不归因于外部框架
+- **not yet verified** — Phase 2 引入的技术（LangGraph/DSPy/Instructor/NATS/Milvus），尚未研究源码
+
+已验证的框架：
+- **OpenHands** (`software-agent-sdk` repo, 2026-06-12): EventLog, Event pairing, Agent frozen model, PreToolUse hooks, View projection
+- **Letta** (`letta-ai/letta`, 2026-06-12): Block, BlockHistory, dual-write, compaction, RRF, archival_memory
+- **Cline** (`cline/cline`, 2026-06-12): shadow-git Checkpoint, apply_patch, AutoApprovalSettings, PreToolUse hooks, Plan/Act mode
+
+未验证的框架（Phase 2 引入前需验证）：
+- LangGraph, DSPy, Instructor, NATS JetStream, Milvus, Langfuse
 
 ---
 
@@ -216,8 +236,8 @@ cognitiveplane/
 ├── governance/                   # Governance Plane — 审批/验证/升级
 │   ├── __init__.py
 │   ├── ports.py                  # ValidationPipelinePort, HumanReviewRepository, ApprovalServicePort
-│   ├── approval.py               # ApprovalService (Plan/Approve/Execute from Cline)
-│   ├── tool_policy.py            # 🆕 ToolPolicy (from Cline) — {enabled, autoApprove} per-tool + wildcard
+│   ├── approval.py               # ApprovalService (WeldEvent own design — Cline has binary plan/act only)
+│   ├── tool_policy.py            # 🆕 ToolPolicy (WeldEvent own design — Cline uses category-level booleans)
 │   ├── escalation.py             # EscalationTracker (per-case isolation, persisted)
 │   ├── review.py                 # HumanReview workflow
 │   ├── permissions.py            # RBAC (Phase2: OPA)
@@ -244,10 +264,10 @@ cognitiveplane/
 │   │   ├── request_confirmation.py # 向人工请求确认（Agent→人）
 │   │   ├── escalate.py           # 升级到人工干预
 │   │   ├── explain_decision.py   # 解释决策推理
-│   │   └── archive_memory.py     # 🆕 Agent-controlled memory archival (from Letta)
-│   ├── hooks.py                  # 🆕 beforeTool hooks (from OpenHands/Cline) — skip/stop/modify interception
-│   ├── event_log.py              # 🆕 Append-only EventLog (from OpenHands) — state transitions as events
-│   ├── checkpoint.py             # 🆕 Decision checkpoint/rollback (from Cline) — state snapshots for recovery
+│   │   └── archive_memory.py     # 🆕 Agent-controlled memory archival (inspired by Letta archival_memory_insert)
+│   ├── hooks.py                  # 🆕 beforeTool hooks (inspired by OpenHands/Cline) — ALLOW/DENY only
+│   ├── event_log.py              # 🆕 Append-only EventLog (inspired by OpenHands) — state transitions as events
+│   ├── checkpoint.py             # 🆕 Decision checkpoint/rollback (inspired by Cline shadow-git + OpenHands EventLog)
 │   ├── orchestrator.py           # BrainOrchestrator (typed injection, drives ReAct, stateless per OpenHands pattern)
 │   ├── state_machine.py          # BrainStateMachine (pure function, 7 states)
 │   ├── persona.py                # PersonaSelector (Planner/Copilot/CAA)
@@ -265,7 +285,7 @@ cognitiveplane/
 │   ├── ports.py                  # CognitiveGatewayWritePort, CognitiveGatewayReadPort
 │   ├── write_gateway.py          # Decision/Escalation/Instruction → WeldMap
 │   ├── read_gateway.py           # WeldMap查询（workflow/image/annotation/decision域只读）
-│   ├── events.py                 # 🆕 ActionEvent/ObservationEvent pair (from OpenHands) — gateway I/O as events
+│   ├── events.py                 # 🆕 ActionEvent/ObservationEvent pair (inspired by OpenHands) — dual-ID pairing
 │   └── weldmap_client.py         # WeldMap HTTP/gRPC client adapter
 │
 ├── knowledge/                    # Knowledge Plane — RAG知识检索
@@ -281,11 +301,11 @@ cognitiveplane/
 │   ├── __init__.py
 │   ├── ports.py                  # MemorySearchPort, MemoryReadPort, MemoryWritePort, etc.
 │   ├── hierarchy.py              # L0-L5 level definition + promotion rules
-│   ├── blocks.py                 # 🆕 Block-based working memory (from Letta) — versioned, compiled to prompt
-│   ├── search.py                 # Multi-level search (hybrid: vector + FTS + RRF from Letta)
+│   ├── blocks.py                 # 🆕 Block-based working memory (inspired by Letta Block) — explicit checkpoint, XML compile
+│   ├── search.py                 # Multi-level search (hybrid: vector + FTS + RRF, inspired by Letta)
 │   ├── promotion.py              # Memory promotion (RAW→VALIDATED→PROMOTED)
-│   ├── compaction.py             # 🆕 Context compaction with fallback chain (from Letta) — sliding_window→all→self_compact
-│   ├── dual_write.py             # 🆕 Dual-write persistence (from Letta) — PG + Redis/Milvus sync
+│   ├── compaction.py             # 🆕 Context compaction (inspired by Letta) — expensive→cheap fallback chain
+│   ├── dual_write.py             # 🆕 Conditional dual-write (inspired by Letta) — PG always, vector when available
 │   ├── archive.py
 │   └── confidence.py             # Real confidence scoring (fix P1-14: no more constant 0.5)
 │
@@ -359,19 +379,19 @@ cognitiveplane/
 | Direct port calls between modules | All cross-layer state through WeldMap | Architecture principle: single source of truth |
 | Two separate WeldMapSnapshot DTOs | Unified WeldMapSnapshot in shared/dto/context.py | Fix P1-6: unify the two conflicting DTOs |
 
-### Key Changes from v3 → v4 (Borrowed Patterns)
+### Key Changes from v3 → v4 (Verified Source References)
 
-| v3 Design | v4 Design | Source |
-|-----------|-----------|--------|
-| No beforeTool hooks | `control/hooks.py` with SafetyHook + PolicyHook | OpenHands/Cline |
-| No event tracing | `control/event_log.py` append-only BrainEvent log | OpenHands EventLog |
-| No decision rollback | `control/checkpoint.py` CheckpointManager with apply_patch | Cline checkpoint/rollback |
-| L0/L1 plain dict memory | `memory/blocks.py` Block-based with version history | Letta Block memory |
-| PG-only memory persistence | `memory/dual_write.py` PG + Redis/Milvus dual-write | Letta dual-write |
-| No context compaction | `memory/compaction.py` sliding_window→summary→self_compact | Letta compaction |
-| No tool execution policy | `governance/tool_policy.py` ToolPolicy with per-tool rules | Cline ToolPolicy |
-| No agent archival control | `control/tools/archive_memory.py` agent-controlled promotion | Letta archival |
-| No gateway event tracking | `gateway/events.py` ActionEvent↔ObservationEvent pairs | OpenHands events |
+| v3 Design | v4 Design | Source | Verification |
+|-----------|-----------|--------|-------------|
+| No beforeTool hooks | `control/hooks.py` with SafetyHook + PolicyHook (ALLOW/DENY) | Inspired by OpenHands PreToolUse hooks + Cline PreToolUse hooks | ✅ Verified — both frameworks' hooks are allow/deny only, no MODIFY |
+| No event tracing | `control/event_log.py` append-only BrainEvent log with dual-ID pairing | Inspired by OpenHands EventLog | ✅ Verified — pairing uses tool_call_id + action_id back-pointer, not single correlation_id |
+| No decision rollback | `control/checkpoint.py` CheckpointManager with EventLog replay + apply_patch | Inspired by Cline shadow-git + OpenHands View projection | ✅ Verified — Cline uses shadow-git (filesystem), not in-memory snapshots |
+| L0/L1 plain dict memory | `memory/blocks.py` Block-based with explicit checkpoint history | Inspired by Letta Block memory | ✅ Verified — version is ORM-only, checkpoints are explicit not automatic |
+| PG-only memory persistence | `memory/dual_write.py` conditional PG + Redis/Milvus dual-write | Inspired by Letta conditional dual-write | ✅ Verified — dual-write only when vector_db_provider == TPUF |
+| No context compaction | `memory/compaction.py` with correct fallback chain (expensive→cheap) | Inspired by Letta compact_messages | ✅ Verified — chain direction corrected: self_compact degrades TOWARD all, not the reverse |
+| No tool execution policy | `governance/tool_policy.py` ToolPolicy with per-tool rules | **WeldEvent own design** — Cline uses category-level booleans | ✅ Verified — Cline has no per-tool ToolPolicy class |
+| No agent archival control | `control/tools/archive_memory.py` agent-controlled promotion | Inspired by Letta archival_memory_insert | ✅ Verified — Letta agent must explicitly call, no auto-promotion |
+| No gateway event tracking | `gateway/events.py` ActionEvent↔ObservationEvent pairs with dual IDs | Inspired by OpenHands events | ✅ Verified — dual-ID pairing matches source |
 
 ---
 
@@ -568,15 +588,16 @@ def _build_control(cap, know, mem, gov, gw) -> ControlDeps:
 
 ## 5. Control Plane — BrainCore
 
-### Conversation-as-Runtime (from OpenHands)
+### Conversation-as-Runtime (inspired by OpenHands)
 
-OpenHands核心设计：Agent是冻结的Pydantic model（无mutable state），所有可变状态由Conversation持有。LocalConversation与RemoteConversation共享同一接口，实现本地/远程透明执行。
+> **源码验证 (2026-06-12):** OpenHands SDK (`software-agent-sdk`) 中 Agent 使用 `model_config = ConfigDict(frozen=True)` 实现冻结，可变状态在 `ConversationState` (`conversation/state.py:82`)。LocalConversation 与 RemoteConversation 通过工厂模式切换 (`conversation/conversation.py:32`)。验证状态: ✅
 
-**应用到WeldEvent：** BrainOrchestrator是无状态的——每次请求创建新的DecisionContext，所有中间状态存入EventLog。Session持有per-operator的可变状态。
+OpenHands 核心设计：Agent 是冻结的 Pydantic model（`frozen=True`，无 mutable state），所有可变状态由 ConversationState 持有。LocalConversation 与 RemoteConversation 共享 BaseConversation 接口。
+
+**应用到 WeldEvent：** BrainOrchestrator 是无状态的——每次请求创建新的 DecisionContext，所有中间状态存入 EventLog。Session 持有 per-operator 的可变状态。
 
 ```python
 # [Phase 1] Orchestrator core — stateless, event-driven
-# Orchestrator is stateless — no mutable fields
 class BrainOrchestrator:
     """Stateless decision executor. All mutable state in EventLog/Session."""
 
@@ -590,122 +611,223 @@ class BrainOrchestrator:
         # ... pipeline drives state through event_log.append()
 ```
 
-### Append-Only EventLog (from OpenHands)
+### Append-Only EventLog (inspired by OpenHands EventLog)
 
-OpenHands使用ActionEvent↔ObservationEvent配对，增量View投影。每个Action产生对应Observation，EventLog是append-only的。
+> **源码验证 (2026-06-12):** OpenHands SDK 中 `EventLog` 定义在 `conversation/event_store.py:24`，append-only 通过 cross-process filelock + frozen Pydantic event 模型强制执行。Event 基类 (`event/base.py:21-32`) 字段为 `id: EventID`, `timestamp: str` (ISO 8601), `source: SourceType`，使用 `ConfigDict(extra="forbid", frozen=True)`。Action 与 Observation 配对**不是单一 correlation_id**，而是通过两个 ID：`ActionEvent.tool_call_id` + `ObservationEvent.action_id`（反向指针，`observation.py:35-36`）。View 投影 (`context/view/view.py:143-161`) 逐事件 append + `enforce_properties` 重应用不变式。验证状态: ✅ 结构确认，配对机制修正
 
-**应用到WeldEvent：** Brain每次状态转换、Tool调用、Validation结果都追加为事件。支持完整审计追踪和时间旅行调试。
+OpenHands 使用 ActionEvent↔ObservationEvent 配对，增量 View 投影。每个 Action 产生对应 Observation，EventLog 是 append-only 的。**注意：配对通过两个独立 ID 实现**——ActionEvent 持有 `tool_call_id`，ObservationEvent 通过 `action_id` 反向引用发起的 Action。
+
+**应用到 WeldEvent：** Brain 每次状态转换、Tool 调用、Validation 结果都追加为事件。支持完整审计追踪和时间旅行调试。Action↔Observation 配对使用与 OpenHands 一致的双 ID 模式。
 
 ```python
 # [Phase 1] control/event_log.py
-@dataclass
+class BrainEventType(str, Enum):
+    STATE_TRANSITION = "state_transition"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    VALIDATION = "validation"
+    DECISION = "decision"
+    CHECKPOINT = "checkpoint"
+
+@dataclass(frozen=True)
 class BrainEvent:
+    """Immutable event in the decision pipeline. Frozen to enforce append-only semantics.
+    Modeled after OpenHands Event base (event/base.py:21-32): id + timestamp + source."""
+    event_id: str
     timestamp: datetime
-    event_type: str          # "state_transition" | "tool_call" | "tool_result" | "validation" | "decision"
-    source: str              # module that emitted
-    data: dict               # event payload
-    correlation_id: str      # links Action↔Observation pairs
+    event_type: BrainEventType
+    source: str              # module that emitted (e.g. "orchestrator", "knowledge", "validation")
+    data: dict
+
+@dataclass(frozen=True)
+class ToolCallEvent(BrainEvent):
+    """Action: Brain initiates a tool call. Carries tool_call_id for pairing.
+    Modeled after OpenHands ActionEvent.tool_call_id (action.py:23-66)."""
+    tool_call_id: str
+    tool_name: str
+    arguments: dict
+
+@dataclass(frozen=True)
+class ToolResultEvent(BrainEvent):
+    """Observation: Tool execution result. Pairs back to ToolCallEvent via action_id.
+    Modeled after OpenHands ObservationEvent.action_id (observation.py:35-36)."""
+    action_id: str           # Back-pointer to the ToolCallEvent.event_id
+    tool_call_id: str        # Same tool_call_id as the paired ToolCallEvent
+    success: bool
+    result: dict | None = None
+    error: str | None = None
 
 class EventLog:
-    """Append-only event log for a single decision pipeline run."""
+    """Append-only event log for a single decision pipeline run.
+    Modeled after OpenHands EventLog (conversation/event_store.py:24)."""
 
     def __init__(self, case_id: CaseId):
         self.case_id = case_id
         self._events: list[BrainEvent] = []
 
-    def append(self, event_type: str, source: str, data: dict) -> BrainEvent:
+    def append(self, event: BrainEvent) -> BrainEvent:
+        if any(e.event_id == event.event_id for e in self._events):
+            raise ValueError(f"Event with ID '{event.event_id}' already exists")
+        self._events.append(event)
+        return event
+
+    def emit(self, event_type: BrainEventType, source: str, data: dict) -> BrainEvent:
         event = BrainEvent(
+            event_id=str(uuid4()),
             timestamp=datetime.now(timezone.utc),
             event_type=event_type,
             source=source,
             data=data,
-            correlation_id=str(uuid4()),
         )
-        self._events.append(event)
+        return self.append(event)
+
+    def emit_tool_call(self, source: str, tool_name: str, arguments: dict) -> ToolCallEvent:
+        tool_call_id = str(uuid4())
+        event = ToolCallEvent(
+            event_id=str(uuid4()),
+            timestamp=datetime.now(timezone.utc),
+            event_type=BrainEventType.TOOL_CALL,
+            source=source,
+            data={"tool_name": tool_name},
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            arguments=arguments,
+        )
+        self.append(event)
         return event
 
-    def query(self, event_type: str | None = None, source: str | None = None) -> list[BrainEvent]:
+    def emit_tool_result(self, source: str, action_id: str, tool_call_id: str,
+                         success: bool, result: dict | None = None, error: str | None = None) -> ToolResultEvent:
+        event = ToolResultEvent(
+            event_id=str(uuid4()),
+            timestamp=datetime.now(timezone.utc),
+            event_type=BrainEventType.TOOL_RESULT,
+            source=source,
+            data={"success": success},
+            action_id=action_id,
+            tool_call_id=tool_call_id,
+            success=success,
+            result=result,
+            error=error,
+        )
+        self.append(event)
+        return event
+
+    def query(self, event_type: BrainEventType | None = None,
+              source: str | None = None) -> list[BrainEvent]:
         return [e for e in self._events
                 if (event_type is None or e.event_type == event_type)
                 and (source is None or e.source == source)]
 
+    def find_paired_result(self, tool_call_event: ToolCallEvent) -> ToolResultEvent | None:
+        """Find the Observation paired with a ToolCall, via action_id back-pointer."""
+        for e in self._events:
+            if isinstance(e, ToolResultEvent) and e.action_id == tool_call_event.event_id:
+                return e
+        return None
+
     def project_view(self) -> DecisionPipelineView:
-        """Incremental projection — current state from event stream."""
+        """Incremental projection — current state from event stream.
+        Modeled after OpenHands View.from_events() (context/view/view.py:143-161)."""
         view = DecisionPipelineView()
         for event in self._events:
             view.apply(event)
         return view
 ```
 
-### beforeTool Hooks (from OpenHands/Cline)
+### beforeTool Hooks (inspired by OpenHands PreToolUse hooks + Cline PreToolUse hooks)
 
-OpenHands: SecurityAnalyzer评估风险等级，beforeTool hooks可skip/stop/modify tool输入。Cline: beforeTool hooks在Tool执行前拦截，返回HookResult(approved/skip/stop/modify)。
+> **源码验证 (2026-06-12):**
+> - OpenHands SDK: PreToolUse hooks 定义在 `hooks/types.py:11-19`，`HookDecision = ALLOW | DENY`（无 MODIFY）。被 deny 的 tool call 替换为 `UserRejectObservation`（`event/llm_convertible/observation.py:69-82`），LLM 在下一轮看到拒绝原因。SecurityAnalyzer (`security/analyzer.py:15-55`) 是独立的安全评估轴，输出 `SecurityRisk` 驱动 `ConfirmationPolicy`。验证状态: ✅
+> - Cline: PreToolUse hooks 在 `core/hooks/hook-executor.ts`，返回 `{cancel, contextModification, errorMessage}`。`contextModification` **不修改 tool 参数**，只往会话注入文本。Hook 以外部脚本形式执行（30s timeout，JSON stdin/stdout）。验证状态: ✅
+> - **关键差异：两个框架都不支持"修改 tool 参数后执行"。** 此前 spec 的 `HookAction.MODIFY` 是虚构的。
 
-**应用到WeldEvent：** ValidationPipeline和ToolPolicy在Tool执行前拦截。高风险Tool（adjust_parameter, escalate）需要额外审批；修改类Tool可被hook修改参数。
+**应用到 WeldEvent：** Tool 执行前的拦截分两层——SafetyHook 做安全阻断，PolicyHook 做审批路由。被拦截的 Tool 产生 RejectionObservation 替代 ToolResult，LLM 在下一轮看到拒绝原因并调整策略。
 
 ```python
 # [Phase 1] control/hooks.py
 from enum import Enum
 from dataclasses import dataclass
 
-class HookAction(Enum):
-    CONTINUE = "continue"    # Proceed with original input
-    SKIP = "skip"            # Skip this tool call, return empty result
-    STOP = "stop"            # Stop entire ReAct loop
-    MODIFY = "modify"        # Modify tool arguments before execution
+class HookDecision(Enum):
+    """Hook verdict. Modeled after OpenHands HookDecision (hooks/types.py:36-40).
+    Only ALLOW/DENY — neither OpenHands nor Cline supports argument modification."""
+    ALLOW = "allow"     # Proceed with tool execution
+    DENY = "deny"       # Block tool, produce RejectionObservation instead
 
 @dataclass
 class HookResult:
-    action: HookAction
-    modified_args: dict | None = None  # Only when action=MODIFY
-    reason: str | None = None
+    decision: HookDecision
+    reason: str | None = None  # Denial reason shown to LLM in next turn
 
 class BeforeToolHook(ABC):
     @abstractmethod
     async def before_execute(self, tool_name: str, arguments: dict, context: ContextSnapshot) -> HookResult: ...
 
 class SafetyHook(BeforeToolHook):
-    """Block dangerous operations based on context."""
+    """Block dangerous operations based on safety status.
+    Modeled after OpenHands SecurityAnalyzer pattern (security/analyzer.py)."""
     async def before_execute(self, tool_name, arguments, context):
         if tool_name == "adjust_parameter" and context.safety_status == SafetyStatus.BLOCK:
-            return HookResult(action=HookAction.STOP, reason="Safety BLOCK — parameter changes forbidden")
-        return HookResult(action=HookAction.CONTINUE)
+            return HookResult(decision=HookDecision.DENY, reason="Safety BLOCK — parameter changes forbidden")
+        return HookResult(decision=HookDecision.ALLOW)
 
 class PolicyHook(BeforeToolHook):
-    """Enforce ToolPolicy from governance/tool_policy.py."""
+    """Enforce ToolPolicy. Denied tools produce RejectionObservation (from OpenHands pattern).
+    Modeled after OpenHands ConfirmationPolicy + Cline auto-approval flow."""
     def __init__(self, policy: "ToolPolicy"):
         self._policy = policy
 
     async def before_execute(self, tool_name, arguments, context):
         rule = self._policy.get_rule(tool_name)
         if not rule.enabled:
-            return HookResult(action=HookAction.SKIP, reason=f"Tool {tool_name} disabled by policy")
+            return HookResult(decision=HookDecision.DENY, reason=f"Tool {tool_name} disabled by policy")
         if rule.auto_approve:
-            return HookResult(action=HookAction.CONTINUE)
+            return HookResult(decision=HookDecision.ALLOW)
         # Needs approval — route to ApprovalService
         approval = await self._policy.request_approval(tool_name, arguments, context)
         if not approval.approved:
-            return HookResult(action=HookAction.STOP, reason=approval.reason or "Approval denied")
-        return HookResult(action=HookAction.CONTINUE)
+            return HookResult(decision=HookDecision.DENY, reason=approval.reason or "Approval denied")
+        return HookResult(decision=HookDecision.ALLOW)
 ```
 
-### Checkpoint/Rollback (from Cline)
+### Checkpoint/Rollback (inspired by Cline shadow-git + OpenHands EventLog projection)
 
-Cline的createCheckpoint配置允许在关键操作前保存状态快照，出错时回滚。WeldEvent的Decision pipeline需要在Validation失败或人工拒绝时恢复到安全状态。
+> **源码验证 (2026-06-12):** Cline 的 Checkpoint 实际是 **shadow git** 机制（`integrations/checkpoints/CheckpointTracker.ts`）：创建独立 git 仓库，用 `simple-git` 做 `git init` + `core.worktree` + `commit`，恢复时用 `git reset --hard`。**只恢复 workspace 文件**，对话/决策状态不在此层恢复。不是内存中的快照 dict。Cline 的 `apply_patch` (`core/task/tools/handlers/ApplyPatchHandler.ts`) 使用 npm `diff` 包处理 unified-diff 格式；`replace_in_file` (`core/assistant-message/diff.ts`) 使用 SEARCH/REPLACE DSL + 三级 fuzzy fallback (exact → line-trimmed → block-anchor)。验证状态: ✅ 机制确认
+
+WeldEvent 的决策 pipeline 需要两种回滚能力：
+1. **Decision 状态回滚**——回滚到之前某个决策点，继续推理（基于 EventLog 重放）
+2. **Decision 内容修改**——对已生成的决策做结构化 patch，不需完全重新决策
+
+Cline 的 shadow-git 是面向文件系统的，不直接适用于 WeldEvent 的结构化决策对象。我们借鉴其**概念**（checkpoint 作为可恢复的版本点 + patch 机制），但实现方式不同。
 
 ```python
-# [Phase 1] control/checkpoint.py — Phase 2: replace with LangGraph PostgresSaver
-@dataclass
+# [Phase 1] control/checkpoint.py
+# Phase 2: may replace with LangGraph PostgresSaver if compatible
+
+@dataclass(frozen=True)
 class DecisionCheckpoint:
+    """Immutable snapshot of decision pipeline state at a point in time.
+    Unlike Cline's shadow-git (file-system based), this operates on structured
+    decision objects — WeldEvent doesn't have workspace files to roll back."""
     checkpoint_id: str
     case_id: CaseId
     state: BrainStateType
     decision: BrainDecision | None
-    event_log_snapshot: list[BrainEvent]
+    event_log_length: int     # EventLog length at checkpoint time (for replay)
     created_at: datetime
 
 class CheckpointManager:
-    """Save/restore decision pipeline state for rollback."""
+    """Save/restore decision pipeline state for rollback.
+
+    Design rationale:
+    - Cline uses shadow-git for workspace file rollback — not applicable here
+      because WeldEvent decisions are structured objects, not files
+    - OpenHands uses EventLog + View projection — we borrow this: restore by
+      replaying EventLog up to the checkpoint length
+    - apply_patch inspired by Cline's replace_in_file DSL (exact + fuzzy matching)
+      but adapted for structured decision objects instead of text files
+    """
 
     def __init__(self, memory_write: MemoryWritePort):
         self._memory = memory_write
@@ -719,7 +841,7 @@ class CheckpointManager:
             case_id=case_id,
             state=state,
             decision=decision,
-            event_log_snapshot=list(event_log._events),
+            event_log_length=len(event_log._events),
             created_at=datetime.now(timezone.utc),
         )
         self._checkpoints[cp_id] = checkpoint
@@ -738,21 +860,34 @@ class CheckpointManager:
             raise CheckpointNotFoundError(checkpoint_id)
         return cp
 
+    async def replay_event_log(self, event_log: EventLog, checkpoint: DecisionCheckpoint) -> EventLog:
+        """Replay EventLog up to checkpoint length to reconstruct prior state.
+        Borrowed from OpenHands View.from_events() projection pattern."""
+        truncated = EventLog(case_id=checkpoint.case_id)
+        for event in event_log._events[:checkpoint.event_log_length]:
+            truncated.append(event)
+        return truncated
+
     async def apply_patch(self, checkpoint_id: str, patch: dict) -> BrainDecision:
-        """Apply structured diff to a checkpointed decision (from Cline apply_patch).
-        Enables fine-grained parameter adjustments without full re-decision."""
+        """Apply structured diff to a checkpointed decision.
+        Inspired by Cline's replace_in_file SEARCH/REPLACE DSL
+        (core/assistant-message/diff.ts), but adapted:
+        - Cline patches text files with exact/fuzzy string matching
+        - We patch structured BrainDecision objects with field-level updates
+        - Supports: parameter add/remove/modify, confidence adjustment
+        """
         cp = await self.restore(checkpoint_id)
         if not cp.decision:
             raise ValueError("No decision in checkpoint")
-        # Diff-based modification — only changed fields updated
-        patched = self._apply_diff(cp.decision, patch)
+        patched = self._apply_structured_diff(cp.decision, patch)
         return patched
 
     @staticmethod
-    def _apply_diff(decision: BrainDecision, patch: dict) -> BrainDecision:
-        """Structured diff with fuzz matching (from Cline apply_patch grammar).
-        Only modifies fields present in patch, preserves everything else."""
-        # Implementation: iterate patch keys, apply to decision.outputs
+    def _apply_structured_diff(decision: BrainDecision, patch: dict) -> BrainDecision:
+        """Field-level structured diff on decision object.
+        Only modifies fields present in patch, preserves everything else.
+        Unlike Cline's text-based fuzzy matching, this operates on typed fields."""
+        # Iterate patch keys, apply to decision outputs
         # Supports: parameter add/remove/modify, confidence adjustment
         ...
 ```
@@ -773,8 +908,8 @@ class BrainOrchestrator:
         gateway_write: CognitiveGatewayWritePort,  # Write to WeldMap
         decision_repo: BrainDecisionRepository,
         supervisor: SupervisorCenter,
-        hooks: list[BeforeToolHook],        # 🆕 from OpenHands/Cline
-        checkpoint_mgr: CheckpointManager,  # 🆕 from Cline
+        hooks: list[BeforeToolHook],        # 🆕 inspired by OpenHands PreToolUse hooks
+        checkpoint_mgr: CheckpointManager,  # 🆕 inspired by Cline shadow-git + OpenHands EventLog
     ): ...
 
     async def execute(self, objective, requirements, context) -> OrchestrationResult:
@@ -802,7 +937,7 @@ class BrainOrchestrator:
         event_log.append("memory_searched", "memory", {"count": len(memory)})
         state = self._transition(state, mode.memory_received_trigger, event_log)
 
-        # 5. Checkpoint before reasoning (from Cline)
+        # 5. Checkpoint before reasoning (inspired by Cline checkpoint pattern)
         cp_id = await self._checkpoint_mgr.save(context.case_id, state, None, event_log)
 
         # 6. Reasoning / Planning / Reflection
@@ -891,28 +1026,35 @@ class DecisionFactory:
 
 ## 6. Gateway — CognitiveGateway (L1→WeldMap)
 
-### Action/Observation Event Pairs (from OpenHands) [Phase 1]
+### Action/Observation Event Pairs (inspired by OpenHands) [Phase 1]
 
-OpenHands核心设计：ActionEvent↔ObservationEvent配对。每次Action（如tool call）产生对应Observation（tool result）。EventLog是append-only的，View从事件流增量投影。
+> **源码验证 (2026-06-12):** OpenHands SDK 中 Action↔Observation 配对通过两个独立 ID：`ActionEvent.tool_call_id` + `ObservationEvent.action_id`（反向指针，指向 Action 的 event_id）。此前 spec 用单一 `correlation_id` 是不准确的——已修正为与源码一致的双 ID 模式。验证状态: ✅ 修正
 
-**应用到WeldEvent：** CognitiveGateway的每次write操作是一个ActionEvent，WeldMap返回结果是ObservationEvent。配对关系通过correlation_id链接，支持审计追踪。
+OpenHands 核心设计：ActionEvent↔ObservationEvent 配对。每次 Action（如 tool call）产生对应 Observation（tool result）。配对通过 **两个 ID**：ActionEvent 持有 `tool_call_id`，ObservationEvent 通过 `action_id` 反向引用发起的 Action。
+
+**应用到 WeldEvent：** CognitiveGateway 的每次 write 操作是一个 ActionEvent，WeldMap 返回结果是 ObservationEvent。配对关系使用与 OpenHands 一致的双 ID 模式（action_id 反向指针），支持审计追踪。
 
 ```python
 # [Phase 1] gateway/events.py
-@dataclass
+@dataclass(frozen=True)
 class GatewayActionEvent:
-    """Action: CognitiveGateway initiates a write to WeldMap."""
+    """Action: CognitiveGateway initiates a write to WeldMap.
+    Modeled after OpenHands ActionEvent (event/llm_convertible/action.py:23-66)."""
     action_id: str
+    tool_call_id: str          # Groups related actions for the same tool invocation
     action_type: str           # "publish_decision" | "publish_escalation" | "notify_workflow"
     domain: str                # WeldMap domain: "decision" | "negotiation"
     payload: dict
     timestamp: datetime
 
-@dataclass
+@dataclass(frozen=True)
 class GatewayObservationEvent:
-    """Observation: WeldMap responds to a write action."""
+    """Observation: WeldMap responds to a write action.
+    Modeled after OpenHands ObservationEvent (event/llm_convertible/observation.py:18-37).
+    Pairs back to ActionEvent via action_id back-pointer."""
     observation_id: str
-    action_id: str             # Links back to ActionEvent
+    action_id: str             # Back-pointer to the GatewayActionEvent.action_id
+    tool_call_id: str          # Same tool_call_id as the paired ActionEvent
     success: bool
     domain: str
     result: dict | None
@@ -1070,13 +1212,12 @@ User Input
 class ReActEngine:
     """Core Reasoning + Acting loop for BrainCore.
 
-    Borrowed from DeepAgents/Claude Code/OpenHands pattern:
-    Thought → Action → Observation → Thought → ... → Final Answer
+    Pattern: Thought → Action → Observation → Thought → ... → Final Answer
 
     Enhanced with:
-    - beforeTool hooks (OpenHands/Cline) — skip/stop/modify tool calls
-    - ToolPolicy enforcement (Cline) — auto_approve or require human approval
-    - Context compaction (Letta) — fallback chain when context window fills
+    - beforeTool hooks (inspired by OpenHands/Cline) — ALLOW/DENY tool calls
+    - ToolPolicy enforcement (WeldEvent own design) — auto_approve or require human approval
+    - Context compaction (inspired by Letta) — fallback chain when context window fills
     """
 
     def __init__(
@@ -1120,7 +1261,7 @@ class ReActEngine:
         messages.append({"role": "user", "content": user_input.raw_text})
 
         for i in range(self._max_iterations):
-            # Context compaction check (from Letta)
+            # Context compaction check (inspired by Letta compact_messages)
             messages = await self._compactor.compact(messages, session.event_log)
 
             # LLM reasons and decides action
@@ -1139,16 +1280,15 @@ class ReActEngine:
 
             # Execute each tool call — with hook interception
             for tool_call in response.tool_calls:
-                # beforeTool hooks (from OpenHands/Cline)
+                # beforeTool hooks (inspired by OpenHands PreToolUse + Cline PreToolUse)
+                # Result: ALLOW (proceed) or DENY (substitute RejectionObservation)
                 hook_result = await self._run_hooks(tool_call.name, tool_call.arguments, context)
-                if hook_result.action == HookAction.SKIP:
+                if hook_result.decision == HookDecision.DENY:
+                    # Denied → produce RejectionObservation (from OpenHands UserRejectObservation pattern)
+                    # LLM sees denial reason on next turn and adjusts strategy
                     messages.append({"role": "tool", "tool_call_id": tool_call.id,
-                                     "content": json.dumps({"skipped": True, "reason": hook_result.reason})})
+                                     "content": json.dumps({"rejected": True, "reason": hook_result.reason})})
                     continue
-                if hook_result.action == HookAction.STOP:
-                    return InteractionResponse(text_reply=f"操作已拦截: {hook_result.reason}")
-                if hook_result.action == HookAction.MODIFY:
-                    tool_call.arguments = hook_result.modified_args  # Apply modified args
 
                 result = await self._tools.execute(tool_call.name, tool_call.arguments)
                 messages.append(tool_call.to_message())
@@ -1166,12 +1306,12 @@ class ReActEngine:
 
     async def _run_hooks(self, tool_name: str, arguments: dict,
                          context: ContextSnapshot) -> HookResult:
-        """Run all beforeTool hooks in order. First non-CONTINUE wins."""
+        """Run all beforeTool hooks in order. First DENY wins."""
         for hook in self._hooks:
             result = await hook.before_execute(tool_name, arguments, context)
-            if result.action != HookAction.CONTINUE:
+            if result.decision == HookDecision.DENY:
                 return result
-        return HookResult(action=HookAction.CONTINUE)
+        return HookResult(decision=HookDecision.ALLOW)
 
     async def _run_structured(self, user_input, context, session) -> InteractionResponse:
         """Layer 2: Structured output intent analysis + rule-based routing."""
@@ -1450,17 +1590,26 @@ class EscalationTracker:
         return EscalationAction.CONTINUE
 ```
 
-### ToolPolicy (from Cline) [Phase 1]
+### ToolPolicy (WeldEvent 自研设计，灵感源自 Cline auto-approval + OpenHooks ConfirmationPolicy)
 
-Cline核心设计：ToolPolicy {enabled, autoApprove}支持通配符 `*` + per-tool覆盖。beforeTool hooks在Tool执行前拦截。
+> **源码验证 (2026-06-12):** Cline **没有** per-tool ToolPolicy 类。Cline 使用类别级 `AutoApprovalSettings`（`shared/AutoApprovalSettings.ts`，8 个 boolean: readFiles/editFiles/executeSafeCommands/executeAllCommands/useBrowser/useMcp 及外部变体），外加 bash 的 glob 权限（`core/permissions/CommandPermissionController.ts`，通过 `CLINE_COMMAND_PERMISSIONS` 环境变量）。没有通配符 + per-tool 覆盖结构。验证状态: ✅ 原设计归属修正
+>
+> OpenHands 的 `SecurityAnalyzer` + `ConfirmationPolicy` 提供了安全评估 + 确认路由的模式，但也不是 per-tool 策略表。
+>
+> **WeldEvent 的 ToolPolicy 是自研设计**，结合了：Cline 的类别级 auto-approval 思想 + OpenHands 的 SecurityAnalyzer 确认路由 + 工业场景需要的 per-tool 精细控制。这是合理的工业适配——工业场景的 Tool 风险差异比通用编程场景更大。
 
-**应用到WeldEvent：** 治理层定义哪些Tool需要人工审批，哪些可自动执行。高风险Tool（adjust_parameter, escalate）默认autoApprove=false，查询类Tool默认autoApprove=true。
+WeldEvent 治理层定义哪些 Tool 需要人工审批，哪些可自动执行。高风险 Tool（adjust_parameter, escalate）默认 auto_approve=false，查询类 Tool 默认 auto_approve=true。
 
 ```python
 # [Phase 1] governance/tool_policy.py
+# NOTE: This is WeldEvent's own design, inspired by Cline's category-based
+# auto-approval concept but extended with per-tool granularity needed for
+# industrial safety requirements.
+
 @dataclass
 class ToolRule:
-    """Per-tool execution policy (from Cline ToolPolicy)."""
+    """Per-tool execution policy. WeldEvent own design — Cline uses category-level
+    booleans (AutoApprovalSettings), not per-tool rules with wildcard override."""
     enabled: bool = True
     auto_approve: bool = False
     require_reason: bool = False
@@ -1513,7 +1662,9 @@ class ToolPolicy:
         ...
 ```
 
-### ApprovalService (Cline Plan/Approve/Execute) [Phase 1]
+### ApprovalService (WeldEvent 自研设计) [Phase 1]
+
+> **源码验证 (2026-06-12):** Cline 是 `Mode = "plan" | "act"` 二态切换（`shared/storage/types.ts:14`），没有 "Plan/Approve/Execute" 三阶段模型。ApprovalService 是 WeldEvent 自研，用于处理 ToolPolicy 要求人工审批的场景。验证状态: ✅ 归属修正
 
 ```python
 class ApprovalService:
@@ -1528,50 +1679,87 @@ class ApprovalService:
 
 ## 10. Memory Plane — Industrial Memory L0-L5
 
-### Block-Based Working Memory (from Letta) [Phase 1]
+### Block-Based Working Memory (inspired by Letta Block) [Phase 1]
 
-Letta核心设计：Working memory由多个Block组成，每个Block有label/value/limit/read_only/tags。Block编译为XML注入System Prompt。Block有version history，支持checkpoint/undo/redo和乐观锁。
+> **源码验证 (2026-06-12):** Letta `Block` 定义在 `schemas/block.py:13-90`，Pydantic schema 字段：value, limit, label, read_only, description, metadata, hidden, tags。**`version` 字段不在 Pydantic schema 上**——它只在 ORM 层 (`orm/block.py:53-60`)，通过 SQLAlchemy `version_id_col` 做乐观锁。版本历史通过独立的 `BlockHistory` 表 (`orm/block_history.py:11-47`)，但 **checkpoint 是显式调用** `checkpoint_block_async`，`update_block_async` 不自动 checkpoint。编译为 System Prompt 使用手写 XML via StringIO（`schemas/memory.py:131-188`），不是模板引擎，`prompt_template` 字段已废弃。验证状态: ✅
 
-**应用到WeldEvent：** L0/L1工作内存使用Block模型——每个决策上下文、案例状态、操作员偏好为独立Block。Block版本历史支持决策回滚。标签过滤支持精准检索。
+Letta 核心设计：Working memory 由多个 Block 组成，每个 Block 有 label/value/limit/read_only/tags。Block 编译为 XML 注入 System Prompt（手写 StringIO，非模板引擎）。Block 有 version history（通过独立 BlockHistory 表 + 显式 checkpoint），ORM 层有乐观锁（SQLAlchemy `version_id_col`）。
+
+**应用到 WeldEvent：** L0/L1 工作内存使用 Block 模型——每个决策上下文、案例状态、操作员偏好为独立 Block。Block 版本历史支持决策回滚。标签过滤支持精准检索。
+
+**与 Letta 的关键差异：**
+- Letta 的 `version` 在 ORM 层（SQLAlchemy `version_id_col`），我们 Phase 1 用内存实现，需要在应用层模拟版本追踪
+- Letta 的 checkpoint 是显式调用（不是每次 update 自动保存），我们保持一致——只在关键决策点 checkpoint
+- Letta 的 prompt 编译是手写 StringIO XML，我们采用相同方式（简单可靠，不引入模板依赖）
 
 ```python
 # [Phase 1] memory/blocks.py
+# Phase 2: migrate to ORM with SQLAlchemy version_id_col for optimistic locking
+
 @dataclass
 class MemoryBlock:
-    """A versioned, tagged block of working memory (from Letta)."""
+    """A tagged block of working memory. Inspired by Letta Block (schemas/block.py:13-90).
+    NOTE: Letta's `version` field is ORM-only (version_id_col), not on Pydantic schema.
+    For Phase 1 (in-memory), we track version in application layer for undo/redo."""
     label: str                     # e.g. "case_context", "operator_preference", "active_constraints"
     value: str                     # Block content (compiled into system prompt)
     limit: int                     # Max character length
     read_only: bool = False
+    description: str = ""          # Block purpose description (from Letta)
     tags: list[str] = field(default_factory=list)  # e.g. ["safety", "parameter"]
-    version: int = 0
+    # Phase 1 only: application-layer version tracking
+    # Phase 2: replace with ORM version_id_col
+    _version: int = field(default=0, repr=False)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass
 class BlockVersion:
-    """Snapshot of a block at a point in time — enables undo/redo."""
+    """Snapshot of a block at a point in time — enables undo/redo.
+    Modeled after Letta BlockHistory (orm/block_history.py:11-47).
+    NOTE: In Letta, checkpoint is explicit (you must call checkpoint_block_async),
+    not automatic on every update. We follow the same pattern."""
     version: int
     value: str
     timestamp: datetime
     change_reason: str | None = None
 
 class BlockManager:
-    """Manages working memory blocks with version history."""
+    """Manages working memory blocks with version history.
+    Inspired by Letta BlockManager (services/block_manager.py)."""
 
     def __init__(self):
         self._blocks: dict[str, MemoryBlock] = {}
         self._history: dict[str, list[BlockVersion]] = {}
 
     def compile_to_prompt(self) -> str:
-        """Compile all blocks into XML system prompt (from Letta compilation pattern)."""
-        parts = []
+        """Compile all blocks into XML system prompt.
+        Modeled after Letta _render_memory_blocks_standard (schemas/memory.py:131-188):
+        handwritten XML via string concatenation, not template engine.
+        Letta's prompt_template field is deprecated and ignored."""
+        parts = ["<memory_blocks>"]
         for label, block in sorted(self._blocks.items()):
             escaped = block.value.replace("<", "&lt;").replace(">", "&gt;")
-            parts.append(f"<{label}>\n{escaped}\n</{label}>")
+            desc = block.description.replace("<", "&lt;").replace(">", "&gt;") if block.description else ""
+            parts.append(f"<{label}>")
+            if desc:
+                parts.append(f"<description>{desc}</description>")
+            parts.append(f"<metadata>")
+            if block.read_only:
+                parts.append(f"- read_only=true")
+            parts.append(f"- chars_current={len(block.value)}")
+            parts.append(f"- chars_limit={block.limit}")
+            parts.append(f"</metadata>")
+            parts.append(f"<value>")
+            parts.append(escaped)
+            parts.append(f"</value>")
+            parts.append(f"</{label}>")
+        parts.append("</memory_blocks>")
         return "\n".join(parts)
 
     def update(self, label: str, new_value: str, reason: str | None = None) -> MemoryBlock:
+        """Update block value. Does NOT auto-checkpoint (consistent with Letta).
+        In Letta, update_block_async and checkpoint_block_async are separate calls."""
         block = self._blocks.get(label)
         if not block:
             raise KeyError(f"No block: {label}")
@@ -1580,141 +1768,229 @@ class BlockManager:
         if len(new_value) > block.limit:
             new_value = new_value[:block.limit]
 
-        # Save version history
-        self._history.setdefault(label, []).append(BlockVersion(
-            version=block.version, value=block.value,
-            timestamp=datetime.now(timezone.utc), change_reason=reason,
-        ))
-        block.version += 1
+        block._version += 1
         block.value = new_value
         block.updated_at = datetime.now(timezone.utc)
         return block
 
+    def checkpoint(self, label: str, reason: str | None = None) -> None:
+        """Explicitly checkpoint a block's current state.
+        Modeled after Letta checkpoint_block_async (block_manager.py:842) —
+        checkpoints are explicit, not automatic on every update."""
+        block = self._blocks.get(label)
+        if not block:
+            raise KeyError(f"No block: {label}")
+        self._history.setdefault(label, []).append(BlockVersion(
+            version=block._version,
+            value=block.value,
+            timestamp=datetime.now(timezone.utc),
+            change_reason=reason,
+        ))
+
     def undo(self, label: str) -> MemoryBlock:
-        """Revert block to previous version."""
+        """Revert block to previous checkpointed version.
+        Modeled after Letta undo_checkpoint_block (block_manager.py:952)."""
         history = self._history.get(label, [])
         if not history:
-            raise ValueError(f"No history for block: {label}")
+            raise ValueError(f"No checkpoint history for block: {label}")
         last = history.pop()
         block = self._blocks[label]
         block.value = last.value
-        block.version = last.version
+        block._version = last.version
+        block.updated_at = datetime.now(timezone.utc)
         return block
 
     def query_by_tags(self, tags: list[str]) -> list[MemoryBlock]:
         return [b for b in self._blocks.values() if any(t in b.tags for t in tags)]
 ```
 
-### Dual-Write Persistence (from Letta) [Phase 1 — PG+Redis; Phase 2 — PG+Milvus]
+### Dual-Write Persistence (inspired by Letta conditional dual-write) [Phase 1 — PG+Redis; Phase 2 — PG+Milvus]
 
-Letta：Archival memory使用dual-write——同时写入SQL和Turbopuffer向量DB。Shareable Archives通过junction table实现跨Agent共享。
+> **源码验证 (2026-06-12):** Letta 的 dual-write **是有条件的**（`services/passage_manager.py:606-630`）：仅当 `archive.vector_db_provider == TPUF` 时才双写 Turbopuffer，否则单写 PG (with pgvector)。同一个 passage ID 在两个存储间复用。写入顺序：PG 先写（source of truth），向量存储后写（best-effort）。验证状态: ✅
+>
+> Letta 的 RRF 融合（`helpers/tpuf_client.py:1489-1560`）使用 k=60, vector/fts weights=0.5/0.5，但**仅 Turbopuffer 路径**生效，SQL 回退路径没有 RRF。验证状态: ✅
 
-**应用到WeldEvent：** L2-L5持久内存使用dual-write——同时写入PostgreSQL（结构化查询）和Redis/Milvus（向量检索）。写入链确保双存储一致性。
+Letta：Archival memory 使用**条件性** dual-write——仅当配置了 Turbopuffer 向量 DB 时才双写，否则单写 PG (with pgvector)。PG 是 source of truth，向量存储是 best-effort。
+
+**应用到 WeldEvent：** L2-L5 持久内存使用条件性 dual-write。PG 总是写入，向量存储仅在配置可用时写入。搜索时，如果向量存储不可用，退化为纯 PG 结构化查询。
 
 ```python
 # [Phase 1] memory/dual_write.py — Phase 2: replace redis vector with Milvus
 class DualWriteMemoryService:
-    """Write to both PG (structured) and Redis/Milvus (vector) simultaneously."""
+    """Conditional dual-write: PG (always) + vector store (when available).
+    Modeled after Letta passage_manager.py:606-630 — dual-write is gated by
+    vector_db_provider config, not unconditional."""
 
-    def __init__(self, pg_repo: PostgreSQLMemoryRepository, vector_store: VectorStorePort):
+    def __init__(self, pg_repo: PostgreSQLMemoryRepository, vector_store: VectorStorePort | None = None):
         self._pg = pg_repo
         self._vector = vector_store
 
+    @property
+    def _vector_available(self) -> bool:
+        return self._vector is not None and self._vector.is_available()
+
     async def store(self, record: MemoryRecord) -> None:
-        """Dual-write with best-effort vector sync."""
+        """Write to PG first (source of truth), then vector store (best-effort).
+        Consistent with Letta: PG first, vector second, same IDs across stores."""
         # 1. Write to PG first (source of truth)
         pg_id = await self._pg.save(record)
 
-        # 2. Write to vector store (best-effort, non-blocking)
-        try:
-            if record.feature_vector:
+        # 2. Write to vector store only if available AND record has feature vector
+        if self._vector_available and record.feature_vector:
+            try:
                 await self._vector.upsert(
                     id=pg_id,
                     vector=record.feature_vector,
                     metadata={"case_id": str(record.case_id), "memory_type": record.memory_type.value},
                 )
-        except VectorStoreUnavailableError:
-            # Log but don't fail — PG is source of truth
-            logger.warning("Vector store unavailable, PG write succeeded for %s", pg_id)
+            except VectorStoreUnavailableError:
+                # Log but don't fail — PG is source of truth
+                logger.warning("Vector store unavailable, PG write succeeded for %s", pg_id)
 
     async def search(self, query: MemorySearchQuery) -> list[MemoryRecord]:
-        """Hybrid search: vector similarity + PG structured query, RRF fusion."""
-        results = []
+        """Hybrid search when vector store available; PG-only fallback otherwise.
+        RRF fusion only applies when both vector and PG results exist.
+        Modeled after Letta tpuf_client.py:1489-1560 (k=60, weights=0.5/0.5)
+        but only when Turbopuffer path is active — SQL fallback has no RRF."""
+        if not self._vector_available or not query.feature_vector:
+            # Degraded: PG-only search (no RRF, consistent with Letta SQL fallback)
+            return await self._pg.search(query)
 
-        # Vector search (if available and feature_vector provided)
-        if query.feature_vector and self._vector.is_available():
-            vector_hits = await self._vector.search(
-                vector=query.feature_vector,
-                limit=query.max_results,
-                filter_tags=query.tags,
-            )
-            results.extend(await self._pg.find_by_ids(vector_hits))
+        # Full hybrid: vector + PG + RRF
+        vector_hits = await self._vector.search(
+            vector=query.feature_vector,
+            limit=query.max_results,
+            filter_tags=query.tags,
+        )
+        vector_results = await self._pg.find_by_ids(vector_hits)
+        pg_results = await self._pg.search(query)
 
-        # PG structured search (always)
-        pg_hits = await self._pg.search(query)
-        results.extend(pg_hits)
-
-        # RRF (Reciprocal Rank Fusion) — from Letta recall memory
-        return self._rrf_fuse(results, vector_weight=0.6, pg_weight=0.4)
+        return self._rrf_fuse(vector_results, pg_results, k=60, vector_weight=0.5, pg_weight=0.5)
 
     @staticmethod
-    def _rrf_fuse(results: list, vector_weight: float, pg_weight: float) -> list:
-        """Reciprocal Rank Fusion for combining vector + structured results."""
+    def _rrf_fuse(vector_results: list, pg_results: list,
+                  k: int = 60, vector_weight: float = 0.5, pg_weight: float = 0.5) -> list:
+        """Reciprocal Rank Fusion. Parameters from Letta tpuf_client.py (k=60, Cormack et al. 2009).
+        NOTE: Letta uses equal weights (0.5/0.5), not 0.6/0.4."""
         scores: dict[str, float] = {}
-        for rank, r in enumerate(results):
-            rid = str(r.record_id)
-            scores[rid] = scores.get(rid, 0.0) + vector_weight / (rank + 1)
-        # Deduplicate and sort by fused score
         seen: dict[str, MemoryRecord] = {}
-        for r in results:
+
+        for rank, r in enumerate(vector_results):
             rid = str(r.record_id)
+            scores[rid] = scores.get(rid, 0.0) + vector_weight / (k + rank + 1)
             if rid not in seen:
                 seen[rid] = r
+
+        for rank, r in enumerate(pg_results):
+            rid = str(r.record_id)
+            scores[rid] = scores.get(rid, 0.0) + pg_weight / (k + rank + 1)
+            if rid not in seen:
+                seen[rid] = r
+
         return sorted(seen.values(), key=lambda r: scores.get(str(r.record_id), 0.0), reverse=True)
 ```
 
-### Context Compaction (from Letta) [Phase 1]
+### Context Compaction (inspired by Letta compact_messages) [Phase 1]
 
-Letta：Compaction fallback chain: sliding_window → all → self_compact。当context window接近上限时，按链式降级执行压缩。
+> **源码验证 (2026-06-12):** Letta 的 compaction 模式定义在 `services/summarizer/summarizer_config.py:77-83`：`Literal["all", "sliding_window", "self_compact_all", "self_compact_sliding_window"]`，默认 `"sliding_window"`。实际 fallback 链方向与此前 spec 描述**相反**：
+> - `self_compact_all` → 失败时退化到 `self_compact_sliding_window` → 再退化到 `all`
+> - `self_compact_sliding_window` → 失败时退化到 `all`
+> - `sliding_window` → 失败时退化到 `all`
+> - `all` → 无进一步退化
+>
+> **没有任何路径退化向 self_compact。** 此前 spec 的 "sliding_window → all → self_compact" 链方向是错误的。验证状态: ✅ 修正
 
-**应用到WeldEvent：** ReAct Engine的迭代上下文需要压缩策略——长对话轮次时，老消息被压缩为摘要，保留关键推理链和决策点。
+Letta：Compaction 使用多种策略，退化方向是从复杂策略（self_compact）退化到简单策略（all/sliding_window），不是反过来。
+
+**应用到 WeldEvent：** ReAct Engine 的迭代上下文需要压缩策略。默认使用 `sliding_window`（最便宜），失败时退化到 `all`（全量摘要）。如果配置了 `self_compact`，则先尝试 self_compact，失败时退化到 `all`。
 
 ```python
 # [Phase 1] memory/compaction.py
+# Compaction strategy order based on Letta actual source (compact.py:200-380):
+# self_compact_* degrades TOWARD all/sliding_window, not the reverse.
+
 class CompactionStrategy(Enum):
-    SLIDING_WINDOW = "sliding_window"  # Keep last N messages + summary
-    FULL_SUMMARY = "full_summary"      # Summarize all history
-    SELF_COMPACT = "self_compact"      # LLM self-summarizes its context
+    SLIDING_WINDOW = "sliding_window"          # Keep last N messages (cheapest, no LLM call)
+    FULL_SUMMARY = "full_summary"              # LLM summarizes all history (moderate cost)
+    SELF_COMPACT_SLIDING = "self_compact_sliding"  # LLM compacts + sliding window (expensive)
+    SELF_COMPACT_ALL = "self_compact_all"      # LLM compacts all context (most expensive)
 
 class ContextCompactor:
     """Compacts ReAct conversation context when approaching LLM limits.
-    Fallback chain: sliding_window → full_summary → self_compact (from Letta)."""
+    Fallback chain direction (from Letta compact.py):
+      self_compact_all → self_compact_sliding → full_summary (all)
+      self_compact_sliding → full_summary (all)
+      sliding_window → full_summary (all)
+      full_summary → no further fallback
+    More expensive strategies degrade TOWARD cheaper ones on failure."""
 
-    def __init__(self, llm_provider: LLMProvider, max_tokens: int = 8000):
+    def __init__(self, llm_provider: LLMProvider, max_tokens: int = 8000,
+                 default_strategy: CompactionStrategy = CompactionStrategy.SLIDING_WINDOW):
         self._llm = llm_provider
         self._max_tokens = max_tokens
+        self._default_strategy = default_strategy
 
     async def compact(self, messages: list[dict], event_log: EventLog) -> list[dict]:
-        """Apply compaction fallback chain."""
+        """Apply compaction with fallback chain. Direction: expensive → cheap on failure."""
         estimated = self._estimate_tokens(messages)
         if estimated <= self._max_tokens:
             return messages
 
-        # Try sliding window first (cheapest)
-        result = self._sliding_window(messages)
-        if self._estimate_tokens(result) <= self._max_tokens:
-            return result
+        strategy = self._default_strategy
+        while True:
+            try:
+                if strategy == CompactionStrategy.SLIDING_WINDOW:
+                    result = self._sliding_window(messages)
+                    if self._estimate_tokens(result) <= self._max_tokens:
+                        return result
+                    # sliding_window failed → fall back to full_summary
+                    strategy = CompactionStrategy.FULL_SUMMARY
+                    continue
 
-        # Full summary (moderate cost)
-        result = await self._full_summary(messages, event_log)
-        if self._estimate_tokens(result) <= self._max_tokens:
-            return result
+                elif strategy == CompactionStrategy.FULL_SUMMARY:
+                    result = await self._full_summary(messages, event_log)
+                    if self._estimate_tokens(result) <= self._max_tokens:
+                        return result
+                    # full_summary is the last resort — return whatever we got
+                    return result
 
-        # Self-compact (most expensive — LLM compresses its own context)
-        return await self._self_compact(messages, event_log)
+                elif strategy == CompactionStrategy.SELF_COMPACT_ALL:
+                    result = await self._self_compact_all(messages, event_log)
+                    if self._estimate_tokens(result) <= self._max_tokens:
+                        return result
+                    # self_compact_all failed → fall back to self_compact_sliding
+                    strategy = CompactionStrategy.SELF_COMPACT_SLIDING
+                    continue
+
+                elif strategy == CompactionStrategy.SELF_COMPACT_SLIDING:
+                    result = await self._self_compact_sliding(messages, event_log)
+                    if self._estimate_tokens(result) <= self._max_tokens:
+                        return result
+                    # self_compact_sliding failed → fall back to full_summary
+                    strategy = CompactionStrategy.FULL_SUMMARY
+                    continue
+
+            except ContextWindowExceededError:
+                # LLM call itself failed — degrade to next cheaper strategy
+                strategy = self._next_cheaper(strategy)
+                if strategy is None:
+                    # All strategies exhausted — return sliding_window as best effort
+                    return self._sliding_window(messages)
+                continue
+
+    @staticmethod
+    def _next_cheaper(current: CompactionStrategy) -> CompactionStrategy | None:
+        """Fallback chain from Letta: expensive strategies degrade toward cheap ones."""
+        FALLBACK = {
+            CompactionStrategy.SELF_COMPACT_ALL: CompactionStrategy.SELF_COMPACT_SLIDING,
+            CompactionStrategy.SELF_COMPACT_SLIDING: CompactionStrategy.FULL_SUMMARY,
+            CompactionStrategy.FULL_SUMMARY: None,  # Last resort
+            CompactionStrategy.SLIDING_WINDOW: CompactionStrategy.FULL_SUMMARY,
+        }
+        return FALLBACK.get(current)
 
     def _sliding_window(self, messages: list[dict], keep_recent: int = 6) -> list[dict]:
-        """Keep system prompt + last N messages."""
+        """Keep system prompt + last N messages. Cheapest — no LLM call."""
         system = [m for m in messages if m["role"] == "system"]
         recent = [m for m in messages if m["role"] != "system"][-keep_recent:]
         return system + recent
@@ -1730,10 +2006,9 @@ class ContextCompactor:
         )
         return system + [{"role": "assistant", "content": f"[Previous context summary]: {summary}"}] + recent
 
-    async def _self_compact(self, messages: list[dict], event_log: EventLog) -> list[dict]:
-        """LLM produces a compact version of its own context (most expensive)."""
-        # Extract key events from EventLog for grounding
-        key_events = event_log.query(event_type="decision") + event_log.query(event_type="tool_call")
+    async def _self_compact_all(self, messages: list[dict], event_log: EventLog) -> list[dict]:
+        """LLM produces a compact version of its entire context (most expensive)."""
+        key_events = event_log.query(event_type=BrainEventType.DECISION) + event_log.query(event_type=BrainEventType.TOOL_CALL)
         context_hint = "\n".join(f"- {e.data}" for e in key_events[:10])
 
         compacted = await self._llm.complete(
@@ -1741,18 +2016,35 @@ class ContextCompactor:
         )
         system = [m for m in messages if m["role"] == "system"]
         return system + [{"role": "assistant", "content": f"[Compacted context]: {compacted}"}]
+
+    async def _self_compact_sliding(self, messages: list[dict], event_log: EventLog) -> list[dict]:
+        """LLM compacts older messages, keeps recent messages as-is."""
+        older = [m for m in messages if m["role"] != "system"][:-6]
+        recent = [m for m in messages if m["role"] != "system"][-6:]
+        system = [m for m in messages if m["role"] == "system"]
+
+        key_events = event_log.query(event_type=BrainEventType.TOOL_CALL)
+        context_hint = "\n".join(f"- {e.data}" for e in key_events[:5])
+
+        compacted = await self._llm.complete(
+            prompt=f"Compact the following older conversation context, preserving key decisions:\n{context_hint}\n\nMessages:\n{json.dumps(older)}",
+        )
+        return system + [{"role": "assistant", "content": f"[Compacted older context]: {compacted}"}] + recent
 ```
 
-### Agent-Controlled Archival (from Letta)
+### Agent-Controlled Archival (inspired by Letta archival_memory_insert)
 
-Letta：Agent主动调用archival_memory_insert()将重要信息从working memory移到长期存档。不是自动的——agent决定什么值得保存。
+> **源码验证 (2026-06-12):** Letta 的 `archival_memory_insert` 和 `archival_memory_search` 是 agent 可调用的 tool（`functions/function_sets/base.py:166-247`），但函数体是 `raise NotImplementedError`，实际执行走 tool executor 管道。**没有自动的 working→archival 晋升**——agent 必须自己决定何时调用。验证状态: ✅
 
-**应用到WeldEvent：** BrainCore通过Tool调用控制记忆归档。search_memory Tool在搜索时也触发潜在的记忆提升。agent决定何时将L1 Working Memory提升到L2 Case Memory。
+Letta：Agent 主动调用 `archival_memory_insert()` 将重要信息从 working memory 移到长期存档。不是自动的——agent 决定什么值得保存。
+
+**应用到 WeldEvent：** BrainCore 通过 Tool 调用控制记忆归档。agent 决定何时将 L1 Working Memory 提升到 L2 Case Memory。没有自动晋升。
 
 ```python
 # [Phase 1] control/tools/archive_memory.py
 class ArchiveMemoryTool(BrainTool):
-    """Agent-controlled memory archival (from Letta)."""
+    """Agent-controlled memory archival. Inspired by Letta archival_memory_insert
+    (functions/function_sets/base.py:166-247) — agent decides what to archive."""
     name = "archive_memory"
     description = "将当前工作记忆中的重要信息归档到案例长期记忆。用于保存关键决策、推理链或经验教训。"
 
@@ -1853,10 +2145,10 @@ User Input (text / image / annotation)
   │  │                                                                   │
   │  │  LLM reasons about intent, decides which Tool(s) to call         │
   │  │                                                                   │
-  │  │  ┌── beforeTool Hooks (from OpenHands/Cline) ──────────────┐     │
-  │  │  │  SafetyHook: block if SafetyStatus.BLOCK                │     │
+  │  │  ┌── beforeTool Hooks (inspired by OpenHands/Cline) ──────┐     │
+  │  │  │  SafetyHook: DENY if SafetyStatus.BLOCK                 │     │
   │  │  │  PolicyHook: enforce ToolPolicy (auto_approve or deny)   │     │
-  │  │  │  Result: CONTINUE / SKIP / STOP / MODIFY                 │     │
+  │  │  │  Result: ALLOW / DENY (no MODIFY — verified from source)│     │
   │  │  └──────────────────────────────────────────────────────────┘     │
   │  │                                                                   │
   │  │  ┌── Tool Execution ──────────────────────────────────────┐      │
@@ -2016,34 +2308,34 @@ Same as v1 design (Section 12).
 
 This section maps specific techniques discovered through source code research of 3 frameworks to their concrete implementation in the CognitivePlane redesign.
 
-### OpenHands (Source: github.com/All-Hands-AI/OpenHands)
+### OpenHands (Source: github.com/OpenHands/software-agent-sdk — verified 2026-06-12)
 
-| Source Pattern | How OpenHands Does It | WeldEvent Adaptation | File |
-|---------------|----------------------|---------------------|------|
-| Conversation-as-Runtime | Agent is frozen Pydantic model; Conversation holds all mutable state. LocalConversation/RemoteConversation same interface | BrainOrchestrator is stateless; EventLog holds per-run state; Session holds per-operator state | control/orchestrator.py, interaction/session.py |
-| Event Sourcing | Append-only EventLog; ActionEvent↔ObservationEvent matching; incremental View projection | BrainEvent append-only log per decision pipeline run; GatewayActionEvent↔GatewayObservationEvent pairs; DecisionPipelineView projection | control/event_log.py, gateway/events.py |
-| beforeTool Hooks | SecurityAnalyzer evaluates risk; hooks return skip/stop/modify; ParallelToolExecutor with ResourceLockManager | BeforeToolHook ABC; SafetyHook blocks on SafetyStatus.BLOCK; PolicyHook enforces ToolPolicy; hooks chain with first-non-CONTINUE wins | control/hooks.py |
-| Workspace Isolation | BaseWorkspace → Local/Remote/Docker; dedicated non-root user, port isolation, ulimit | Not directly applicable (WeldEvent agents run in L3 Agent Pool, not L1). Borrow concept for Tool isolation — each Tool execution is sandboxed in its own async context | control/tools/ |
+| Source Pattern | How OpenHands Does It (verified) | WeldEvent Adaptation | File |
+|---------------|--------------------------------|---------------------|------|
+| Conversation-as-Runtime | Agent: `frozen=True` Pydantic model (`agent/base.py:126-138`); mutable state in `ConversationState` (`conversation/state.py:82`); LocalConversation/RemoteConversation factory (`conversation/conversation.py:32`) | BrainOrchestrator is stateless; EventLog holds per-run state; Session holds per-operator state | control/orchestrator.py, interaction/session.py |
+| Event Sourcing | `EventLog` append-only via filelock + frozen events (`conversation/event_store.py:24`); Action↔Observation paired by `tool_call_id` + `action_id` back-pointer (NOT single correlation_id); `View.from_events()` projection (`context/view/view.py:143-161`) | BrainEvent frozen dataclass; ToolCallEvent + ToolResultEvent with dual-ID pairing; EventLog.append with duplicate check; DecisionPipelineView projection | control/event_log.py, gateway/events.py |
+| PreToolUse Hooks | `HookDecision = ALLOW | DENY` only (`hooks/types.py:36-40`); no MODIFY; denied → `UserRejectObservation` (`observation.py:69-82`); SecurityAnalyzer separate axis (`security/analyzer.py:15-55`) | BeforeToolHook ABC with `HookDecision = ALLOW | DENY`; SafetyHook + PolicyHook; denied → RejectionObservation (LLM sees reason next turn) | control/hooks.py |
+| Workspace Isolation | BaseWorkspace → Local/Remote/Docker; dedicated non-root user, port isolation, ulimit | Not directly applicable (WeldEvent agents run in L3 Agent Pool, not L1). Borrow concept for Tool isolation | control/tools/ |
 
-### Letta (Source: github.com/letta-ai/letta)
+### Letta (Source: github.com/letta-ai/letta — verified 2026-06-12)
 
-| Source Pattern | How Letta Does It | WeldEvent Adaptation | File |
-|---------------|-------------------|---------------------|------|
-| Block-based Working Memory | Each Block: label, value, limit, read_only, tags; compiled into XML system prompt; version history with checkpoint/undo/redo | MemoryBlock with label/value/limit/read_only/tags; compile_to_prompt() for XML system prompt injection; BlockManager with version history for undo; tag-based filtering for precision retrieval | memory/blocks.py |
-| Dual-Write Persistence | Archival memory: SQL + Turbopuffer vector DB; best-effort vector sync; shareable Archives via junction table | DualWriteMemoryService: PG (source of truth) + Redis/Milvus (vector); PG write succeeds even if vector fails; vector availability checked before search | memory/dual_write.py |
-| Hybrid Search + RRF | Recall memory: vector + FTS + Reciprocal Rank Fusion; sequence_id ordering | Vector similarity + PG structured query → RRF fusion (vector_weight=0.6, pg_weight=0.4); deduplication by record_id | memory/search.py |
-| Compaction Fallback Chain | sliding_window → all → self_compact; agent-controlled archival via archival_memory_insert() | ContextCompactor: sliding_window (keep 6 recent) → full_summary (LLM summarize) → self_compact (LLM compress); ArchiveMemoryTool for agent-controlled L1→L2 promotion | memory/compaction.py, control/tools/archive_memory.py |
-| Agent-Controlled Archival | Agent explicitly calls archival_memory_insert(); not automatic | ArchiveMemoryTool: Brain decides when working memory content deserves promotion to case memory; tag-based classification for retrieval | control/tools/archive_memory.py |
+| Source Pattern | How Letta Does It (verified) | WeldEvent Adaptation | File |
+|---------------|------------------------------|---------------------|------|
+| Block-based Working Memory | `Block` in Pydantic schema (`schemas/block.py:13-90`): value, limit, label, read_only, tags. `version` on ORM only (`orm/block.py:53-60`, via `version_id_col`). Compilation: handwritten XML via StringIO (`schemas/memory.py:131-188`), `prompt_template` deprecated. Checkpoint is **explicit** (`block_manager.py:842`), not automatic | MemoryBlock with label/value/limit/read_only/tags; `compile_to_prompt()` with Letta-style XML; explicit `checkpoint()` call (not auto on update); undo from checkpoint history | memory/blocks.py |
+| Conditional Dual-Write | Dual-write only when `archive.vector_db_provider == TPUF` (`passage_manager.py:606-630`); PG first (source of truth), Turbopuffer second (best-effort); same IDs across stores | DualWriteMemoryService: PG always, vector when available; `_vector_available` check; PG-only fallback when vector unavailable | memory/dual_write.py |
+| Hybrid Search + RRF | RRF k=60, weights 0.5/0.5 (`tpuf_client.py:1489-1560`); **only Turbopuffer path** — SQL fallback has no RRF | RRF k=60, weights 0.5/0.5 (matching Letta); only when vector store available; PG-only fallback without RRF | memory/search.py |
+| Compaction Fallback Chain | Direction: **expensive → cheap on failure** (`compact.py:200-380`): self_compact_all → self_compact_sliding → all; sliding_window → all; all → no fallback. **NOT** sliding_window → all → self_compact | ContextCompactor: correct fallback chain (self_compact → all → no further); `_next_cheaper()` follows Letta's actual direction | memory/compaction.py |
+| Agent-Controlled Archival | `archival_memory_insert/search` are agent tools (`functions/function_sets/base.py:166-247`) but stub-bodied (`NotImplementedError`); **no automatic** working→archival promotion | ArchiveMemoryTool: Brain decides when to archive; no auto-promotion | control/tools/archive_memory.py |
 
-### Cline (Source: github.com/cline/cline)
+### Cline (Source: github.com/cline/cline — verified 2026-06-12)
 
-| Source Pattern | How Cline Does It | WeldEvent Adaptation | File |
-|---------------|-------------------|---------------------|------|
-| ToolPolicy {enabled, autoApprove} | Wildcard `*` + per-tool override; binary approval with reason | ToolPolicy with DEFAULT_RULES dict; per-tool ToolRule (enabled, auto_approve, require_reason, max_calls_per_session); wildcard fallback | governance/tool_policy.py |
-| beforeTool Hooks | Can skip, stop, or modify input; binary approval: ToolApprovalResult {approved, reason?} | BeforeToolHook ABC with HookAction enum (CONTINUE/SKIP/STOP/MODIFY); PolicyHook enforces ToolPolicy; SafetyHook blocks dangerous operations | control/hooks.py |
-| Checkpoint/Rollback | createCheckpoint config; state snapshots for recovery | CheckpointManager: saves BrainState + Decision + EventLog snapshot; restore() for rollback; persisted to L5 Audit memory | control/checkpoint.py |
-| apply_patch Diff | Structured diff grammar with fuzz matching; fine-grained changes without full replacement | CheckpointManager.apply_patch(): structured diff on decision parameters; only modified fields updated; supports parameter add/remove/modify + confidence adjustment | control/checkpoint.py |
-| Mode Switching | mode-switching system (Plan/Code); restricts available tools per mode | Not adopted directly. WeldEvent uses ReAct unified model instead of mode switching. ToolPolicy achieves similar effect — different policy profiles can restrict available tools per persona | governance/tool_policy.py |
+| Source Pattern | How Cline Does It (verified) | WeldEvent Adaptation | File |
+|---------------|------------------------------|---------------------|------|
+| Auto-approval | **Category-level** `AutoApprovalSettings` (`shared/AutoApprovalSettings.ts`): 8 booleans (readFiles/editFiles/executeSafeCommands etc.), NOT per-tool ToolPolicy. Bash: glob-based `CommandPermissionController`. **No wildcard `*` per-tool override** | ToolPolicy is **WeldEvent own design** — per-tool rules with wildcard fallback, needed for industrial safety granularity. Cline's category concept inspired the auto_approve distinction | governance/tool_policy.py |
+| PreToolUse Hooks | Result: `{cancel, contextModification, errorMessage}` (`core/hooks/hook-executor.ts`); `contextModification` injects text into conversation, does NOT rewrite tool params. External script execution (30s timeout) | BeforeToolHook with `HookDecision = ALLOW | DENY`; no parameter modification (consistent with both Cline and OpenHands) | control/hooks.py |
+| Shadow-git Checkpoint | `CheckpointTracker` (`integrations/checkpoints/`): separate git repo + `simple-git` + `git reset --hard`; **workspace files only**, not conversation state | CheckpointManager: inspired by concept (versioned recovery points), but WeldEvent operates on structured decision objects not files; EventLog replay for state reconstruction; `apply_patch` for structured decision diffs | control/checkpoint.py |
+| apply_patch + replace_in_file | `ApplyPatchHandler.ts` (818 lines): unified-diff via npm `diff` package; `diff.ts` (856 lines): SEARCH/REPLACE DSL + 3-level fuzzy fallback (exact → line-trimmed → block-anchor) | `CheckpointManager.apply_patch()`: inspired by Cline's diff concept but adapted for structured decision objects (field-level patch, not text fuzz matching) | control/checkpoint.py |
+| Mode Switching | Binary toggle: `Mode = "plan" \| "act"` (`shared/storage/types.ts:14`). **No "Approve" phase** | Not adopted. WeldEvent uses ReAct unified model. ToolPolicy achieves tool restriction per persona | governance/tool_policy.py |
 
 ### Borrowing Decisions — What We Did NOT Borrow
 
@@ -2383,7 +2675,7 @@ return {1, new_version}
 |-----------|-----------|---------------------|
 | TodoListMiddleware | `write_todos` tool for task tracking | Borrow for `design_workflow` tool decomposition |
 | SubAgentMiddleware | `task` tool spawns sub-agent graph | Borrow for Sub-Agent delegation in BrainCore |
-| SummarizationMiddleware | Auto-compact when token threshold exceeded | Already implemented as ContextCompactor (from Letta) |
+| SummarizationMiddleware | Auto-compact when token threshold exceeded | Already implemented as ContextCompactor (inspired by Letta, verified) |
 | HumanInTheLoopMiddleware | Pause on specified tool calls | Already implemented as PolicyHook + interrupt (from LangGraph) |
 | FilesystemMiddleware | File operations with permissions | Not applicable — industrial domain uses different tools |
 

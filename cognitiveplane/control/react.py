@@ -78,20 +78,26 @@ class ReActEngine:
 
     async def run(
         self,
-        user_input: str,
+        user_input: str | list[dict],
         context: ContextSnapshot,
         session: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        """Run the ReAct loop with automatic tier selection."""
+        """Run the ReAct loop with automatic tier selection.
+
+        user_input: str (text-only) OR list[dict] (OpenAI multimodal content:
+            [{"type":"text","text":...}, {"type":"image_url","image_url":{"url":...}}]).
+            When the primary LLM doesn't support vision, image_url parts are
+            filtered out at the engine layer (plan §2.3 dual-track + line 3166).
+        """
         self._tools_used = []
         tier = self._select_tier()
 
         if tier == InteractionTier.REACT_FUNCTION_CALLING:
             response = await self._run_react(user_input, context, session or {}, tier)
         elif tier == InteractionTier.STRUCTURED_OUTPUT:
-            response = await self._run_structured(user_input, context, session or {})
+            response = await self._run_structured(self._coerce_text(user_input), context, session or {})
         else:
-            response = await self._run_embedding_rules(user_input, context, session or {})
+            response = await self._run_embedding_rules(self._coerce_text(user_input), context, session or {})
 
         await self._emit("final", {
             "reply": response.text_reply,
@@ -103,7 +109,7 @@ class ReActEngine:
 
     async def _run_react(
         self,
-        user_input: str,
+        user_input: str | list[dict],
         context: ContextSnapshot,
         session: dict[str, Any],
         tier: InteractionTier,
@@ -111,10 +117,10 @@ class ReActEngine:
         """Tier 1: Full ReAct with Function Calling."""
         llm = self._deps.capability.llm_provider
         if llm is None:
-            return await self._run_embedding_rules(user_input, context, session)
+            return await self._run_embedding_rules(self._coerce_text(user_input), context, session)
 
         messages = self._build_system_prompt(context, session)
-        messages.append({"role": "user", "content": user_input})
+        messages.append({"role": "user", "content": self._adapt_user_input(llm, user_input)})
 
         tool_rounds = 0
         for i in range(self._max_iterations):
@@ -240,6 +246,37 @@ class ReActEngine:
             if result.decision == HookDecision.DENY:
                 return result
         return HookResult(decision=HookDecision.ALLOW)
+
+    @staticmethod
+    def _coerce_text(user_input: str | list[dict]) -> str:
+        """Flatten multimodal content to plain text (for tier 2/3 fallback).
+
+        plan §2.3: image_url parts have no text payload; we keep text parts
+        joined by newline. image_id references are already in the text payload
+        (chat.py injects them), so the tool layer still works after degradation.
+        """
+        if isinstance(user_input, str):
+            return user_input
+        parts = [p.get("text", "") for p in user_input if p.get("type") == "text"]
+        return "\n".join(p for p in parts if p)
+
+    def _adapt_user_input(
+        self, llm: Any, user_input: str | list[dict]
+    ) -> str | list[dict]:
+        """Adapt user_input to the LLM's vision capability.
+
+        plan §2.3 dual-track + line 3166: ReActEngine accepts multimodal
+        content. When the primary LLM is text-only (e.g. DeepSeek), image_url
+        parts are filtered out at the engine layer — thumbnails stay in the
+        tool layer via image_id references. When the primary is multimodal,
+        full content is forwarded.
+        """
+        if isinstance(user_input, str):
+            return user_input
+        if getattr(llm, "supports_vision", False):
+            return user_input
+        # Text-only LLM: strip image_url parts, keep text.
+        return self._coerce_text(user_input)
 
     async def _run_structured(
         self,

@@ -23,6 +23,7 @@ from enum import Enum
 from typing import Any
 
 from cognitiveplane.capability.provider import LLMResponse
+from cognitiveplane.interaction.image_store import ImageStore, StoredImage
 
 
 class FileType(str, Enum):
@@ -52,8 +53,10 @@ class ParsedFile:
     file_type: FileType
     mime_type: str
     size_bytes: int
-    # 图片类型: base64 data URL
-    image_data: str | None = None
+    # 图片类型: image_id (ImageStore 引用) — plan §2.3 工具层只传引用
+    image_id: str | None = None
+    # 图片类型: thumbnail data URL (消息层直接给 LLM 看) — plan §A.3
+    thumbnail: str | None = None
     # 文本类型: 提取的文本内容
     text_content: str | None = None
     # 数据类型: 解析后的结构化数据
@@ -67,7 +70,10 @@ class FileProcessResult:
     """文件处理结果。"""
     files: list[ParsedFile] = field(default_factory=list)
     summary: str = ""
-    image_urls: list[str] = field(default_factory=list)
+    # plan §2.3: 图片只暴露 image_id 给工具层引用；thumbnail 通过 ParsedFile.thumbnail 获取
+    image_ids: list[str] = field(default_factory=list)
+    # plan §A.3: thumbnail 列表，消息层注入用
+    thumbnails: list[str] = field(default_factory=list)
     text_context: str = ""
 
 
@@ -129,10 +135,22 @@ class FileHandler:
     支持两种输入:
       - process_uploaded_files: 接收 UploadedFile 对象（multipart 上传，推荐）
       - process_files: 接收 base64 data URL 列表（兼容旧接口）
+
+    图片走 ImageStore (plan §A.3)：
+      - 上传时生成 Thumbnail + 存原图
+      - ParsedFile.image_id 供工具层引用
+      - ParsedFile.thumbnail 供消息层注入
     """
 
-    def __init__(self, llm_provider=None) -> None:
+    def __init__(self, llm_provider=None, image_store: ImageStore | None = None) -> None:
         self._llm = llm_provider
+        # 注意: ImageStore 定义了 __len__，空 store 在布尔上下文是 falsy，
+        # 不能用 `image_store or ImageStore()`，否则会误新建实例
+        self._images = image_store if image_store is not None else ImageStore()
+
+    @property
+    def image_store(self) -> ImageStore:
+        return self._images
 
     async def process_uploaded_files(
         self,
@@ -141,42 +159,41 @@ class FileHandler:
     ) -> FileProcessResult:
         """处理 multipart 上传的文件（推荐方式，无大小限制）。"""
         result = FileProcessResult()
-        all_images: list[str] = []
+        all_image_ids: list[str] = []
+        all_thumbnails: list[str] = []
         all_text_parts: list[str] = []
 
         for uf in uploaded_files:
             try:
                 file_type = _detect_file_type(uf.filename, uf.content_type)
-
-                # 图片: 转 base64 data URL 供多模态模型使用
-                image_data_url = None
-                if file_type == FileType.IMAGE:
-                    b64 = base64.b64encode(uf.data).decode()
-                    image_data_url = f"data:{uf.content_type};base64,{b64}"
-
                 parsed = await self._process_single(
-                    uf.filename, file_type, uf.content_type, uf.data, image_data_url
+                    uf.filename, file_type, uf.content_type or "application/octet-stream", uf.data
                 )
                 result.files.append(parsed)
 
-                if parsed.image_data:
-                    all_images.append(parsed.image_data)
+                if parsed.image_id:
+                    all_image_ids.append(parsed.image_id)
+                    if parsed.thumbnail:
+                        all_thumbnails.append(parsed.thumbnail)
                 if parsed.children:
                     for child in parsed.children:
-                        if child.image_data:
-                            all_images.append(child.image_data)
+                        if child.image_id:
+                            all_image_ids.append(child.image_id)
+                            if child.thumbnail:
+                                all_thumbnails.append(child.thumbnail)
                 if parsed.text_content:
                     all_text_parts.append(f"【{uf.filename}】\n{parsed.text_content}")
 
             except Exception as e:
                 all_text_parts.append(f"【文件处理失败】{uf.filename}: {e}")
 
-        result.image_urls = all_images
+        result.image_ids = all_image_ids
+        result.thumbnails = all_thumbnails
         result.text_context = "\n\n".join(all_text_parts)
 
         parts = []
-        if all_images:
-            parts.append(f"{len(all_images)}张图片")
+        if all_image_ids:
+            parts.append(f"{len(all_image_ids)}张图片")
         text_files = [f for f in result.files if f.text_content]
         if text_files:
             parts.append(f"{len(text_files)}个文档")
@@ -194,7 +211,8 @@ class FileHandler:
     ) -> FileProcessResult:
         """处理上传的文件列表，返回统一结果。"""
         result = FileProcessResult()
-        all_images: list[str] = []
+        all_image_ids: list[str] = []
+        all_thumbnails: list[str] = []
         all_text_parts: list[str] = []
 
         for data_url in file_data_urls:
@@ -203,31 +221,33 @@ class FileHandler:
                 file_type = _detect_file_type(filename, mime_type)
 
                 parsed = await self._process_single(
-                    filename, file_type, mime_type, raw_bytes, data_url
+                    filename, file_type, mime_type, raw_bytes
                 )
                 result.files.append(parsed)
 
-                # 收集图片
-                if parsed.image_data:
-                    all_images.append(parsed.image_data)
+                if parsed.image_id:
+                    all_image_ids.append(parsed.image_id)
+                    if parsed.thumbnail:
+                        all_thumbnails.append(parsed.thumbnail)
                 if parsed.children:
                     for child in parsed.children:
-                        if child.image_data:
-                            all_images.append(child.image_data)
+                        if child.image_id:
+                            all_image_ids.append(child.image_id)
+                            if child.thumbnail:
+                                all_thumbnails.append(child.thumbnail)
 
-                # 收集文本
                 if parsed.text_content:
                     all_text_parts.append(f"【{filename}】\n{parsed.text_content}")
 
             except Exception as e:
                 all_text_parts.append(f"【文件处理失败】{filename}: {e}")
 
-        result.image_urls = all_images
+        result.image_ids = all_image_ids
+        result.thumbnails = all_thumbnails
         result.text_context = "\n\n".join(all_text_parts)
 
-        # 生成摘要
         parts = []
-        images_count = len(all_images)
+        images_count = len(all_image_ids)
         if images_count:
             parts.append(f"{images_count}张图片")
         text_files = [f for f in result.files if f.text_content]
@@ -246,7 +266,6 @@ class FileHandler:
         file_type: FileType,
         mime_type: str,
         raw_bytes: bytes,
-        data_url: str,
     ) -> ParsedFile:
         """处理单个文件。"""
         parsed = ParsedFile(
@@ -257,7 +276,10 @@ class FileHandler:
         )
 
         if file_type == FileType.IMAGE:
-            parsed.image_data = data_url
+            # plan §A.3: 存原图 + 生成 thumbnail
+            stored = self._images.store(raw_bytes, mime_type)
+            parsed.image_id = stored.image_id
+            parsed.thumbnail = stored.thumbnail_data_url
 
         elif file_type == FileType.ZIP:
             parsed.children = self._handle_zip(raw_bytes)
@@ -298,15 +320,15 @@ class FileHandler:
                     ft = _detect_file_type(name, mime)
 
                     if ft == FileType.IMAGE:
-                        b64 = base64.b64encode(entry_bytes).decode()
-                        ext = os.path.splitext(name)[1].lower()
                         mime_guess = mimetypes.guess_type(name)[0] or "image/jpeg"
+                        stored = self._images.store(entry_bytes, mime_guess)
                         children.append(ParsedFile(
                             filename=os.path.basename(name),
                             file_type=ft,
                             mime_type=mime_guess,
                             size_bytes=len(entry_bytes),
-                            image_data=f"data:{mime_guess};base64,{b64}",
+                            image_id=stored.image_id,
+                            thumbnail=stored.thumbnail_data_url,
                         ))
                     elif ft in (FileType.PDF, FileType.DOCX):
                         child = ParsedFile(

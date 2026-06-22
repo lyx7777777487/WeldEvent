@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from cognitiveplane.capability.provider import LLMProvider
     from cognitiveplane.capability.web_search import WebSearchProvider
+    from cognitiveplane.interaction.image_store import ImageStore
     from cognitiveplane.shared.ports.knowledge import (
         RAGQueryPort,
         StandardsQueryPort,
@@ -42,9 +43,11 @@ if TYPE_CHECKING:
 
 @dataclass
 class CapabilityDeps:
-    """L7 Capability plane dependencies — LLM providers + web search."""
+    """L7 Capability plane dependencies — LLM providers + web search + image store."""
     llm_provider: LLMProvider | None = None
     web_search: WebSearchProvider | None = None
+    # Plan §A.3: image store for thumbnail/original layering
+    image_store: ImageStore | None = None
     # Phase 2b: instructor: InstructorClient | None = None
     # Phase 2h: vision: VisionAdapter | None = None
 

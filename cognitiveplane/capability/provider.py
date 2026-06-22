@@ -52,6 +52,19 @@ class LLMProvider(ABC):
     Source: L1-Interaction-Layer-Business-Requirements.md §3.6.2.
     """
 
+    @property
+    def supports_vision(self) -> bool:
+        """Whether the *primary* chat-completions model accepts image_url
+        content parts. False for text-only models like DeepSeek-chat; True
+        for multimodal primaries. Used by ReActEngine to decide whether to
+        forward multimodal content to `complete()` or degrade to text-only.
+
+        Subclasses representing multimodal primaries should override.
+        Vision-Complete (tool-layer) is independent of this flag — see
+        `vision_complete`.
+        """
+        return False
+
     @abstractmethod
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Synchronous completion (chat completions)."""

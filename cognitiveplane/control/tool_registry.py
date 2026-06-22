@@ -40,9 +40,12 @@ class ToolRegistry:
         if deps.knowledge.process_knowledge is not None:
             self.register(SearchProcessTool(deps.knowledge.process_knowledge))
 
-        # Vision tool — multimodal image analysis
+        # Vision tool — multimodal image analysis (plan §2.3: uses image_id, fetches original from ImageStore)
         if deps.capability.llm_provider is not None:
-            self.register(AnalyzeImageTool(deps.capability.llm_provider))
+            self.register(AnalyzeImageTool(
+                deps.capability.llm_provider,
+                deps.capability.image_store,
+            ))
 
         # Gateway tools
         if deps.gateway.read is not None:

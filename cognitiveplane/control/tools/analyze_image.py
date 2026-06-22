@@ -1,17 +1,29 @@
 """AnalyzeImageTool — 焊缝图片质量分析工具。
 
-调用多模态LLM对上传的焊缝图片进行质量评估，
-包括缺陷检测、质量评级和改进建议。
+Plan §2.3 双轨设计:
+  - 消息层: Thumbnail 注入 LLM content (LLM 直接看缩略图)
+  - 工具层: LLM 调 analyze_image(image_id=...) 只传引用
+
+本工具接收 image_id，从 ImageStore 取原图送给 vision_complete。
+原图不进 tool_calls (token 限制)。
+
+Plan §A.3:
+  - ImageStore 分层存储 (thumbnail + original)
+  - 工具内部用原图分析 (高清细节)，消息层用 thumbnail (成本闸门)
 """
 
 from cognitiveplane.control.tools import BrainTool, ToolResult
 
 
 class AnalyzeImageTool(BrainTool):
-    """Analyze weld images using multimodal LLM for quality assessment."""
+    """Analyze weld images using multimodal LLM for quality assessment.
 
-    def __init__(self, llm_provider=None) -> None:
+    接收 image_id (ImageStore 引用)，工具内部取原图送 vision_complete。
+    """
+
+    def __init__(self, llm_provider=None, image_store=None) -> None:
         self._llm = llm_provider
+        self._image_store = image_store
 
     @property
     def name(self) -> str:
@@ -20,11 +32,12 @@ class AnalyzeImageTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Analyze weld seam images for quality assessment. "
+            "Analyze a weld seam image for quality assessment. "
             "Detects defects (porosity, slag inclusion, cracks, undercut, etc.), "
             "evaluates quality grade, and provides improvement suggestions. "
-            "image_data can be a base64 data URL (data:image/...;base64,...) "
-            "or a pending reference (PENDING:session_id:index)."
+            "Pass image_id (UUID from the system prompt image list). "
+            "The tool fetches the high-resolution original internally — "
+            "do NOT pass base64 data URLs."
         )
 
     @property
@@ -32,9 +45,9 @@ class AnalyzeImageTool(BrainTool):
         return {
             "type": "object",
             "properties": {
-                "image_data": {
+                "image_id": {
                     "type": "string",
-                    "description": "Image to analyze. Can be a base64 data URL (data:image/...;base64,...) or a pending reference (PENDING:session_id:index)",
+                    "description": "Image ID (UUID) from the system-provided image list. The tool fetches the original from the image store.",
                 },
                 "question": {
                     "type": "string",
@@ -49,27 +62,32 @@ class AnalyzeImageTool(BrainTool):
                     "description": "Plate thickness in mm if known",
                 },
             },
-            "required": ["image_data"],
+            "required": ["image_id"],
         }
 
     async def execute(self, **kwargs) -> ToolResult:
-        image_data = kwargs.get("image_data", "")
+        image_id = kwargs.get("image_id", "")
         question = kwargs.get("question", "请对这张焊缝图片进行全面质量评估")
         material = kwargs.get("material", "")
         thickness = kwargs.get("thickness_mm", "")
 
-        if not image_data:
-            return ToolResult(error="No image data provided")
-
-        # Resolve PENDING:session_id:index references
-        resolved_data = self._resolve_image_ref(image_data)
-        if resolved_data is None:
-            return ToolResult(error=f"Image reference not found: {image_data}")
+        if not image_id:
+            return ToolResult(error="No image_id provided")
 
         if self._llm is None or not hasattr(self._llm, "vision_complete"):
             return ToolResult(error="Multimodal model not available")
 
-        # Build analysis prompt
+        if self._image_store is None:
+            return ToolResult(error="ImageStore not available — cannot resolve image_id")
+
+        # plan §2.3: 工具层从 ImageStore 取原图 (不进 tool_calls)
+        original_data_url = self._image_store.get_original_data_url(image_id)
+        if original_data_url is None:
+            return ToolResult(
+                error=f"image_id not found in ImageStore: {image_id}",
+                error_type="invalid_image",
+            )
+
         prompt_parts = [
             "你是焊接质检专家，请对以下焊缝图片进行质量分析：\n",
             f"用户问题：{question}\n",
@@ -90,11 +108,12 @@ class AnalyzeImageTool(BrainTool):
         try:
             response = await self._llm.vision_complete(
                 text="".join(prompt_parts),
-                images=[resolved_data],
+                images=[original_data_url],
             )
             return ToolResult(output={
                 "analysis": response.content,
                 "model": getattr(response, "model", "unknown"),
+                "image_id": image_id,
             })
         except Exception as e:
             error_type, message = self._classify_vision_error(e)
@@ -113,44 +132,14 @@ class AnalyzeImageTool(BrainTool):
         exc_name = type(exc).__name__
         exc_msg = str(exc).lower()
 
-        # openai-sdk error class names (works without importing openai directly)
         if exc_name in ("NotFoundError", "AuthenticationError", "PermissionDeniedError"):
             return "vision_unavailable", f"Vision endpoint unavailable: {exc}"
         if exc_name in ("APIConnectionError", "APITimeoutError", "RateLimitError", "InternalServerError"):
             return "vision_transient", f"Vision transient error: {exc}"
         if exc_name == "BadRequestError":
-            # BadRequestError covers both invalid image and invalid model config
             if any(k in exc_msg for k in ("image", "format", "size", "resolution")):
                 return "invalid_image", f"Invalid image: {exc}"
             return "vision_unavailable", f"Vision endpoint misconfigured: {exc}"
-        # Network errors from underlying http libs
         if exc_name in ("ConnectError", "TimeoutError", "ConnectionError", "OSError"):
             return "vision_transient", f"Network error: {exc}"
         return "vision_unknown", f"Image analysis failed ({exc_name}): {exc}"
-
-    @staticmethod
-    def _resolve_image_ref(image_data: str) -> str | None:
-        """Resolve PENDING:session_id:index reference to actual data URL.
-
-        Format: PENDING:<session_id>:<index>
-        Returns the actual base64 data URL from the pending images cache.
-        """
-        if not image_data.startswith("PENDING:"):
-            return image_data  # Already a data URL
-
-        parts = image_data.split(":")
-        if len(parts) != 3:
-            return None
-
-        _, session_id, index_str = parts
-        try:
-            index = int(index_str)
-        except ValueError:
-            return None
-
-        # Import the pending images cache from chat module
-        from cognitiveplane.interaction.api.chat import _pending_images
-        images = _pending_images.get(session_id, [])
-        if 0 <= index < len(images):
-            return images[index]
-        return None

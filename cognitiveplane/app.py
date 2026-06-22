@@ -718,9 +718,11 @@ def _build_dependencies(llm_available: bool) -> "CognitiveDependencies":
     )
 
     # Capability
+    from cognitiveplane.interaction.image_store import ImageStore
     capability_deps = CapabilityDeps(
         llm_provider=get_llm() if llm_available else None,
         web_search=AutoWebSearchProvider(),
+        image_store=ImageStore(),  # plan §A.3: app 级共享 ImageStore
     )
 
     return CognitiveDependencies(

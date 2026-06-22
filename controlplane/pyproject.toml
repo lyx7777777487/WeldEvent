@@ -1,0 +1,36 @@
+[project]
+name = "industrial-agent-controlplane"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "temporalio>=1.27.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+# NOTE: This configuration is for running inside the Temporal repo.
+# After migrating to a standalone project, replace the [tool.setuptools]
+# and [tool.setuptools.packages.find] sections with:
+#
+#   [tool.setuptools.packages.find]
+#   include = ["controlplane*"]
+#
+#[tool.setuptools]
+#package-dir = {"" = "."}
+#
+#[tool.setuptools.packages.find]
+#where = [".."]
+#include = ["controlplane*"]
+
+[tool.setuptools.packages.find]
+include = ["controlplane*"]
+
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

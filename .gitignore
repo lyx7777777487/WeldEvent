@@ -6,3 +6,15 @@ __pycache__/
 dist/
 build/
 .venv/
+.env
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db

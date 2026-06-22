@@ -146,6 +146,12 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     @router.websocket("/ws")
     async def websocket_chat(websocket: WebSocket) -> None:
         await websocket.accept()
+
+        async def stream_event(event_type: str, payload: dict) -> None:
+            await websocket.send_json({"type": event_type, **payload})
+
+        ws_engine = ReActEngine(deps, hooks=hooks, event_callback=stream_event)
+
         try:
             while True:
                 data = await websocket.receive_json()
@@ -165,7 +171,7 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
                     timestamp=datetime.now(timezone.utc),
                 )
 
-                response = await engine.run(
+                response = await ws_engine.run(
                     user_input=request.message,
                     context=context,
                     session={"session_id": str(session.session_id.value)},

@@ -10,13 +10,15 @@ Tier 3: Semantic embedding + rule engine (no LLM)
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.hooks import BeforeToolHook, HookDecision, HookResult
 from cognitiveplane.control.tool_registry import ToolRegistry
 from cognitiveplane.control.tools import ToolResult
 from cognitiveplane.shared.dto_context import ContextSnapshot
+
+EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
 class InteractionTier(Enum):
@@ -49,12 +51,24 @@ class ReActEngine:
         tool_registry: ToolRegistry | None = None,
         hooks: list[BeforeToolHook] | None = None,
         max_iterations: int = 6,
+        event_callback: EventCallback | None = None,
     ) -> None:
         self._deps = deps
         self._tools = tool_registry or ToolRegistry(deps)
         self._hooks = hooks or []
         self._max_iterations = max_iterations
         self._tools_used: list[str] = []
+        self._event_callback = event_callback
+
+    async def _emit(self, event_type: str, payload: dict[str, Any]) -> None:
+        """Fire event callback if registered. Swallow callback errors —
+        streaming must never break the core ReAct loop."""
+        if self._event_callback is None:
+            return
+        try:
+            await self._event_callback(event_type, payload)
+        except Exception:
+            pass
 
     def _select_tier(self) -> InteractionTier:
         """Choose interaction tier based on LLM availability."""
@@ -73,11 +87,19 @@ class ReActEngine:
         tier = self._select_tier()
 
         if tier == InteractionTier.REACT_FUNCTION_CALLING:
-            return await self._run_react(user_input, context, session or {}, tier)
+            response = await self._run_react(user_input, context, session or {}, tier)
         elif tier == InteractionTier.STRUCTURED_OUTPUT:
-            return await self._run_structured(user_input, context, session or {})
+            response = await self._run_structured(user_input, context, session or {})
         else:
-            return await self._run_embedding_rules(user_input, context, session or {})
+            response = await self._run_embedding_rules(user_input, context, session or {})
+
+        await self._emit("final", {
+            "reply": response.text_reply,
+            "tools_used": response.tools_used,
+            "tier": response.tier_used.value,
+            "error": response.error,
+        })
+        return response
 
     async def _run_react(
         self,
@@ -96,6 +118,10 @@ class ReActEngine:
 
         tool_rounds = 0
         for i in range(self._max_iterations):
+            await self._emit("thinking", {
+                "iteration": i + 1,
+                "tools_so_far": list(self._tools_used),
+            })
             try:
                 response = await llm.complete(
                     self._make_llm_request(messages)
@@ -131,6 +157,12 @@ class ReActEngine:
                 # Run hooks — first DENY wins
                 hook_result = await self._run_hooks(tool_name, arguments, context)
                 if hook_result.decision == HookDecision.DENY:
+                    await self._emit("tool_call", {
+                        "tool": tool_name,
+                        "arguments": arguments,
+                        "rejected": True,
+                        "reason": hook_result.reason,
+                    })
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.get("id", ""),
@@ -141,9 +173,21 @@ class ReActEngine:
                     })
                     continue
 
+                await self._emit("tool_call", {
+                    "tool": tool_name,
+                    "arguments": arguments,
+                })
+
                 # Execute tool
                 result = await self._tools.execute(tool_name, arguments)
                 self._tools_used.append(tool_name)
+
+                await self._emit("tool_result", {
+                    "tool": tool_name,
+                    "result": result.to_json(),
+                    "error": result.error,
+                    "error_type": result.error_type,
+                })
 
                 messages.append({
                     "role": "assistant",

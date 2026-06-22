@@ -122,7 +122,23 @@
 | 架构先代劳的事 | LLM 暂时做不好的原因 | 什么时候还给 LLM |
 |---|---|---|
 | Persona（推理深度）选择 | 任务特征匹配（Planner/Copilot/CAA）是架构职责，不是 LLM 能力盲区 | 永久由架构选（与 AgentRole 正交，见 §A.2）|
-| Memory 自动注入 prompt | LLM 还没学会主动查什么记忆，架构先自动注入 | 阶段 5+：LLM 显式调 `search_memory`，架构不再自动塞 |
+| Memory 自动注入 prompt | LLM 还没学会主动查什么记忆，架构先自动注入 | 阶段 5+：**LLM readiness 达标后**移除自动注入（见下） |
+
+#### 阶段 5 移除自动注入的 readiness 标准
+
+"阶段 5+ 还给 LLM"不是时间触发，是**能力达标触发**。LLM 必须先证明自己会主动查 Memory，架构才能撤掉自动注入——否则撤了就是盲目降级。
+
+**移除自动注入的硬指标**（阶段 4 末期连续 2 周观测）：
+
+| 指标 | 阈值 | 测量方式 |
+|---|---|---|
+| ADAPTIVE 模式下 LLM 主动调 `search_memory` 比例 | ≥ 70% | EventLog 统计：ADAPTIVE 任务中含 `search_memory` tool_call 的比例 |
+| LLM 主动查询的 Memory 命中率（查到的条目相关性）| ≥ 60% | 查询后 LLM 是否在后续推理中引用（EventLog 中 search_memory → think 内容关联）|
+| 移除自动注入后回归测试通过率 | 100% | A/B 测试：同一任务集跑"有自动注入"vs"无自动注入"，结果质量不下降 |
+
+**未达标时**：阶段 5 不移除自动注入。继续观测，每 2 周复测一次。达标后才进入阶段 5。
+
+**部分达标选项**：如果只有第 1 项达标（≥70%）但第 2 项未达标，可降级为"**仅 high-confidence 任务移除自动注入**"——低置信任务仍保留自动注入作为 fallback。这是渐进过渡，不是全有全无。
 
 #### 两条规则
 
@@ -1355,9 +1371,15 @@ LLM 参考此上下文推理 → 判断倾向"气孔"
 ```
 M0→M1  auto (会话结束)
 M1→M2  auto (案例完成)
-M2→M3  confidence>0.8 + 3次验证 + 人工确认
-M3→M4  confidence>0.95 + committee
+M2→M3  confidence>0.8 + 3次验证 + 人工确认 + 初始化 last_verified_at
+M3→M4  confidence>0.95 + committee + 刷新 last_verified_at
 ```
+
+**`last_verified_at` 字段**（ROUTINE 过期机制依赖，见 §A.2）：
+- M0/M1/M2 条目无 `last_verified_at`——不触发 ROUTINE（架构只在 M3+ 探针命中时考虑 ROUTINE）
+- M3 条目 `last_verified_at` = 人工确认时刻
+- M4 条目 `last_verified_at` = committee 通过时刻
+- 复审 task 通过时刷新；复审失败降级 confidence 或归档（条目不再参与 ROUTINE 探针）
 
 **用户反馈分两种性质，晋升路径不同**（与 §4.4 冲突裁决一致）：
 
@@ -2629,7 +2651,26 @@ ReasoningMode 只影响"是否调 Memory / 是否多轮推理 / 检索范围"，
 |---|---|---|---|
 | **AgentRole** | 工作模式（工具白名单 + system prompt 风格） | LLM | LLM 通过 `switch_role` 工具自主切换 |
 | **Persona** | 推理深度（Planner/Copilot/CAA） | 架构 | 任务特征（调 design_workflow → Planner；高置信低风险 → CAA；默认 → Copilot）|
-| **ReasoningMode** | 成本控制（ROUTINE/ADAPTIVE/EXPLORATORY） | 架构 | Memory 命中率（>0.9 → ROUTINE；已知模式 → ADAPTIVE；未知 → EXPLORATORY）|
+| **ReasoningMode** | 成本控制（ROUTINE/ADAPTIVE/EXPLORATORY） | 架构 | Memory 命中率（>0.9 → ROUTINE；已知模式 → ADAPTIVE；未知 → EXPLORATORY）+ fallback 信号（见下）|
+
+#### ReasoningMode fallback 信号（解决 Memory 冷启动期）
+
+Memory 命中率 >0.9 需要 M3+ 条目积累（M2→M3 需 3 次人工验证，M3→M4 需 committee）——这是人类吞吐瓶颈，不是代码问题。阶段 4 引入 ReasoningModeSelector 后，相当长时间内 Memory 没有高置信条目，纯靠命中率会导致**所有任务走 ADAPTIVE/EXPLORATORY（最贵档）**，成本控制承诺失效。
+
+**冷启动期 fallback 信号**（不依赖 Memory 命中率）：
+
+| 信号源 | 取值 | 触发 ReasoningMode |
+|---|---|---|
+| `UrgencyLevel`（用户/上游传入）| ROUTINE | ROUTINE（跳过 Memory 探针）|
+| `UrgencyLevel` | URGENT | ADAPTIVE |
+| `UrgencyLevel` | CRITICAL | EXPLORATORY（强制全推理）|
+| 任务类型分类（IntentClassifier 产出）| 查询类（标准查询/案例查询）| ADAPTIVE |
+| 任务类型分类 | 决策类（缺陷判定/工艺调整）| EXPLORATORY |
+| Memory 探针 | 命中率 >0.9 | ROUTINE（覆盖 urgency=ROUTINE 之外的判断）|
+
+**优先级**：CRITICAL urgency > Memory 探针 > 任务类型 > 其他 urgency。即用户标 CRITICAL 时即使 Memory 命中高也强制 EXPLORATORY——安全优先于成本。
+
+**冷启动期声明**：阶段 4 早期（M3 条目 < 100 条）Memory 探针命中率长期 <0.9，ReasoningMode 主要由 urgency + 任务类型驱动。这是预期行为，不是 bug。Memory 攒到 M3 条目 >100 且 >30% 命中率后，探针才成为主导信号。
 
 #### Role × Persona 兼容矩阵
 
@@ -2645,6 +2686,20 @@ ReasoningMode 只影响"是否调 Memory / 是否多轮推理 / 检索范围"，
 - LLM 不能通过 `switch_role` 改变 Persona——Persona 由架构选，与 Role 正交
 - ReasoningMode 与 Role/Persona 完全正交
 
+**Role×Persona 冲突裁决**（LLM 切 Role 后与当前 Persona 非法组合时）：
+
+LLM 通过 `switch_role` 切角色是异步发生的——切之前架构选的 Persona 可能与新 Role 非法组合（如 LLM 从 Vision 切到 Quality，但当前 Persona 是 CAA）。裁决规则：
+
+| 情形 | 架构行为 | LLM 感知 |
+|---|---|---|
+| LLM 切到合法组合 | 接受 switch_role，Persona 不变 | tool_result: "switched to Quality, persona=Copilot" |
+| LLM 切到非法组合（如 Quality+CAA） | 接受 switch_role，**Persona 自动降级到该 Role 的默认 Persona**（见矩阵"默认"列）| tool_result: "switched to Quality, persona downgraded CAA→Copilot (Quality+CAA 非法)" |
+| LLM 切到 ⚠️ 风险组合（如 Operator+CAA） | 接受 switch_role，Persona 降级到 Copilot，**且该会话剩余生命周期内 CAA 被禁** | tool_result: "switched to Operator, persona=Copilot, CAA disabled for session (risk control)" |
+
+**原则**：架构不拒绝 `switch_role`（LLM 自主权），但架构强制 Persona 适配（成本/安全约束）。LLM 收到降级信号后可自主决定是否继续——如果继续操作即视为接受降级后的 Persona。
+
+**EventLog 记录**：所有 Role×Persona 冲突裁决必须记进 EventLog，含原 Persona、新 Persona、降级原因。审计可追溯。
+
 #### ReasoningMode 与 Memory 注入的衔接
 
 §0.1 说"阶段 5+ LLM 显式调 search_memory，架构不再自动注入 Memory"。但 §A.2 选 ReasoningMode 又依赖 Memory 命中率——架构仍要查 Memory。衔接机制是**轻量 Memory 探针**：
@@ -2656,6 +2711,23 @@ ReasoningMode 只影响"是否调 Memory / 是否多轮推理 / 检索范围"，
 阶段 0-3 无 Memory 探针（ReasoningModeSelector 阶段 4 才引入，探针作为其依赖不可能更早）；阶段 4 探针 + 自动注入并存；阶段 5+ 探针保留、自动注入移除。
 
 **ROUTINE 模式语义澄清**：ROUTINE 下架构跳过 LLM 推理，直接返回探针命中的 Memory 条目；自动注入仅在 ADAPTIVE/EXPLORATORY 模式下发生。ROUTINE 是 ReAct 的**唯一合法旁路**——架构在 Memory 高置信命中时直接返回缓存结果，跳过 LLM 推理。这是 §0.1 "架构永远不替 LLM 决定调哪个工具"的**显式例外**：ROUTINE 语义下"无需推理"（高置信命中 = 已知答案），不存在"调哪个工具"的决策。该例外由架构基于 Memory 命中率严格触发，LLM 不能主动声明 ROUTINE。
+
+**ROUTINE 过期机制**（解决 stale Memory 条目风险）：
+
+焊接标准会更新（GB/T 换版）、缺陷模式会演化（新材料新工艺）。ROUTINE 直接返回 Memory 条目跳过 LLM 推理——如果条目过期，工业安全场景下是责任问题，不是性能问题。Memory 条目必须带 `last_verified_at` 字段，ROUTINE 触发前架构检查：
+
+| 条目状态 | `last_verified_at` 年龄 | ROUTINE 行为 |
+|---|---|---|
+| fresh | ≤ 90 天 | 正常触发 ROUTINE，返回条目 |
+| stale | 90-180 天 | 不触发 ROUTINE，降级 ADAPTIVE，条目作为 strong hint 注入 |
+| expired | > 180 天 | 不触发 ROUTINE，降级 EXPLORATORY，条目作为 weak hint 注入 + 异步触发复审 task |
+
+**复审 task**：expired 条目自动入队 `memory_review_queue`，由质量工程师周期性复审。复审通过刷新 `last_verified_at`；复审失败降级 confidence 或归档。
+
+**关键约束**：
+- `last_verified_at` 在 M2→M3 晋升时初始化（人工确认时刻）
+- M3→M4 committee 通过时刷新
+- 标准/规则类条目（M4 Knowledge）的过期阈值可按标准类型差异化（如国标 365 天、企业标准 180 天）——具体阈值在 §八 Memory 实现时定
 
 ### A.3 图像细节渐进式获取 — LLM 主动请求
 
@@ -3178,6 +3250,8 @@ ReAct 是"协议级"的简单循环，自建成本可控；以上三者是"协�
 | **spawn_investigator breadth cap** | 阶段 6 spawn_investigator 引入时 | 加 `max_concurrent_investigators=3` 配置项，与 Token Budget 叠加防失控 |
 | **request_clarification 元递归熔断** | 阶段 4 request_clarification 引入时 | 单会话调用 ≥N 次未解决 → 强制 escalate，防 SupervisorCenter 触发的元递归 |
 | **M0→M1 自动晋升触发条件** | 阶段 4 Memory 成熟时 | 定义"会话结束"判定（显式登出 + 30 分钟无活动；网络抖动断连不触发）|
+| **三 plane 包结构：独立 pyproject vs monorepo** | 阶段 3 落地后 | cognitiveplane / controlplane / executionplane 当前各自 pyproject.toml，跨包 import 路径痛苦。阶段 3 末评估是否合并为单 monorepo 包（uv workspace 或 pip editable）。决策依据：阶段 3 实际跨包 import 频次 + CI 构建时间 |
+| **ROUTINE 过期阈值差异化** | 阶段 4 Memory 成熟时 | §A.2 过期机制默认 90/180 天，但国标（GB/T）vs 企业标准 vs 案例记忆的合理阈值不同。阶段 4 末期按条目类型定差异化阈值表 |
 
 **为什么留白**：这些项目的设计依赖运行时反馈——比如"两操作员同时改 Case"的冲突模式，只有真实跑过才知道常见冲突类型是什么，提前设计会基于猜测。等代码跑起来回填，比现在硬写更可靠。
 
@@ -3209,6 +3283,20 @@ ReAct 是"协议级"的简单循环，自建成本可控；以上三者是"协�
 | 3.5 | 单图反馈闭环 | 用户改 1 张图的标注 → Memory.write(correction) → 下一轮 ReAct LLM 能感知（通过 EventLog 验证） |
 
 阶段 4/5/6 的验收标准在该阶段开始前 1 周由当前负责人起草，走 PR review 通过后并入本节。不在阶段开始前定标准的，阶段不得开始。
+
+#### 阶段 4 — 多角色协作 + Memory 成熟 + ReasoningMode
+
+| # | 验收项 | 通过条件 |
+|---|---|---|
+| 4.1 | AgentRole 切换 | LLM 通过 `switch_role` 在 Explorer/Vision/Quality/Operator 间切换，tool_result 正确反映新 Role 的工具白名单 |
+| 4.2 | Role×Persona 冲突裁决 | 构造非法组合（如 Quality+CAA），架构自动降级 Persona 到 Copilot，EventLog 记录降级原因；构造 ⚠️ 风险组合（Operator+CAA），架构降级 + 禁 CAA for session |
+| 4.3 | Memory M3 晋升 | 至少 10 条 M2 条目经 3 次验证 + 人工确认晋升到 M3，`last_verified_at` 正确初始化 |
+| 4.4 | ReasoningMode 三档生效 | 同一任务在 urgency=ROUTINE/URGENT/CRITICAL 下分别走 ROUTINE/ADAPTIVE/EXPLORATORY（EventLog 验证）；Memory 探针命中率 <0.9 时 fallback 信号（urgency + 任务类型）正确驱动 ReasoningMode |
+| 4.5 | ROUTINE 旁路 + 过期 | Memory 探针命中 M3+ 条目且 fresh（≤90天）→ ROUTINE 直接返回，跳过 LLM；构造 stale（90-180天）条目 → 降级 ADAPTIVE；构造 expired（>180天）条目 → 降级 EXPLORATORY + 异步复审 task 入队 |
+| 4.6 | LLM readiness 观测启动 | 阶段 4 末期开始连续 2 周统计 §0.1 "阶段 5 移除自动注入 readiness" 三项指标，记录到 SLO 看板 |
+| 4.7 | 不引入禁用项 | 阶段 4 代码 diff 中不出现 `mcp_*` / `agent_loop.py` / `request_image_detail` / `design_workflow` 等阶段 5+ 文件 |
+
+阶段 4 不验收：阶段 5 readiness 达标（4.6 只启动观测，达标判定在阶段 5 启动前）、L2 Temporal 集成（阶段 5）、工作流模板入 Memory（阶段 6）。
 
 #### 11.4.1 测试方法论约束
 

@@ -96,3 +96,57 @@ def test_websocket_interrupt_cancels_react(app_with_mock_llm, monkeypatch):
                 break
         interrupted = [e for e in events if e.get("type") == "interrupted"]
         assert len(interrupted) == 1, f"expected interrupted, got {events}"
+
+
+def test_feedback_injected_into_next_react_system_prompt(app_with_mock_llm, monkeypatch):
+    """3.5 — feedback → Memory.write → 下一轮 ReAct 的 §5.1 worldview injection 命中 correction.
+
+    验收 §11.4 3.5: 用户改 1 张图的标注 → ... → 下一轮 ReAct LLM 能感知.
+    本测试只验证认知平面侧 — correction 文本能被 Memory.search 搜到并注入 system prompt.
+    """
+    captured_messages: list[list[dict]] = []
+
+    class CapturingLLM(MockLLMProvider):
+        @property
+        def supports_function_calling(self) -> bool:
+            return True  # Tier-1 so complete() is called with full messages
+        async def complete(self, request):
+            captured_messages.append(request.messages)
+            return await super().complete(request)
+
+    monkeypatch.setattr(capability_module, "get_llm", lambda: CapturingLLM(default_response="答复"))
+    monkeypatch.setattr("cognitiveplane.app._bootstrap_llm", lambda: True)
+    app = create_app()
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/chat/ws") as ws:
+        # 1. 先发 feedback
+        ws.send_json({
+            "type": "feedback",
+            "correction": "焊缝根部气孔位置标错了, 应该在 2 号位置",
+            "session_id": "sess-closed-loop",
+            "category": "wrong_result",
+        })
+        for _ in range(10):
+            if ws.receive_json().get("type") == "feedback_received":
+                break
+
+        # 2. 再发 chat — 下一轮 ReAct 应通过 §5.1 读到 correction
+        ws.send_json({
+            "type": "chat",
+            "message": "再看一下这张图",
+            "session_id": "sess-closed-loop",
+        })
+        for _ in range(20):
+            data = ws.receive_json()
+            if data.get("type") == "final":
+                break
+
+    # 验证 — 最后一轮 ReAct 的 system prompt 含 correction
+    assert len(captured_messages) >= 1, f"LLM not called: {captured_messages}"
+    last_messages = captured_messages[-1]
+    system_msg = next((m for m in last_messages if m.get("role") == "system"), None)
+    assert system_msg is not None, f"no system message in {last_messages}"
+    assert "焊缝根部气孔位置标错了" in system_msg["content"], (
+        f"correction not injected into system prompt: {system_msg['content'][:500]}"
+    )

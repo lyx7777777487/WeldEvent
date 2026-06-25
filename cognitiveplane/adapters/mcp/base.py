@@ -79,3 +79,31 @@ class MCPClient(ABC):
 
         callback 在工具列表变更时被调用（异步）。MCPRegistry 用此触发重判。
         """
+
+
+class MCPServer:
+    """一个 MCP server 的连接包装。
+
+    Spec §2.4 — 持有 MCPClient，暴露 list_tools / call_tool / on_list_changed。
+    Server 本身无状态 — 每次调用都委托 client。
+    """
+
+    def __init__(self, client: MCPClient, name: str) -> None:
+        self._client = client
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    async def list_tools(self) -> list[ToolDescriptor]:
+        return await self._client.list_tools()
+
+    async def call_tool(self, name: str, arguments: dict) -> dict:
+        return await self._client.call_tool(name, arguments)
+
+    def on_list_changed(
+        self, callback: Callable[[], Awaitable[None]]
+    ) -> None:
+        """订阅 list_changed 事件 — 转发给 client.subscribe_list_changed。"""
+        self._client.subscribe_list_changed(callback)

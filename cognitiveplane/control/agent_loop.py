@@ -329,5 +329,27 @@ class AgentLoop:
             return None
 
     async def _handle_interrupt(self, message: dict[str, Any]) -> None:
-        """Task 5 实现."""
-        raise NotImplementedError
+        """interrupt → 取消 react_task + 发 interrupted."""
+        try:
+            msg = InterruptMessage(**message)
+        except Exception as e:
+            await self._send_json({
+                "type": "error",
+                "error": f"invalid interrupt message: {e}",
+            })
+            return
+
+        if self._react_task is None or self._react_task.done():
+            return
+
+        self._react_task.cancel()
+        try:
+            await self._react_task
+        except asyncio.CancelledError:
+            pass
+        self._react_task = None
+
+        await self._send_json({
+            "type": "interrupted",
+            "reason": msg.reason or "user requested",
+        })

@@ -301,3 +301,76 @@ async def test_feedback_message_rejected_when_memory_write_fails():
     assert "memory down" in rejected[0].get("reason", "")
 
     await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_interrupt_message_cancels_react_task():
+    """type=interrupt → react_task.cancel() + 发 interrupted."""
+    deps, _ = _make_deps()
+
+    # 用一个慢 LLM — 让 react_task 跑的过程中能被 cancel
+    class SlowLLM(MockLLMProvider):
+        @property
+        def supports_function_calling(self) -> bool:
+            return True  # Force Tier-1 so complete() is actually called
+        async def complete(self, request):
+            await asyncio.sleep(2.0)  # 慢, 给 interrupt 时间
+            return await super().complete(request)
+    deps.capability.llm_provider = SlowLLM()
+
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    # 启动 chat
+    await loop.put_message({
+        "type": "chat",
+        "message": "你好",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)  # 让 react_task 启动
+
+    # 发 interrupt
+    await loop.put_message({
+        "type": "interrupt",
+        "session_id": "sess-1",
+        "reason": "停, 我看错了",
+    })
+    await asyncio.sleep(0.2)  # 让 cancel 生效
+
+    interrupted = [m for m in sent if m.get("type") == "interrupted"]
+    assert len(interrupted) == 1, f"expected 1 interrupted, got {sent}"
+    assert interrupted[0]["reason"] == "停, 我看错了"
+
+    # react_task 已取消
+    assert loop._react_task is None or loop._react_task.done()
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_interrupt_without_active_react_task_is_noop():
+    """无 react_task 时 interrupt → 不发 interrupted (无东西可中断)."""
+    deps, _ = _make_deps()
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "type": "interrupt",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)
+
+    # 无 react_task → 不发 interrupted
+    assert not any(m.get("type") == "interrupted" for m in sent)
+
+    await loop.stop()

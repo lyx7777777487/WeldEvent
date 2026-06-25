@@ -3304,12 +3304,15 @@ HumanGateSignal (L2 人工审批):
   ├── ✅ C 子项目 MCP 基础设施 (MCPClient/MCPServer/MCPAdapter/MCPRegistry/
   │   ToolPolicyClassifier/InProcessClient/echo_server stub) — 57 测试通过
   │   L1/L3 split: 认知平面只持认知内容 MCP, 工业执行 MCP 归 executionplane 仓库
-  ├── ⬜ WebSocket AgentLoop 持续运行 (主循环 + feedback consumer 双 task)
+  ├── ✅ D 子项目 AgentLoop + WebSocket 双向 (AgentLoop 双 task + feedback/interrupt
+  │   消息分发 + 3.5 反馈闭环认知平面侧) — 17 测试通过 (13 unit + 4 E2E)
+  │   零侵入 ReActEngine.run(): feedback 在下一轮 ReAct 通过 §5.1 注入 system prompt
   ├── ✅ 中间结果实时推送 (server→client: thinking/tool_call/tool_result/final)
-  ├── ⬜ client→server 通道 (feedback/interrupt) — 当前 await run() 阻塞 receive
+  ├── ✅ client→server 通道 (feedback/interrupt) — AgentLoop 双 task 处理
+  ├── ✅ 3.5 反馈闭环 (认知平面侧): feedback → Memory.write → 下一轮 ReAct system prompt 含 correction
   ├── ⬜ MCP detect_defects (executionplane 仓库实现 MCP server, 认知平面通过 MCP 管道调用)
   ├── ⬜ MCP annotate_label/update_annotation (同上, executionplane 仓库)
-  └── ⬜ 用户反馈通过 feedback consumer 写 Memory，主循环不阻塞
+  └── ⬜ 3.5 真实标注闭环 (依赖 detect_defects/annotate_label 工具实现)
 
 阶段 4: 系统从反馈中学习         ⬜ 阶段 3后
   ├── Memory.write(correction, VALIDATED)
@@ -3475,11 +3478,12 @@ ReAct 是"协议级"的简单循环，自建成本可控；以上三者是"协�
 | # | 验收项 | 通过条件 | 状态 |
 |---|---|---|---|
 | 3.0 | MCP 基础设施 (C 子项目) | MCPClient/MCPServer/MCPAdapter/MCPRegistry/三层 ToolPolicyClassifier/InProcessClient + echo_server E2E 管道验证 — 57 测试通过 | ✅ 完成 (2026-06-25) |
-| 3.1 | WebSocket 双向通信 | 前端能收到 `thinking` / `tool_call` / `tool_result`，能发 `feedback` / `interrupt` | ⚠️ server→client 完成; client→server 待做 |
-| 3.2 | AgentLoop 双 task | 主循环 + feedback consumer 通过 Memory 通信，主循环不阻塞等用户 | ⬜ 未启动 |
+| 3.1 | WebSocket 双向通信 | 前端能收到 `thinking` / `tool_call` / `tool_result`，能发 `feedback` / `interrupt` | ✅ 完成 (D 子项目, 2026-06-25) |
+| 3.2 | AgentLoop 双 task | 主循环 + feedback consumer 通过 Memory 通信，主循环不阻塞等用户 | ✅ 完成 (D 子项目, 2026-06-25) |
 | 3.3 | MCP detect_defects | LLM 自主决定调用 detect_defects，结果回流 ReAct 下一轮 | ⬜ 管道就绪, L3 工具实现待做 |
 | 3.4 | MCP annotate_label | LLM 调 annotate_label 创建标注，前端实时渲染 | ⬜ 管道就绪, L3 工具实现待做 |
-| 3.5 | 单图反馈闭环 | 用户改 1 张图的标注 → Memory.write(correction) → 下一轮 ReAct LLM 能感知（通过 EventLog 验证） | ⬜ 依赖 3.1+3.4 |
+| 3.5 | 单图反馈闭环 (认知平面侧) | feedback → Memory.write → 下一轮 ReAct system prompt 含 correction | ✅ 完成 (D 子项目, 2026-06-25) |
+| 3.5 | 单图反馈闭环 (真实标注) | 用户改 1 张图的标注 → Memory.write(correction) → 下一轮 ReAct LLM 能感知（通过 EventLog 验证） | ⬜ 依赖 3.4 |
 
 阶段 4/5/6 的验收标准在该阶段开始前 1 周由当前负责人起草，走 PR review 通过后并入本节。不在阶段开始前定标准的，阶段不得开始。
 

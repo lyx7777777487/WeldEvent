@@ -1,0 +1,16 @@
+# governance/mcp_policy.yaml
+# Phase 3 第三层人工 override 配置。
+# 优先级最高 — 覆盖 annotations 判定和前缀启发式。
+# Phase 3 起步为空，按需添加 override。
+#
+# 格式:
+#   <tool_name>:
+#     auto_approve: <bool>
+#     tier: "A" | "B"
+#     require_reason: <bool>
+#
+# 示例 (Phase 3 不启用，注释样例):
+# echo_tool:
+#   auto_approve: true
+#   tier: "A"
+#   require_reason: false

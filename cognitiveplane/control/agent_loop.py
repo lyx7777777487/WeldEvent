@@ -56,3 +56,94 @@ class FeedbackSummary(BaseModel):
             category=msg.category,
             target_tool_call_id=msg.target_tool_call_id,
         )
+
+
+import asyncio
+import logging
+from typing import Any, Awaitable, Callable
+
+from cognitiveplane.control.deps import CognitiveDependencies
+from cognitiveplane.control.event_log import BrainEventType, EventLog
+
+logger = logging.getLogger(__name__)
+
+SendJsonFn = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+class AgentLoop:
+    """管理 receive_task + react_task 双 task 生命周期.
+
+    使用:
+        loop = AgentLoop(deps=..., event_log=..., send_json=ws.send_json)
+        await loop.start()
+        # ... connection lifetime ...
+        await loop.stop()
+
+    receive_task 循环 await loop._drain_receive() — 子类/测试可注入消息源.
+    默认实现从 self._incoming: asyncio.Queue 取消息 (生产者由 WebSocket handler put).
+    """
+
+    def __init__(
+        self,
+        deps: CognitiveDependencies,
+        event_log: EventLog,
+        send_json: SendJsonFn,
+    ) -> None:
+        self._deps = deps
+        self._event_log = event_log
+        self._send_json = send_json
+        self._incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self._feedback_queue: asyncio.Queue[FeedbackSummary] = asyncio.Queue(maxsize=10)
+        self._receive_task: asyncio.Task | None = None
+        self._react_task: asyncio.Task | None = None
+        self._running = False
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    async def start(self) -> None:
+        """启动 receive_task. react_task 按需启动 (收到 chat 消息时)."""
+        if self._running:
+            return
+        self._running = True
+        self._receive_task = asyncio.create_task(self._receive_loop())
+
+    async def stop(self) -> None:
+        """停止 receive_task + 取消 react_task. Idempotent."""
+        if not self._running:
+            return
+        self._running = False
+        if self._react_task is not None and not self._react_task.done():
+            self._react_task.cancel()
+        if self._receive_task is not None and not self._receive_task.done():
+            self._receive_task.cancel()
+        for task in (self._react_task, self._receive_task):
+            if task is not None:
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        self._react_task = None
+        self._receive_task = None
+
+    async def put_message(self, message: dict[str, Any]) -> None:
+        """WebSocket handler 调此方法 put 消息 — receive_loop 消费."""
+        await self._incoming.put(message)
+
+    async def _receive_loop(self) -> None:
+        """receive_task 主体 — 循环取消息分发."""
+        try:
+            while self._running:
+                message = await self._incoming.get()
+                try:
+                    await self._dispatch(message)
+                except Exception as e:
+                    logger.warning("AgentLoop dispatch error: %s", e)
+                    await self._send_json({"type": "error", "error": f"dispatch: {e}"})
+        except asyncio.CancelledError:
+            pass
+
+    async def _dispatch(self, message: dict[str, Any]) -> None:
+        """根据 type 字段分发. Task 3/4/5 实现."""
+        raise NotImplementedError("dispatch implemented in Task 3-5")

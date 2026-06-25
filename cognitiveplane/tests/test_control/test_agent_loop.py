@@ -59,3 +59,71 @@ def test_feedback_summary_from_message():
     assert summary.correction == "修正内容"
     assert summary.memory_id == "mem-xyz"
     assert summary.category == "wrong_result"
+
+
+import asyncio
+
+from cognitiveplane.control.agent_loop import AgentLoop
+from cognitiveplane.control.deps import CognitiveDependencies
+from cognitiveplane.control.event_log import EventLog
+from cognitiveplane.memory.adapters.port_adapters import (
+    MemorySearchAdapter,
+    MemoryWriteAdapter,
+)
+from cognitiveplane.memory.repositories.in_memory import InMemoryMemoryRepository
+from cognitiveplane.shared.types import CaseId
+
+
+def _make_deps() -> tuple[CognitiveDependencies, InMemoryMemoryRepository]:
+    """构造带 InMemoryMemoryRepository 的 deps — feedback 写入用."""
+    from cognitiveplane.control.deps import (
+        CapabilityDeps, ControlDeps, GatewayDeps, GovernanceDeps,
+        KnowledgeDeps, MemoryDeps,
+    )
+    repo = InMemoryMemoryRepository()
+    deps = CognitiveDependencies(
+        capability=CapabilityDeps(),
+        control=ControlDeps(),
+        knowledge=KnowledgeDeps(),
+        memory=MemoryDeps(
+            search=MemorySearchAdapter(repo),
+            write=MemoryWriteAdapter(repo),
+        ),
+        gateway=GatewayDeps(),
+        governance=GovernanceDeps(),
+    )
+    return deps, repo
+
+
+@pytest.mark.asyncio
+async def test_agentloop_construct_and_start():
+    """AgentLoop 构造 + start() 启动 receive_task, stop() 取消."""
+    deps, _ = _make_deps()
+    event_log = EventLog(case_id=CaseId(value="test"))
+
+    loop = AgentLoop(
+        deps=deps,
+        event_log=event_log,
+        send_json=lambda data: None,  # no-op for unit test
+    )
+    assert loop.is_running is False
+
+    await loop.start()
+    assert loop.is_running is True
+
+    await loop.stop()
+    assert loop.is_running is False
+
+
+@pytest.mark.asyncio
+async def test_agentloop_stop_is_idempotent():
+    """stop() 多次调用不抛异常."""
+    deps, _ = _make_deps()
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=lambda data: None,
+    )
+    await loop.start()
+    await loop.stop()
+    await loop.stop()  # idempotent

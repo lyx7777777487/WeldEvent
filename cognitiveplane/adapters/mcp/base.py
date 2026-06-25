@@ -13,6 +13,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from cognitiveplane.control.tools import BrainTool, ToolResult
+
 
 @dataclass(frozen=True)
 class MCPAnnotations:
@@ -107,3 +109,48 @@ class MCPServer:
     ) -> None:
         """订阅 list_changed 事件 — 转发给 client.subscribe_list_changed。"""
         self._client.subscribe_list_changed(callback)
+
+
+class MCPAdapter(BrainTool):
+    """适配单个 MCP 工具为 BrainTool。
+
+    Spec §2.4 + §3.2 — 无状态，每次 execute 都委托 server.call_tool。
+    LLM 通过 ToolRegistry 看到的接口与内部工具完全一致。
+    """
+
+    def __init__(
+        self,
+        server: MCPServer,
+        descriptor: ToolDescriptor,
+        policy: MCPPolicyDecision,
+    ) -> None:
+        self._server = server
+        self._descriptor = descriptor
+        self._policy = policy
+
+    @property
+    def name(self) -> str:
+        return self._descriptor.name
+
+    @property
+    def description(self) -> str:
+        return self._descriptor.description
+
+    @property
+    def parameters_schema(self) -> dict:
+        return self._descriptor.parameters_schema
+
+    @property
+    def policy(self) -> MCPPolicyDecision:
+        """缓存的三层判定结果 — Hook 拦截时读此字段，不重判。"""
+        return self._policy
+
+    async def execute(self, **kwargs) -> ToolResult:
+        try:
+            result = await self._server.call_tool(self._descriptor.name, kwargs)
+            return ToolResult(output=result)
+        except Exception as e:
+            return ToolResult(
+                error=f"mcp_call_failed: {e}",
+                error_type="mcp_call_failed",
+            )

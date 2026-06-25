@@ -133,3 +133,26 @@ class TestOrchestratorTypedDeps:
         )
         assert result.success is True
         assert result.decision is not None
+
+
+def test_control_deps_has_mcp_registry_field():
+    """Spec §7.2 — ControlDeps.mcp_registry 从注释占位变为真实字段。"""
+    from cognitiveplane.control.deps import ControlDeps
+
+    deps = ControlDeps()
+    assert deps.mcp_registry is None  # default None
+
+
+def test_control_deps_mcp_registry_assignable():
+    """可注入 MCPRegistry 实例。"""
+    from cognitiveplane.control.deps import ControlDeps
+    from cognitiveplane.adapters.mcp.tool_policy_classifier import (
+        MCPToolPolicyClassifier,
+    )
+    from cognitiveplane.control.mcp_registry import MCPRegistry
+
+    classifier = MCPToolPolicyClassifier(yaml_path=None)
+    registry = MCPRegistry(classifier=classifier, event_log=None)
+    deps = ControlDeps(mcp_registry=registry)
+
+    assert deps.mcp_registry is registry

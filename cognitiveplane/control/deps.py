@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from cognitiveplane.capability.provider import LLMProvider
     from cognitiveplane.capability.web_search import WebSearchProvider
-    from cognitiveplane.interaction.image_store import ImageStore
     from cognitiveplane.shared.ports.knowledge import (
         RAGQueryPort,
         StandardsQueryPort,
@@ -38,16 +37,20 @@ if TYPE_CHECKING:
     from cognitiveplane.shared.ports.learning import LearningEventRepository
     from cognitiveplane.control.ports import BrainDecisionRepository
     from cognitiveplane.control.orchestrator import BrainOrchestrator
+    from cognitiveplane.control.mcp_registry import MCPRegistry
     from cognitiveplane.governance.escalation import EscalationTracker
 
 
 @dataclass
 class CapabilityDeps:
-    """L7 Capability plane dependencies — LLM providers + web search + image store."""
+    """L7 Capability plane dependencies — pure capability Providers (no side effects).
+
+    Plan §7 line 2234 contract: CapabilityDeps only holds llm_provider + web_search.
+    ImageStore is session-scoped state, not a Provider — passed explicitly through
+    ReActEngine → ToolRegistry → AnalyzeImageTool (not stored in any Deps group).
+    """
     llm_provider: LLMProvider | None = None
     web_search: WebSearchProvider | None = None
-    # Plan §A.3: image store for thumbnail/original layering
-    image_store: ImageStore | None = None
     # Phase 2b: instructor: InstructorClient | None = None
     # Phase 2h: vision: VisionAdapter | None = None
 
@@ -80,10 +83,23 @@ class MemoryDeps:
 
 @dataclass
 class GatewayDeps:
-    """L3 Gateway plane dependencies."""
+    """L3 Gateway plane dependencies.
+
+    Plan §7 target design splits this into ``GatewayReadDeps`` /
+    ``GatewayWriteDeps`` sub-dataclasses so the composition root can hand
+    Control only the read half — a compile-time guard preventing Control from
+    bypassing the validation pipeline via a bare WritePort. Phase 2 has not
+    done that split: validation is still wired through ``GovernanceDeps``
+    and enforced by ``BrainOrchestrator`` calling ``validate()`` before
+    ``publish_decision()`` (orchestrator.py:329). The type-level split is
+    deferred to Phase 3 — that is when the second write path
+    (``notify_workflow_trigger``, light schema-only validation) appears and
+    the guard becomes load-bearing.
+    """
     read: GatewayReadPort | None = None
     write: GatewayWritePort | None = None
     # Phase 2d: nats_publisher: NATSPublisher | None = None
+    # Phase 3: split into GatewayReadDeps/GatewayWriteDeps (plan §7 line 2381)
 
 
 @dataclass
@@ -93,6 +109,7 @@ class GovernanceDeps:
     review_repo: HumanReviewRequestRepository | None = None
     learning_repo: LearningEventRepository | None = None
     escalation: EscalationTracker | None = None
+    # Phase 3: validation moves to GatewayWriteDeps (plan §7 line 2376)
 
 
 @dataclass
@@ -100,6 +117,7 @@ class ControlDeps:
     """L1 Control plane dependencies — orchestrator and decision repository."""
     orchestrator: BrainOrchestrator | None = None
     decision_repo: BrainDecisionRepository | None = None
+    mcp_registry: "MCPRegistry | None" = None  # Phase 3 解锁 (plan §7 line 2338)
     # Phase 1c: tool_policy: ToolPolicy | None = None
     # Phase 1c: hooks: list[BeforeToolHook] = field(default_factory=list)
     # Phase 2a: react_graph: CompiledStateGraph | None = None

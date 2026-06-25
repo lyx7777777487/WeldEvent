@@ -226,7 +226,7 @@
 | Control 调用 Tools/Memory/Capability/Knowledge | 四者都是 Control 的依赖，**同级**，不是 Control 的下游 |
 | Tools 调用 Knowledge/Gateway | 知识库是 `search_standards` 等内部工具的后端；Gateway 是 `read_weldmap` 等外部工具的后端 |
 | Tools 框（图中的"工具集"）| 仅画 **Tool 协议层 + 认知业务工具**（`control/tools/`）。外部能力工具（MCP）实现在 L4 `adapters/mcp/`，不在本图——通过 `mcp_registry.py` 注册到 ToolRegistry 后 LLM 看到的就是普通工具（详见 §13）|
-| Capability 只放 LLM Provider | DeepSeek Chat / Volc Vision 是 LLM 能力，**web_search 不是 Capability——它是 Tool**（详见 §13 工具三层体系）|
+| Capability 放能力 Provider | DeepSeek Chat / Volc Vision 是 LLM Provider；`WebSearchProvider`（Tavily/DuckDuckGo HTTP 封装）也是 Capability 里的能力 Provider。`web_search` **工具**不是 Capability——它在 `control/tools/` 里，是 Tool 协议层入口，内部委托 `WebSearchProvider`（详见 §13 工具三层体系、§术语表 Provider vs Tool）|
 | Adapters 接所有层 | PG/Redis/MinIO/WeldMap HTTP 是基础设施，被上面所有层调用 |
 | L2 Temporal | 当前阶段不接入，未来规则系统引入时通过 Bridge（§5.9）连 |
 
@@ -362,6 +362,57 @@ LLM 视角:
 LLM 仍然自主决定要不要看图、看几次、用什么工具处理
 ```
 
+### 2.4 反馈循环模式分类 — 5 种 Loop 的边界与引入时机
+
+> **来源**: Loop Engineering 研究（2026-06）。把系统中所有"循环"按反馈来源、作用域、是否阻塞 LLM 主循环分 5 类，避免"loop"一词被滥用导致设计混淆。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    5 种反馈循环模式                                │
+│                                                                  │
+│  1. task-loop (任务循环)                                          │
+│     作用域: 单次用户请求 → 最终回复                               │
+│     实现: ReActEngine._run_react (§2.1)                          │
+│     阻塞 LLM: 是（LLM 在循环内思考）                             │
+│     引入阶段: 阶段 1                                              │
+│                                                                  │
+│  2. tool-loop (工具内循环)                                        │
+│     作用域: 单次工具调用内部的 retry                              │
+│     实现: Tier-A schema 校验失败 → retry 1 次 (§3.6)             │
+│     阻塞 LLM: 否（架构层重试，LLM 不感知）                       │
+│     引入阶段: 阶段 2                                              │
+│                                                                  │
+│  3. agent-loop (会话循环)                                         │
+│     作用域: 单 WebSocket 连接，多轮 ReAct + 用户反馈              │
+│     实现: AgentLoop (§5.1) — 主 task + feedback consumer         │
+│     阻塞 LLM: 否（feedback consumer 独立 task）                  │
+│     引入阶段: 阶段 3（人机反馈）                                  │
+│                                                                  │
+│  4. learn-loop (跨会话学习循环)                                   │
+│     作用域: 跨 session/case，反馈沉淀到 Memory                   │
+│     实现: Memory.search 自动注入 (§5.1) + promotion 流程         │
+│     阻塞 LLM: 否（异步写入，下个 session 可见）                  │
+│     引入阶段: 阶段 4（反馈学习）                                  │
+│                                                                  │
+│  5. governance-loop (治理循环)                                    │
+│     作用域: 跨所有 session，ToolPolicy/规则演进                  │
+│     实现: 棘轮机制 (§4.2) — 失败沉淀为规则，只增不减             │
+│     阻塞 LLM: 否（运维侧动作）                                   │
+│     引入阶段: 阶段 5+                                             │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**关键约束**:
+- 同一个反馈不能同时进多个 loop——`learn-loop` 的反馈沉淀进 Memory，`governance-loop` 的反馈沉淀进 ToolPolicy，两者解耦
+- `tool-loop` 是架构层 retry，对 LLM 透明；`task-loop` 是 LLM 主循环，对架构透明
+- 5 个 loop 都不能跨级调用——`task-loop` 不能直接写 `governance-loop` 的规则，必须经 `learn-loop` → `governance-loop` 显式晋升
+
+**反例（避免）**:
+- ❌ 在 `task-loop` 里直接 `await queue.get()` 等用户反馈——违反 LLM 非阻塞主循环原则，应走 `agent-loop` 的 feedback consumer
+- ❌ 把 Memory 写入当成 `tool-loop` 的 retry 依据——Memory 是 `learn-loop` 资产，不应在单次工具调用内读取
+- ❌ 自动把 `learn-loop` 的反馈晋升到 `governance-loop`——晋升需人工评审，否则噪音反馈会污染规则库
+
 ---
 
 ## 三、工具集 — LLM 的能力
@@ -439,6 +490,12 @@ LLM 策略 C (研究型):
 ### 3.3 MCP 工具 — LLM 调用外部系统
 
 LLM 不仅能调内部工具，还能通过 MCP (Model Context Protocol) 接入外部系统。
+
+> **L1/L3 MCP 边界 (2026-06-25 确认)**: 认知平面 (L1) 只持有**认知内容 MCP** (如 web_search, 文档检索)。
+> 工业执行 MCP (`detect_defects` / `annotate_label` / `update_annotation` 等) 归
+> `executionplane/` 仓库 (L3), 受 L2 activity pool 调用。两套 MCP 不共享 — 认知
+> 平面通过 MCP 管道调用 L3 提供的执行工具, 但工具实现本体在 L3 仓库。Phase 3 C
+> 子项目 (MCP 基础设施) 已落地于认知平面, L3 侧 MCP server 实现仍待开工。
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -755,6 +812,48 @@ MCP Server 在工具版本升级时会发送 `notifications/tools/list_changed`�
 |---|---|
 | 阶段 3 | 三层规则全部到位，因为 detect_defects/annotate_label 一接入就要决定等级 |
 | 阶段 5+ | governance/mcp_policy.yaml 可视化配置入口 |
+
+#### 4.2.2 棘轮机制 — 失败沉淀为规则
+
+> **来源**: Harness Engineering 研究（2026-06）。规则库只能向前增长，不能向后回退——每次失败沉淀一条规则，规则经人工评审后写入 ToolPolicy，永不自动删除。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    棘轮机制 (Ratchet)                              │
+│                                                                  │
+│  触发事件 (任一即记录):                                           │
+│    - LLM 调用 Tier-A 工具连续 2 次 schema 校验失败                │
+│    - Tier-B 工具被 OnFailAction.REASK 拒绝                       │
+│    - 工具调用超时 (timeout > 30s)                                │
+│    - 副作用冲突 (并发写 WeldMap CAS 失败)                         │
+│                                                                  │
+│  沉淀流程:                                                        │
+│    1. 事件自动写入 governance/policy_ratchet.yaml (草稿区)        │
+│       - 字段: tool_name, failure_pattern, suggested_rule, ts     │
+│       - 草稿区规则不立即生效，等评审                              │
+│    2. 运维侧人工评审 (每周 1 次)                                  │
+│       - 接受 → 提升为正式规则，写入 governance/mcp_policy.yaml   │
+│       - 拒绝 → 标记 dismissed，保留草稿记录                       │
+│    3. 正式规则永不自动删除                                        │
+│       - 需删除时: 运维显式操作 + 写入 EventLog + 通知 LLM         │
+│                                                                  │
+│  关键: 规则只增不减，避免"反复踩同一个坑"                         │
+│  副作用: 规则库膨胀 → LLM 工具集收紧 → LLM 行为更稳定             │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**阶段引入**:
+
+| 阶段 | 棘轮机制能力 |
+|---|---|
+| 阶段 2 | 草稿区自动记录 (事件触发即写) |
+| 阶段 5+ | 人工评审入口 + 正式规则生效 |
+
+**反例（避免）**:
+- ❌ 失败立即自动生成正式规则——会让 LLM 单次抖动永久收紧工具集
+- ❌ 规则自动 GC——"3 个月没用到的规则就删"会再次踩同一个坑
+- ❌ LLM 自己写规则——LLM 不能改 ToolPolicy，规则是架构资产
 
 ### 4.3 验证管道 — 不在流程中，在决策写出时
 
@@ -1097,7 +1196,7 @@ control/
 │   ├── request_clarification.py # 阶段 4 — LLM 反向提问，纯认知行为 (见 §4.4)
 │   ├── request_image_detail.py  # 阶段 5 — LLM 主动请求图像升级，认知行为 (见 §A.3)
 │   ├── switch_role.py           # 阶段 5 — LLM 自我管理角色切换
-│   ├── manage_plan.py           # 阶段 5 — LLM 任务拆解 (借鉴 Claude Code TodoWrite)
+│   ├── manage_plan.py           # 阶段 2 — LLM 任务拆解 (借鉴 Claude Code TodoWrite，多图批量场景必需)
 │   ├── spawn_investigator.py    # 阶段 6 — LLM 派生子调查员 (借鉴 Claude Code Task tool)
 │   ├── explain_decision.py      # 阶段 4 — LLM 解释自己的决策
 │   ├── escalate.py              # 阶段 3 — LLM 主动升级，认知决策（写出走 Gateway）
@@ -1124,7 +1223,7 @@ control/
 ├── supervisor.py             # SupervisorCenter (阶段 3 引入，循环/超时)
 ├── fallback.py               # ToolReliability Tier-C 兜底 (阶段 3 引入)
 ├── event_log.py              # Append-only EventLog (阶段 3 起即引入，见 §A.6)
-├── checkpoint.py             # 决策检查点/回滚 (阶段 5+，见 §A.7)
+├── checkpoint.py             # 决策检查点/回滚 (Phase 2 in-memory 已落 / Phase 5+ PostgreSQL 持久化，见 §A.7)
 ├── state_machine.py          # BrainStateMachine (阶段 3 起 3 态→12 态，见 §A.1)
 ├── deps.py                   # CognitiveDependencies (阶段 1 起即引入)
 ├── ports.py                  # 控制层端口
@@ -2351,7 +2450,7 @@ class WeldMapWriteGateway:
 
 ```
 adapters/
-├── database/                  # PostgreSQL
+├── database/                  # PostgreSQL                       [Phase 1 stub → Phase 5+ 接入]
 │   ├── engine.py              # AsyncDatabaseEngine
 │   ├── models.py              # ORM (6 表)
 │   ├── decision_repo.py       # BrainDecision
@@ -2361,26 +2460,28 @@ adapters/
 │   ├── review_repo.py         # HumanReview
 │   └── audit_repo.py          # AuditEntry (M5)
 ├── cache/
-│   └── redis_client.py        # Redis M0/M1
+│   └── redis_client.py        # Redis M0/M1                      [Phase 1 stub → Phase 5+ 接入]
 ├── storage/
-│   └── minio_client.py        # MinIO
+│   └── minio_client.py        # MinIO                            [Phase 1 stub → Phase 5+ 接入]
 ├── weldmap/
 │   ├── weldmap_http.py        # WeldMap HTTP 客户端 (Gateway 委托给它)
 │   └── event_sourcing.py      # CAS + Materialized Views
-├── retrieval/                 # 检索算法原语 (Knowledge + Memory 共享)
+├── retrieval/                 # 检索算法原语 (Knowledge + Memory 共享)  [Phase 4+ 引入]
 │   ├── vector_index.py        # 向量索引 (pgvector → Milvus 阶段 5+)
 │   ├── fulltext.py            # FTS 全文检索
 │   ├── rrf.py                 # RRF 融合 (k=60, weights 0.5/0.5)
 │   └── reranker.py            # Reranker 重排序 (阶段 5+ 引入)
-├── mcp/                       # MCP 外部工具适配器
+├── mcp/                       # MCP 外部工具适配器                [Phase 3 引入]
 │   ├── label_studio.py        # Label Studio 标注工具
 │   ├── detection_api.py       # 目标检测模型 API
 │   └── base.py                # MCPAdapter ABC
 ├── observability/
-│   ├── tracing.py             # OpenTelemetry
+│   ├── tracing.py             # OpenTelemetry                    [Phase 1 stub → 生产部署]
 │   └── metrics.py
 └── migrations/                # Alembic
 ```
+
+> **Phase 2 现状（2026-06-25 校对）**: `database/` `cache/` `storage/` `observability/` 四个目录已存在但都是 in-memory stub（见 `engine.py:1` `redis_client.py:1` `minio_client.py:1` 注释 "Phase 1 stub"），接口形态已对齐未来真后端，Phase 5+ 替换为 `redis.asyncio` / `aioboto3` / `sqlalchemy.ext.asyncio` 时是行级替换。`retrieval/` `mcp/` 两个目录在 Phase 2 不存在，分别等 Phase 4+（Memory 学习层需要向量/FTS）和 Phase 3（MCP 工具接入）落地。
 
 ---
 
@@ -2397,6 +2498,13 @@ adapters/
 | L1 | Label Studio MCP | 数据标注工具 | 🔜 阶段 3 |
 | L1 | 检测模型 MCP | 目标检测 API | 🔜 阶段 3 |
 | L2 | Temporal | 工作流编排 | 🔜 阶段 5+（见下方引入条件）|
+| L5 | PostgreSQL | 持久化 | 🔜 阶段 5+ 接入（Phase 1 stub 已就位，见 §8）|
+| L5 | pgvector | 向量搜索 | 🔜 阶段 4 Memory M3 + 阶段 6 K4 知识库（见下方注）|
+| L5 | Redis | L0/L1缓存 | 🔜 阶段 5+ 接入（Phase 1 stub 已就位，见 §8）|
+| L5 | MinIO | 图片存储 | 🔜 阶段 5+ 接入（Phase 1 stub 已就位，见 §8）|
+| L6 | NATS JetStream | 事件总线 | 🔜 阶段 5+ 替换内存 |
+| Observability | OpenTelemetry | Tracing+Metrics | 🔜 生产部署（Phase 1 stub 已就位）|
+| Observability | Langfuse | LLM可观测 | 🔜 替换tracking |
 
 **L2 Temporal 引入条件**（明确"🔜"的含义）:
 
@@ -2412,48 +2520,46 @@ L2 不是按时间表引入，是按**信号驱动**引入。满足以下任一�
 **阶段 3 不需要 Temporal**：阶段 3 的"人机反馈 + 检测/标注 MCP"走 AgentLoop feedback_consumer 双任务模型（§5.1），人工等待通过 Memory 通信实现，不依赖 Temporal Signal。强行用 Temporal 处理阶段 3 的人工等待是过度设计。
 
 **阶段 5+ 引入 Temporal 后**，原 AgentLoop feedback_consumer 不删——它仍然负责 L1 ReAct 内部的实时反馈；Temporal 负责跨任务/跨会话的工作流编排。两者并存，职责不同。
-| L5 | PostgreSQL | 持久化 | 🔜 替换内存 |
-| L5 | pgvector | 向量搜索 | 🔜 知识库K4 |
-| L5 | Redis | L0/L1缓存 | 🔜 替换内存 |
-| L5 | MinIO | 图片存储 | 🔜 图片场景 |
-| L6 | NATS JetStream | 事件总线 | 🔜 替换内存 |
-| Observability | OpenTelemetry | Tracing+Metrics | 🔜 生产部署 |
-| Observability | Langfuse | LLM可观测 | 🔜 替换tracking |
+
+**pgvector 引入阶段注**（修正 §8 与本表之前的相位矛盾）:
+- **阶段 4（Memory M3 晋升）**: pgvector 首次接入。Memory.search 的 hybrid（vector + FTS + RRF）算法核心已在 `memory/search.py` 就位，但 vector/FTS adapter 仍走 in-memory stub。阶段 4 M3 晋升需要真实向量召回，pgvector 落地。
+- **阶段 6（K4 知识库主体域）**: K4 知识库在 pgvector 之上构建 4 主体域（焊接/检测/质量/设备）。
+- **阶段 5+（如果先到）**: 若 Memory 规模在阶段 5 已超 pgvector 单机上限，提前迁移到 Milvus；否则 pgvector 持续到阶段 6 后再评估。§8 "pgvector → Milvus 阶段 5+" 指迁移触发时点，不是 pgvector 首次接入时点。
 
 ---
 
 ## 十、关键设计决策
 
-| 决策 | 选择 | 理由 |
-|-----|------|------|
-| 核心循环 | ReAct Loop | LLM 自主决定每一步做什么，不是流水线填空 |
-| 角色模型 | 单Agent + 自主切换 | LLM 通过 switch_role 工具切换，不是架构强制顺序 |
-| 角色分阶段 | 工具白名单随系统成长扩充 | Explorer 先有 web_search，后接入知识库/记忆库 |
-| 推理深度 | Persona (Planner/Copilot/CAA) | LLM 调 design_workflow 时自动 Planner，不是架构规定角色 |
-| 成本控制 | ReasoningMode (ROUTINE/ADAPTIVE/EXPLORATORY) | 架构根据 Memory 命中率自动选择，不是 LLM 选择 |
-| 图像精度 | Thumbnail 默认入场 + LLM 主动升级 | 架构给低成本默认值，LLM 通过 request_image_detail 工具自主升级，不替 LLM 决定"看不看清" |
-| 图片处理 | 多模态消息走 ReAct | 不建旁路，LLM 看图后自主决定用什么工具 |
-| 决策格式 | DecisionFactory 15 种输出类型 | LLM 自由决定内容，架构决定格式 |
-| 状态追踪 | 12-state BrainStateMachine | 追踪 LLM 行为用于审计/超时检测，不控制 LLM 行为 |
-| 学习机制 | Few-Shot Context | Memory 检索 + prompt 注入，不重新训练 |
-| 反馈学习 | 非阻塞 Memory.write | 系统不等用户改完一张图才处理下一张 |
-| 外部工具 | MCP 协议 | Label Studio、检测模型等通过 MCP 动态接入 |
-| 工具三层 | Tool/MCP/Skill | LLM 统一视角，不区分来源；Skill 可选不强制 |
-| 启动上下文 | WELDEVENT.md/OPERATOR.md/CASE_BRIEF + Memory 注入 | 借鉴 Claude Code CLAUDE.md，提供世界观不规定步骤 |
-| 任务管理 | manage_plan 工具 | 借鉴 Claude Code TodoWrite，LLM 自主决定要不要拆任务 |
-| 并行调查 | spawn_investigator 工具 | 借鉴 Claude Code Task tool，LLM 自主派生隔离上下文子调查员 |
-| 工作流设计 | LLM 动态设计 | 不是预定义模板，LLM 根据业务需求实时设计/更新 |
-| 知识组织 | 4 主体域 | 焊接/检测/质量/设备，按域组织，支持跨域关联 |
-| 写出通道 | CognitiveGateway 单一通道 | 强制一致性，验证是守门人不是步骤 |
-| 验证失败 | OnFailAction 5 种策略 | 不同验证失败有不同策略，不是简单报错 |
-| 工具调用 | Hook 拦截 + Policy | 安全边界，不是流程控制 |
-| 决策回滚 | Checkpoint + EventLog | 支持回滚和审计，LLM 被拒绝后可回退重推理 |
-| 并发安全 | Event Sourcing + CAS | WeldMap 写出原子更新，防止并发冲突 |
-| Web 搜索 | DuckDuckGo + Tavily | 零配置可用，有 key 升级 |
-| 记忆管理 | M0-M5 分层 + 晋升 | 完整记忆层次，修正案例直接 VALIDATED |
-| 人机协作 | Human-Governed | Agent 建议，Human 决策 |
-| L1→L2 | Bridge (EventConnector + DecisionTranslator + WorkflowLauncher) | BrainDecision → Temporal 工作流 |
-| DI 模式 | CognitiveDependencies | 6组依赖，编译时类型检查 |
+| 决策 | 选择 | 理由 | 阶段 |
+|-----|------|------|------|
+| 核心循环 | ReAct Loop | LLM 自主决定每一步做什么，不是流水线填空 | ✅ Phase 1-2 |
+| 角色模型 | 单Agent + 自主切换 | LLM 通过 switch_role 工具切换，不是架构强制顺序 | 🔜 Phase 5（`switch_role` 未实现）|
+| 角色分阶段 | 工具白名单随系统成长扩充 | Explorer 先有 web_search，后接入知识库/记忆库 | 🔜 Phase 5 |
+| 推理深度 | Persona (Planner/Copilot/CAA) | LLM 调 design_workflow 时自动 Planner，不是架构规定角色 | ✅ Phase 2（`control/persona.py` 已落地）|
+| 成本控制 | ReasoningMode (ROUTINE/ADAPTIVE/EXPLORATORY) | 架构根据 Memory 命中率自动选择，不是 LLM 选择 | ✅ Phase 2（枚举就位，自动驱动逻辑在 Phase 4 Memory 探针就绪后闭环）|
+| 图像精度 | Thumbnail 默认入场 + LLM 主动升级 | 架构给低成本默认值，LLM 通过 request_image_detail 工具自主升级，不替 LLM 决定"看不看清" | ⚠️ Phase 2 部分（Thumbnail 入场已落 `image_store.py`；`request_image_detail` 工具🔜 Phase 5+，见 §A.3）|
+| 图片处理 | 多模态消息走 ReAct | 不建旁路，LLM 看图后自主决定用什么工具 | ✅ Phase 2 |
+| 决策格式 | DecisionFactory 产 3 种 Persona 输出（Workflow/Parameter/Investigation），其余 12 种决策类型由专门工具直产（escalate→Escalation, request_confirmation→Review 等）| LLM 自主决定内容，架构决定格式 | ✅ Phase 2 已落 3 种；🔜 Phase 3+ 按角色逐个补全到 15 种（见 §A.4）|
+| 状态追踪 | 12-state BrainStateMachine | 追踪 LLM 行为用于审计/超时检测，不控制 LLM 行为 | ✅ Phase 2（`state_machine.py` + orchestrator 集成）|
+| 学习机制 | Few-Shot Context | Memory 检索 + prompt 注入，不重新训练 | 🔜 Phase 4（`react.py:788` 有 `memory_search` section 占位，等 Memory 写入修正案例后闭环）|
+| 反馈学习 | 非阻塞 Memory.write | 系统不等用户改完一张图才处理下一张 | 🔜 Phase 3-4（依赖 AgentLoop feedback consumer）|
+| 外部工具 | MCP 协议 | Label Studio、检测模型等通过 MCP 动态接入 | 🔜 Phase 3 |
+| 工具三层 | Tool/MCP/Skill | LLM 统一视角，不区分来源；Skill 可选不强制 | 🔜 Phase 3+ |
+| 启动上下文 | WELDEVENT.md/OPERATOR.md/CASE_BRIEF + Memory 注入 | 借鉴 Claude Code CLAUDE.md，提供世界观不规定步骤 | ✅ Phase 2（`react.py:58,671-788` 真实读取并拼进 system prompt）|
+| 任务管理 | manage_plan 工具 | 借鉴 Claude Code TodoWrite，LLM 自主决定要不要拆任务 | ✅ Phase 2 |
+| 并行调查 | spawn_investigator 工具 | 借鉴 Claude Code Task tool，LLM 自主派生隔离上下文子调查员 | 🔜 Phase 6+ |
+| 工作流设计 | LLM 动态设计 | 不是预定义模板，LLM 根据业务需求实时设计/更新 | ✅ Phase 2（`design_workflow` 工具）|
+| 知识组织 | 4 主体域 | 焊接/检测/质量/设备，按域组织，支持跨域关联 | 🔜 Phase 6 |
+| 写出通道 | CognitiveGateway 单一通道 | 强制一致性，验证是守门人不是步骤 | ✅ Phase 2 |
+| 验证失败 | OnFailAction 5 种策略 | 不同验证失败有不同策略，不是简单报错 | ✅ Phase 2（`governance/on_fail.py`）|
+| 工具调用 | Hook 拦截 + Policy | 安全边界，不是流程控制 | ✅ Phase 2（`control/hooks.py` SafetyHook/PolicyHook）|
+| 决策回滚 | Checkpoint + EventLog | 支持回滚和审计，LLM 被拒绝后可回退重推理 | ✅ Phase 2（`control/checkpoint.py` + `event_log.py`）|
+| 并发安全 | Event Sourcing + CAS | WeldMap 写出原子更新，防止并发冲突 | 🔜 Phase 5+（`event_sourcing.py` 类已就位但走 in-memory stub，见 §A.9）|
+| Web 搜索 | DuckDuckGo + Tavily | 零配置可用，有 key 升级 | ✅ Phase 2 |
+| 记忆管理 | M0-M5 分层 + 晋升 | 完整记忆层次，修正案例直接 VALIDATED | ✅ Phase 2（管道就位；闭环依赖 Phase 4 反馈写入）|
+| 人机协作 | Human-Governed | Agent 建议，Human 决策 | ✅ Phase 2 |
+| L1→L2 | Bridge (EventConnector + DecisionTranslator + WorkflowLauncher) | BrainDecision → Temporal 工作流 | 🔜 Phase 5+（`bridge/` 3 类已写但 Temporal 未接入，悬空代码，见 §A.10）|
+| DI 模式 | CognitiveDependencies | 6组依赖，编译时类型检查 | ✅ Phase 2（`control/deps.py`；GatewayReadDeps/WriteDeps 类型守护拆分🔜 Phase 3）|
 
 ---
 
@@ -2471,7 +2577,7 @@ L2 不是按时间表引入，是按**信号驱动**引入。满足以下任一�
 | A.4 DecisionFactory | 阶段 3 | 起步只有 1-2 种 DecisionOutput；15 种类型按角色逐个引入 |
 | A.5 Planner/Reflector/SubAgent | 阶段 6+ | 阶段 3-5 不需要深度推理；spawn_investigator 是 SubAgent 的轻量版 |
 | A.6 EventLog | 阶段 3 (审计要求) | 起步即引入，不可省 |
-| A.7 Checkpoint | 阶段 5+ (有回滚需求) | 早期靠 EventLog 重放即可 |
+| A.7 Checkpoint | 阶段 2 (in-memory) / 阶段 5+ (PostgreSQL 持久化) | 接口已在 `control/checkpoint.py` 落地（save/restore/replay_event_log/apply_patch），in-memory 存储；Phase 5+ 换 PostgreSQL 持久化 |
 | A.8 OnFailAction | 阶段 4 (验证失败需多策略) | 阶段 3 直接 ESCALATE 即可 |
 | A.9 Event Sourcing + CAS | 阶段 5+ (并发写) | 早期单写者无需 CAS |
 | A.10 Bridge (L1→L2) | 未来规则系统引入时 | 当前阶段不引入规则触发工作流，等 L2 数据平面就绪 |
@@ -2729,6 +2835,51 @@ LLM 通过 `switch_role` 切角色是异步发生的——切之前架构选的 
 - M3→M4 committee 通过时刷新
 - 标准/规则类条目（M4 Knowledge）的过期阈值可按标准类型差异化（如国标 365 天、企业标准 180 天）——具体阈值在 §八 Memory 实现时定
 
+#### 小模型分层 — ROUTINE 档的杂活外包
+
+> **来源**: Claude Code 实践（2026-06）。"small models for chores" 原则——主 LLM 专注推理，杂活（关键词抽取、tool 路由、format fix）外包给小模型，降低延迟和成本。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    模型分层 (Model Tiering)                       │
+│                                                                  │
+│  主模型 (Main LLM):                                              │
+│    - DeepSeek-Chat (§9 技术栈)                                   │
+│    - 负责: ReAct 推理、工具调用决策、最终回复                    │
+│    - 成本: 高 (按 token 计费)                                    │
+│    - 延迟: 高 (1-3s/调用)                                        │
+│                                                                  │
+│  小模型 (Chore LLM, 阶段 4+ 引入):                               │
+│    - 候选: DeepSeek-Lite / Qwen-Turbo / 本地 SLM                 │
+│    - 负责:                                                       │
+│      1. 关键词抽取 (用户消息 → search query)                     │
+│      2. Tool 路由预判 (省主 LLM 一次 thinking)                   │
+│      3. Format fix (LLM 返回的 JSON 缺括号 → 修复)               │
+│      4. Memory 探针的 query 改写                                 │
+│    - 成本: 低 (1/10 主模型)                                      │
+│    - 延迟: 低 (<500ms)                                           │
+│                                                                  │
+│  分层规则:                                                        │
+│    - ROUTINE 档: 杂活外包给小模型，主模型仅在 ROUTINE 失败时介入  │
+│    - ADAPTIVE 档: 小模型做前置处理，主模型做核心推理              │
+│    - EXPLORATORY 档: 全程主模型，不外包                          │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**阶段引入**:
+
+| 阶段 | 小模型能力 |
+|---|---|
+| 阶段 0-3 | 不引入，主模型独占（避免过早优化） |
+| 阶段 4 | ROUTINE 档杂活外包（关键词抽取、format fix） |
+| 阶段 5+ | ADAPTIVE 档前置处理（tool 路由预判） |
+
+**反例（避免）**:
+- ❌ 阶段 2 引入小模型——主模型调用次数还很少，省不回小模型本身的维护成本
+- ❌ 小模型做工具调用决策——工具选择是核心推理，不能外包
+- ❌ 小模型写 Memory——Memory 写入需主模型判断价值，小模型只读不写
+
 ### A.3 图像细节渐进式获取 — LLM 主动请求
 
 > **哲学一致性自检**: 早期版本曾按 ReasoningMode 由架构自动选 Thumbnail/全图/纯文本，这相当于架构在 LLM 不知情下偷换图像精度，违反"LLM 决定做什么"原则。**修订后的策略**: 架构始终以低成本默认值（Thumbnail）入场，LLM 自己判断信息不足时通过工具显式升级——架构不替 LLM 做"看不看清"的决定。
@@ -2930,6 +3081,47 @@ SubAgent (子代理委托):
 - ❌ 子调查员直接读父私有 Memory——破坏隔离，子被父偏见污染
 - ❌ 反馈自动进全局 Memory 不经父 LLM 决策——违反"LLM 决定做什么"，且会让噪音反馈淹没全局
 
+#### 过度工程化风险提示 — 不要默认全开
+
+> **来源**: Claude Code 实践（2026-06）。Planner/Reflector/SubAgent 三个内部推理工具都是**可选能力**，不是默认配置。Claude Code 自身只有一个主循环 + TodoWrite + Task tool，没有显式 Reflector——但能处理 95% 的工程任务。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    过度工程化的 3 个信号                            │
+│                                                                  │
+│  信号 1: "以防万一" 心态                                          │
+│    "未来可能需要 Reflector，先建框架" → 违反 YAGNI                │
+│    正确做法: 等 LLM 真的产出低置信度决策且无修正机制时再加        │
+│                                                                  │
+│  信号 2: 深度递归                                                │
+│    "spawn_investigator 可以嵌套" → 违反 max depth 1              │
+│    正确做法: 子调查员不能再 spawn 子子调查员，硬性限制           │
+│                                                                  │
+│  信号 3: 默认开启                                                │
+│    "design_workflow 默认对每个 case 跑一遍" → 拖慢主循环          │
+│    正确做法: LLM 自主决定调用，默认不跑                          │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**阶段引入与默认值**:
+
+| 工具 | 引入阶段 | 默认行为 | LLM 调用频率上限 |
+|---|---|---|---|
+| Planner (design_workflow) | 阶段 5 | LLM 自主调用，默认不跑 | 每 session ≤ 3 次 |
+| Reflector | 阶段 6+ (可选) | 不引入，除非观测到低置信度决策堆积 | — |
+| SubAgent (spawn_investigator) | 阶段 6 | LLM 自主调用，max depth 1 | 每 session ≤ 2 次 |
+
+**关键约束**:
+- 阶段 2-4 不引入任何深度推理工具——主循环 + TodoWrite (manage_plan) 足够
+- 阶段 5 引入 Planner 时，先观测 2 周再决定是否调默认值
+- Reflector 在阶段 6 是**可选**，不是必做项——若阶段 5 LLM 决策置信度已稳定 ≥0.85，跳过 Reflector
+
+**反例（避免）**:
+- ❌ 阶段 2 引入 design_workflow——主循环还没跑稳，加规划器只会放大不确定性
+- ❌ 子调查员嵌套——max depth 1 是硬性约束，递归爆炸会拖垮整个系统
+- ❌ Reflector 默认开启——反思会double 推理成本，需明确触发条件（如置信度 <0.6）
+
 ### A.6 EventLog — 不可变审计追踪
 
 ```
@@ -2970,6 +3162,8 @@ ToolResultEvent:
 ```
 
 ### A.7 Checkpoint — 决策检查点/回滚
+
+> **阶段标记**: Phase 2 已落 in-memory 实现（`control/checkpoint.py` — DecisionCheckpoint + CheckpointManager: save/restore/replay_event_log/apply_patch 全部就位）。Phase 5+ 换 PostgreSQL 持久化（与 §A.6 EventLog、§A.9 Event Sourcing 一同接入）。
 
 ```
 DecisionCheckpoint (frozen):
@@ -3101,17 +3295,21 @@ HumanGateSignal (L2 人工审批):
 ```
 阶段 0: LLM 真正参与决策         ✅ 完成
 阶段 1: LLM 能搜索外部信息       ✅ 完成
-阶段 2: LLM 能看图说话           ⬜ 下一步
+阶段 2: LLM 能看图说话           ✅ 完成 (2026-06-22)
   ├── Volc Vision 多模态接入 ReActEngine
   ├── 图片上传 → 多模态消息 → LLM 看图推理
-  └── 阶段 2 不依赖任何外部 MCP 工具，完成后系统就能"看图说话"
+  └── 验收 2.1/2.2/2.3/2.4 全过 (12 张真实角焊原图 E2E 通过)
 
-阶段 3: 实时人机反馈 + 检测/标注 MCP 工具 ⬜ 阶段 2后
-  ├── WebSocket AgentLoop 持续运行 (主循环 + feedback consumer 双 task)
-  ├── 中间结果实时推送 (thinking/tool_call/tool_result)
-  ├── MCP 检测工具接入 (detect_defects) — 阶段 3 引入（与 §A 表一致）
-  ├── MCP 标注工具接入 (annotate_label/update_annotation)
-  └── 用户反馈通过 feedback consumer 写 Memory，主循环不阻塞
+阶段 3: 实时人机反馈 + 检测/标注 MCP 工具 🟡 进行中 (2026-06-25 启动)
+  ├── ✅ C 子项目 MCP 基础设施 (MCPClient/MCPServer/MCPAdapter/MCPRegistry/
+  │   ToolPolicyClassifier/InProcessClient/echo_server stub) — 57 测试通过
+  │   L1/L3 split: 认知平面只持认知内容 MCP, 工业执行 MCP 归 executionplane 仓库
+  ├── ⬜ WebSocket AgentLoop 持续运行 (主循环 + feedback consumer 双 task)
+  ├── ✅ 中间结果实时推送 (server→client: thinking/tool_call/tool_result/final)
+  ├── ⬜ client→server 通道 (feedback/interrupt) — 当前 await run() 阻塞 receive
+  ├── ⬜ MCP detect_defects (executionplane 仓库实现 MCP server, 认知平面通过 MCP 管道调用)
+  ├── ⬜ MCP annotate_label/update_annotation (同上, executionplane 仓库)
+  └── ⬜ 用户反馈通过 feedback consumer 写 Memory，主循环不阻塞
 
 阶段 4: 系统从反馈中学习         ⬜ 阶段 3后
   ├── Memory.write(correction, VALIDATED)
@@ -3274,13 +3472,14 @@ ReAct 是"协议级"的简单循环，自建成本可控；以上三者是"协�
 
 #### 阶段 3 — 实时人机反馈 + 检测/标注 MCP 工具
 
-| # | 验收项 | 通过条件 |
-|---|---|---|
-| 3.1 | WebSocket 双向通信 | 前端能收到 `thinking` / `tool_call` / `tool_result`，能发 `feedback` / `interrupt` |
-| 3.2 | AgentLoop 双 task | 主循环 + feedback consumer 通过 Memory 通信，主循环不阻塞等用户 |
-| 3.3 | MCP detect_defects | LLM 自主决定调用 detect_defects，结果回流 ReAct 下一轮 |
-| 3.4 | MCP annotate_label | LLM 调 annotate_label 创建标注，前端实时渲染 |
-| 3.5 | 单图反馈闭环 | 用户改 1 张图的标注 → Memory.write(correction) → 下一轮 ReAct LLM 能感知（通过 EventLog 验证） |
+| # | 验收项 | 通过条件 | 状态 |
+|---|---|---|---|
+| 3.0 | MCP 基础设施 (C 子项目) | MCPClient/MCPServer/MCPAdapter/MCPRegistry/三层 ToolPolicyClassifier/InProcessClient + echo_server E2E 管道验证 — 57 测试通过 | ✅ 完成 (2026-06-25) |
+| 3.1 | WebSocket 双向通信 | 前端能收到 `thinking` / `tool_call` / `tool_result`，能发 `feedback` / `interrupt` | ⚠️ server→client 完成; client→server 待做 |
+| 3.2 | AgentLoop 双 task | 主循环 + feedback consumer 通过 Memory 通信，主循环不阻塞等用户 | ⬜ 未启动 |
+| 3.3 | MCP detect_defects | LLM 自主决定调用 detect_defects，结果回流 ReAct 下一轮 | ⬜ 管道就绪, L3 工具实现待做 |
+| 3.4 | MCP annotate_label | LLM 调 annotate_label 创建标注，前端实时渲染 | ⬜ 管道就绪, L3 工具实现待做 |
+| 3.5 | 单图反馈闭环 | 用户改 1 张图的标注 → Memory.write(correction) → 下一轮 ReAct LLM 能感知（通过 EventLog 验证） | ⬜ 依赖 3.1+3.4 |
 
 阶段 4/5/6 的验收标准在该阶段开始前 1 周由当前负责人起草，走 PR review 通过后并入本节。不在阶段开始前定标准的，阶段不得开始。
 

@@ -53,3 +53,29 @@ class MCPPolicyDecision:
 
 
 # MCPClient / MCPServer / MCPAdapter 定义在后续 task 加入此文件
+
+
+class MCPClient(ABC):
+    """MCP 传输层抽象。
+
+    Spec §2.4 — Phase 3 只有 InProcessClient；Phase 5+ 加 StdioClient/SSEClient。
+    上层（MCPServer / MCPAdapter / MCPRegistry / ToolRegistry / ReActEngine）
+    不感知传输实现。
+    """
+
+    @abstractmethod
+    async def list_tools(self) -> list[ToolDescriptor]:
+        """返回该 server 暴露的所有工具描述。"""
+
+    @abstractmethod
+    async def call_tool(self, name: str, arguments: dict) -> dict:
+        """调用工具，返回结构化结果。"""
+
+    @abstractmethod
+    def subscribe_list_changed(
+        self, callback: Callable[[], Awaitable[None]]
+    ) -> None:
+        """订阅 tools/list_changed 事件。
+
+        callback 在工具列表变更时被调用（异步）。MCPRegistry 用此触发重判。
+        """

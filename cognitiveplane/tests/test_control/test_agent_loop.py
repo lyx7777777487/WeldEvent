@@ -95,6 +95,18 @@ def _make_deps() -> tuple[CognitiveDependencies, InMemoryMemoryRepository]:
     return deps, repo
 
 
+def _make_send_json(sink: list[dict]):
+    """返回 async send_json — 把消息 append 到 sink. (Python 无 async lambda, 用工厂.)"""
+    async def _send(data: dict) -> None:
+        sink.append(data)
+    return _send
+
+
+async def _noop_send_json(data: dict) -> None:
+    """async no-op send_json."""
+    return None
+
+
 @pytest.mark.asyncio
 async def test_agentloop_construct_and_start():
     """AgentLoop 构造 + start() 启动 receive_task, stop() 取消."""
@@ -104,7 +116,7 @@ async def test_agentloop_construct_and_start():
     loop = AgentLoop(
         deps=deps,
         event_log=event_log,
-        send_json=lambda data: None,  # no-op for unit test
+        send_json=_noop_send_json,
     )
     assert loop.is_running is False
 
@@ -122,8 +134,80 @@ async def test_agentloop_stop_is_idempotent():
     loop = AgentLoop(
         deps=deps,
         event_log=EventLog(case_id=CaseId(value="test")),
-        send_json=lambda data: None,
+        send_json=_noop_send_json,
     )
     await loop.start()
     await loop.stop()
     await loop.stop()  # idempotent
+
+
+from cognitiveplane.capability.mock import MockLLMProvider
+from cognitiveplane.control.deps import CapabilityDeps
+from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.enums import EventType, NoveltyLevel
+from datetime import datetime, timezone
+
+
+def _make_context() -> ContextSnapshot:
+    return ContextSnapshot(
+        case_id=CaseId(value="test"),
+        event_type=EventType.WORKFLOW_ENTERED,
+        workflow_state={},
+        case_data={},
+        measurements=[],
+        memory_match_confidence=0.0,
+        knowledge_coverage=0.0,
+        event_novelty=NoveltyLevel.UNKNOWN,
+        validation_critical_count=0,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_message_starts_react_task():
+    """type=chat 消息 → 启动 react_task → 跑完返回 ChatResponse."""
+    deps, _ = _make_deps()
+    # 用 MockLLMProvider 让 ReActEngine 走 Tier-3 (无 FC, 无 JSON mode... 实际走 default)
+    deps.capability.llm_provider = MockLLMProvider(default_response="测试答复")
+
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "type": "chat",
+        "message": "你好",
+        "session_id": "sess-1",
+    })
+    # 等 react_task 完成
+    await loop.wait_for_react_idle(timeout=2.0)
+
+    assert any(m.get("type") == "final" for m in sent), f"no final event in {sent}"
+    assert loop._react_task is None or loop._react_task.done()
+
+
+@pytest.mark.asyncio
+async def test_chat_message_without_type_treated_as_chat():
+    """无 type 字段 → 当 chat 处理 (向后兼容)."""
+    deps, _ = _make_deps()
+    deps.capability.llm_provider = MockLLMProvider(default_response="答复")
+
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "message": "你好",
+        "session_id": "sess-1",
+    })
+    await loop.wait_for_react_idle(timeout=2.0)
+
+    assert any(m.get("type") == "final" for m in sent)

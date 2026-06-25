@@ -452,6 +452,7 @@ C 实现完后需要以独立 PR 修订计划文档：
 | §11.4 验收 3.3 / 3.4 | §11.4 | "LLM 直接调 detect_defects / annotate_label MCP" → "LLM 调认知平面 request_detection / request_annotation 代理 Tool，经 Gateway → L2 → L3 链路" |
 | 三层判定顺序 | §4.2.1 | 字面顺序"annotations → 前缀 → YAML" → "YAML override → annotations → 前缀"（遵循"人工配置始终优先"明文约束）|
 | §10 表 "L1→L2 Bridge" 行 | §10 | 标注 Bridge 不仅是 L1→L2，也包括 L1→L3 代理 Tool 路径 |
+| §10 "外部工具" 行例子 | §10 | "Label Studio、检测模型等通过 MCP 动态接入" → "认知内容 MCP（文档检索、知识图谱等）通过 MCP 动态接入认知平面；工业执行 MCP（Label Studio、检测模型）在 executionplane 通过 MCP 接入，L1 LLM 经认知平面代理 Tool 间接调用" |
 
 这些偏差不在 C 子项目实现范围内，C 完成后单独处理。
 

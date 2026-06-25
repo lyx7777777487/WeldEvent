@@ -6,7 +6,7 @@
 
 Plan §2.3 双轨:
   - 消息层: thumbnail data URL 直接进 LLM content (LLM 直接看图)
-  - 工具层: LLM 调 analyze_image(image_id=...) 拿原图 (只传引用)
+  - 工具层: LLM 调 analyze_image(image_ref=...) 拿原图 (只传引用)
 
 Plan §A.3:
   - 上传图统一生成 Thumbnail 注入消息层 (成本闸门)
@@ -43,6 +43,7 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     """Create FastAPI router for chat endpoints."""
     from cognitiveplane.control.react import ReActEngine
     from cognitiveplane.control.hooks import SafetyHook, PolicyHook
+    from cognitiveplane.control.event_log import EventLog
     from cognitiveplane.governance.tool_policy import ToolPolicy
     from cognitiveplane.interaction.session import SessionManager
     from cognitiveplane.interaction.file_handler import FileHandler
@@ -57,11 +58,16 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     session_manager = SessionManager()
     tool_policy = ToolPolicy()
     hooks = [SafetyHook(), PolicyHook(tool_policy)]
-    # plan §A.3: ImageStore 由 app._build_dependencies 注入，chat router 和 ToolRegistry 共享
-    # 注意: ImageStore 定义了 __len__，空 store 在布尔上下文是 falsy，必须用 is None 判断
-    image_store = deps.capability.image_store if deps.capability.image_store is not None else ImageStore()
+    # plan §A.3 + §7 contract: ImageStore is session-scoped state, NOT a Provider.
+    # Constructed here and passed explicitly to ReActEngine → ToolRegistry → AnalyzeImageTool.
+    image_store = ImageStore()
     image_sessions = ImageSessionRegistry(image_store)
-    engine = ReActEngine(deps, hooks=hooks)
+    # plan §0.1 规则 1: 架构替 LLM 做的看不见的事 (worldview 注入) 必须记进 EventLog.
+    # Phase 2 用 app 级共享 EventLog (case_id="app-shared"); Phase 3 AgentLoop 时改 per-session.
+    event_log = EventLog(case_id=CaseId(value="app-shared"))
+    engine = ReActEngine(
+        deps, hooks=hooks, image_store=image_store, event_log=event_log,
+    )
     file_handler = FileHandler(llm_provider=deps.capability.llm_provider, image_store=image_store)
 
     # ── JSON 纯文本聊天 ──
@@ -152,51 +158,35 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
             image_sessions=image_sessions,
         )
 
-    # ── WebSocket ──
+    # ── WebSocket ── (Phase 3 子项目 D: AgentLoop 双 task)
 
     @router.websocket("/ws")
     async def websocket_chat(websocket: WebSocket) -> None:
         await websocket.accept()
 
-        async def stream_event(event_type: str, payload: dict) -> None:
-            await websocket.send_json({"type": event_type, **payload})
+        from cognitiveplane.control.agent_loop import AgentLoop
+        from cognitiveplane.control.event_log import EventLog
 
-        ws_engine = ReActEngine(deps, hooks=hooks, event_callback=stream_event)
+        event_log = EventLog(case_id=CaseId(value="app-shared"))
+
+        async def send_json(data: dict) -> None:
+            await websocket.send_json(data)
+
+        loop = AgentLoop(
+            deps=deps,
+            event_log=event_log,
+            send_json=send_json,
+        )
+        await loop.start()
 
         try:
             while True:
                 data = await websocket.receive_json()
-                request = ChatRequest(**data)
-                session = session_manager.create_session(request.operator_id, request.case_id)
-
-                context = ContextSnapshot(
-                    case_id=CaseId(value=request.case_id or "unknown"),
-                    event_type=EventType.WORKFLOW_ENTERED,
-                    workflow_state={},
-                    case_data={},
-                    measurements=[],
-                    memory_match_confidence=0.5,
-                    knowledge_coverage=0.5,
-                    event_novelty=NoveltyLevel.PARTIAL,
-                    validation_critical_count=0,
-                    timestamp=datetime.now(timezone.utc),
-                )
-
-                response = await ws_engine.run(
-                    user_input=request.message,
-                    context=context,
-                    session={"session_id": str(session.session_id.value)},
-                )
-
-                await websocket.send_json(ChatResponse(
-                    reply=response.text_reply,
-                    session_id=str(session.session_id.value),
-                    tools_used=response.tools_used,
-                    tier=response.tier_used.value,
-                    error=response.error,
-                ).model_dump())
+                await loop.put_message(data)
         except WebSocketDisconnect:
             pass
+        finally:
+            await loop.stop()
 
     return router
 
@@ -253,25 +243,28 @@ async def _handle_file_upload_via_react(
         ))
 
     # 2. 解析文件 (ImageStore 自动生成 thumbnail + 分配 image_id)
-    result = await file_handler.process_uploaded_files(uploaded_files, message)
+    # plan §2.3: image_id 格式 PENDING:{session_id}:{index} — 需先取 session_id
+    session_id_str = str(session.session_id.value)
+    result = await file_handler.process_uploaded_files(
+        uploaded_files, message, session_id=session_id_str
+    )
 
     # 3. 注册 image_ids 到 session — analyze_image 通过 image_id 取原图
-    session_id_str = str(session.session_id.value)
     image_ids = result.image_ids
     image_sessions.register(session_id_str, image_ids)
 
     # 4. 构建用户消息 (plan §2.3 双轨: 消息层 thumbnail + 工具层 image_id)
     # ReActEngine 按主 LLM 能力降级 (plan line 3166):
     #   - 多模态主 LLM: 完整 content_parts (text + image_url thumbnails)
-    #   - 文本主 LLM (DeepSeek): 引擎过滤 image_url, 只留 text + image_id 引用
-    # 工具层始终走 analyze_image(image_id=...) 拿原图送 vision_complete
+    #   - 文本主 LLM (DeepSeek): 引擎过滤 image_url, 只留 text + image_ref 引用
+    # 工具层始终走 analyze_image(image_ref=...) 拿原图送 vision_complete
     text_parts = [message]
     if image_ids:
         id_list = ", ".join(image_ids)
         text_parts.append(
             f"\n\n[系统提示：用户上传了 {len(image_ids)} 张焊缝图片。"
-            f"图片 image_id 清单（按上传顺序）：{id_list}。"
-            f"调用 analyze_image(image_id=\"<id>\", question=\"...\") 分析图片。"
+            f"图片 image_ref 清单（按上传顺序）：{id_list}。"
+            f"调用 analyze_image(image_ref=\"<ref>\", question=\"...\") 分析图片。"
             f"工具会取原图送给视觉模型分析。]"
         )
     if result.text_context.strip():

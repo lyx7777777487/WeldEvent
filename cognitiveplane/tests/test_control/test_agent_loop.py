@@ -211,3 +211,93 @@ async def test_chat_message_without_type_treated_as_chat():
     await loop.wait_for_react_idle(timeout=2.0)
 
     assert any(m.get("type") == "final" for m in sent)
+
+
+@pytest.mark.asyncio
+async def test_feedback_message_writes_memory_and_queues():
+    """type=feedback → Memory.write + feedback_queue.put + 发 feedback_received."""
+    deps, repo = _make_deps()
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_noop_send_json,
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "type": "feedback",
+        "correction": "缺陷位置标错了",
+        "session_id": "sess-1",
+        "category": "wrong_result",
+    })
+    # 给 receive_task 时间处理
+    await asyncio.sleep(0.1)
+
+    # Memory.write 被调用 — repo 里有 1 条记录
+    assert len(repo._store) == 1, f"expected 1 memory record, got {len(repo._store)}"
+    record = next(iter(repo._store.values()))
+    assert record.memory_type.value == "OPERATOR_FEEDBACK"
+    assert "缺陷位置标错了" in record.content.summary
+
+    # feedback_queue 有 1 条 (待下一轮 ReAct 排空)
+    assert not loop._feedback_queue.empty()
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_feedback_message_sends_received_ack():
+    """feedback → send_json({type:feedback_received, memory_id:...})."""
+    deps, _ = _make_deps()
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "type": "feedback",
+        "correction": "修正",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)
+
+    acks = [m for m in sent if m.get("type") == "feedback_received"]
+    assert len(acks) == 1, f"expected 1 ack, got {sent}"
+    assert "memory_id" in acks[0]
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_feedback_message_rejected_when_memory_write_fails():
+    """Memory.write 失败 → 发 feedback_rejected, 不崩 AgentLoop."""
+    deps, _ = _make_deps()
+    # 替换 write port 为总是失败的 stub
+    class FailingWrite:
+        async def write(self, input_data):
+            raise RuntimeError("memory down")
+    deps.memory.write = FailingWrite()  # type: ignore[assignment]
+
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    await loop.put_message({
+        "type": "feedback",
+        "correction": "修正",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)
+
+    rejected = [m for m in sent if m.get("type") == "feedback_rejected"]
+    assert len(rejected) == 1
+    assert "memory down" in rejected[0].get("reason", "")
+
+    await loop.stop()

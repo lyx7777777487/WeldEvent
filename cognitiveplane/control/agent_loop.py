@@ -250,8 +250,83 @@ class AgentLoop:
         await asyncio.wait_for(asyncio.shield(self._react_task), timeout=remaining)
 
     async def _handle_feedback(self, message: dict[str, Any]) -> None:
-        """Task 4 实现."""
-        raise NotImplementedError
+        """feedback → Memory.write + feedback_queue.put + 发 feedback_received."""
+        try:
+            msg = FeedbackMessage(**message)
+        except Exception as e:
+            await self._send_json({
+                "type": "feedback_rejected",
+                "reason": f"invalid feedback message: {e}",
+            })
+            return
+
+        memory_id_str = await self._persist_feedback(msg)
+        if memory_id_str is None:
+            return  # _persist_feedback 已发 feedback_rejected
+
+        summary = FeedbackSummary.from_message(msg, memory_id=memory_id_str)
+        try:
+            self._feedback_queue.put_nowait(summary)
+        except asyncio.QueueFull:
+            try:
+                self._feedback_queue.get_nowait()
+                self._feedback_queue.put_nowait(summary)
+            except asyncio.QueueEmpty:
+                pass
+            if self._event_log is not None:
+                self._event_log.emit(
+                    BrainEventType.TOOL_RESULT,
+                    source="agent_loop",
+                    data={"event": "feedback_queue_overflow"},
+                )
+
+        await self._send_json({
+            "type": "feedback_received",
+            "memory_id": memory_id_str,
+            "category": msg.category,
+        })
+
+    async def _persist_feedback(self, msg: FeedbackMessage) -> str | None:
+        """写 Memory. 失败返回 None + 发 feedback_rejected."""
+        from cognitiveplane.shared.dto_memory import MemoryContent
+        from cognitiveplane.shared.enums import MemoryType
+        from cognitiveplane.shared.ports.memory import MemoryWriteInput
+        from cognitiveplane.shared.types import DecisionId
+        from uuid import uuid4
+
+        write_port = self._deps.memory.write
+        if write_port is None:
+            await self._send_json({
+                "type": "feedback_rejected",
+                "reason": "memory write port unavailable",
+            })
+            return None
+
+        try:
+            content = MemoryContent(
+                summary=msg.correction,
+                details={
+                    "category": msg.category,
+                    "target_tool_call_id": msg.target_tool_call_id,
+                    "session_id": msg.session_id,
+                    "source": "human_feedback",
+                },
+                feature_vector=[0.0],
+            )
+            write_input = MemoryWriteInput(
+                memory_type=MemoryType.OPERATOR_FEEDBACK,
+                content=content,
+                source_decision_id=DecisionId(value=uuid4()),
+            )
+            output = await write_port.write(write_input)
+            return str(output.memory_id.value)
+        except Exception as e:
+            logger.exception("feedback persist failed")
+            await self._send_json({
+                "type": "feedback_rejected",
+                "reason": str(e),
+            })
+            return None
 
     async def _handle_interrupt(self, message: dict[str, Any]) -> None:
         """Task 5 实现."""

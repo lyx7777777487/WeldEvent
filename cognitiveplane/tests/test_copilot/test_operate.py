@@ -9,7 +9,7 @@ from cognitiveplane.copilot.operate import CopilotOperate, OperationGuidance
 from cognitiveplane.gateway.adapters.in_memory import InMemoryGatewayAdapter
 from cognitiveplane.gateway.ports import CognitiveGatewayWritePort
 from cognitiveplane.interaction.signals.instruction import LiveInstruction
-from cognitiveplane.shared.dto_gateway import PublishResult
+from cognitiveplane.shared.dto.gateway import PublishResult
 from cognitiveplane.shared.enums import InstructionType
 from cognitiveplane.shared.types import CaseId, InstructionId
 

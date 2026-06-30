@@ -14,13 +14,12 @@ from cognitiveplane.control.deps import (
     KnowledgeDeps,
     MemoryDeps,
 )
-from cognitiveplane.control.orchestrator import BrainOrchestrator
 from cognitiveplane.gateway.adapters.in_memory import InMemoryGatewayAdapter
 from cognitiveplane.knowledge.adapters.stub import StubKnowledgeAdapter
 from cognitiveplane.memory.adapters.port_adapters import MemorySearchAdapter
 from cognitiveplane.memory.repositories.in_memory import InMemoryMemoryRepository
 from cognitiveplane.control.repositories.in_memory import InMemoryBrainDecisionRepository
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
 from cognitiveplane.shared.types import CaseId
 from cognitiveplane.governance.escalation import EscalationTracker
@@ -64,7 +63,6 @@ def _make_deps() -> CognitiveDependencies:
     return CognitiveDependencies(
         capability=CapabilityDeps(),
         control=ControlDeps(
-            orchestrator=BrainOrchestrator(),
             decision_repo=InMemoryBrainDecisionRepository(),
         ),
         knowledge=KnowledgeDeps(
@@ -103,36 +101,10 @@ class TestCognitiveDependencies:
 
 
 class TestOrchestratorTypedDeps:
-    @pytest.mark.asyncio
-    async def test_execute_with_typed_deps(self):
-        """BrainOrchestrator.execute() works with CognitiveDependencies."""
-        deps = _make_deps()
-        orchestrator = deps.control.orchestrator
-        context = _make_context(novelty=NoveltyLevel.KNOWN)
-        result = await orchestrator.execute(
-            objective="Test with typed deps",
-            requirements=[],
-            context=context,
-            deps=deps,
-        )
-        assert result.success is True
-        assert result.decision is not None
-        assert result.published is True
-
-    @pytest.mark.asyncio
-    async def test_execute_adaptive_path(self):
-        """ADAPTIVE path via typed deps."""
-        deps = _make_deps()
-        orchestrator = deps.control.orchestrator
-        context = _make_context(novelty=NoveltyLevel.PARTIAL)
-        result = await orchestrator.execute(
-            objective="Adaptive via typed deps",
-            requirements=[],
-            context=context,
-            deps=deps,
-        )
-        assert result.success is True
-        assert result.decision is not None
+    """Legacy BrainOrchestrator tests removed 2026-06-26 — orchestrator.py deleted
+    as DEAD CODE (replaced by ReActEngine per boundary-pinning §0). ReActEngine
+    integration covered by test_react_engine.py.
+    """
 
 
 def test_control_deps_has_mcp_registry_field():

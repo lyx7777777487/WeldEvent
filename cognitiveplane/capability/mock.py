@@ -23,6 +23,16 @@ class MockLLMProvider(LLMProvider):
         self._canned_json = canned_json
         self._embedding_dim = embedding_dim
 
+    @property
+    def supports_function_calling(self) -> bool:
+        """Mock cannot produce real tool_calls — plan §2.2 LLMTier-2/3 fallback."""
+        return False
+
+    @property
+    def supports_json_mode(self) -> bool:
+        """Mock honors response_format via canned_json — LLMTier-2 available."""
+        return True
+
     async def complete(self, request: LLMRequest) -> LLMResponse:
         content = self._default
         for msg in request.messages:

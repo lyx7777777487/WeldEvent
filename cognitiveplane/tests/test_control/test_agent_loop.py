@@ -143,7 +143,7 @@ async def test_agentloop_stop_is_idempotent():
 
 from cognitiveplane.capability.mock import MockLLMProvider
 from cognitiveplane.control.deps import CapabilityDeps
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
 from datetime import datetime, timezone
 
@@ -371,6 +371,166 @@ async def test_interrupt_without_active_react_task_is_noop():
     await asyncio.sleep(0.1)
 
     # 无 react_task → 不发 interrupted
+    assert not any(m.get("type") == "interrupted" for m in sent)
+
+    await loop.stop()
+
+
+# ── plan §11.4 3.2 边界测试 (2026-06-26) ──
+# react_task 生命周期与 feedback/interrupt 的交叉 case
+
+
+@pytest.mark.asyncio
+async def test_feedback_after_react_completed_still_writes_memory():
+    """react_task 已结束后 feedback → 仍正常写 Memory + 发 ack.
+
+    边界: feedback 不依赖 react_task 状态. 用户可在 ReAct 完成后补反馈,
+    下一轮 ReAct 通过 _fetch_memory_hits 读到 correction.
+    """
+    deps, repo = _make_deps()
+    deps.capability.llm_provider = MockLLMProvider()
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    # 跑完一个 chat (react_task 完成)
+    await loop.put_message({
+        "type": "chat", "message": "你好", "session_id": "sess-1",
+    })
+    await loop.wait_for_react_idle(timeout=5.0)
+    assert loop._react_task is not None and loop._react_task.done()
+
+    # react_task 已结束, 发 feedback
+    await loop.put_message({
+        "type": "feedback",
+        "correction": "刚才回答不对, 应该是气孔不是裂纹",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)
+
+    # feedback 仍写 Memory + 发 ack
+    received = [m for m in sent if m.get("type") == "feedback_received"]
+    assert len(received) == 1
+    assert len(repo._store) == 1
+    stored = next(iter(repo._store.values()))
+    assert "气孔" in stored.content.summary
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_multiple_concurrent_feedbacks_all_written():
+    """连续 3 条 feedback → 全部写 Memory (顺序处理, 无丢失).
+
+    边界: 用户快速连发多条反馈, receive_task 逐条处理, Memory 不丢数据.
+    """
+    deps, repo = _make_deps()
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    for i in range(3):
+        await loop.put_message({
+            "type": "feedback",
+            "correction": f"修正 {i}",
+            "session_id": "sess-1",
+            "category": "wrong_result",
+        })
+    await asyncio.sleep(0.3)  # 让 receive_task 处理完
+
+    received = [m for m in sent if m.get("type") == "feedback_received"]
+    assert len(received) == 3, f"expected 3 acks, got {len(received)}"
+    assert len(repo._store) == 3
+    corrections = {r.content.summary for r in repo._store.values()}
+    assert corrections == {"修正 0", "修正 1", "修正 2"}
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_feedback_after_interrupt_still_writes_memory():
+    """interrupt 取消 react_task 后, feedback 仍能写 Memory.
+
+    边界: interrupt 只取消 react_task, 不阻塞 feedback 路径.
+    用户中断后立即补反馈, 系统应接受.
+    """
+    deps, repo = _make_deps()
+
+    class SlowLLM(MockLLMProvider):
+        @property
+        def supports_function_calling(self) -> bool:
+            return True
+        async def complete(self, request):
+            await asyncio.sleep(2.0)
+            return await super().complete(request)
+    deps.capability.llm_provider = SlowLLM()
+
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    # 启动 chat + interrupt
+    await loop.put_message({"type": "chat", "message": "你好", "session_id": "sess-1"})
+    await asyncio.sleep(0.1)
+    await loop.put_message({"type": "interrupt", "session_id": "sess-1", "reason": "停"})
+    await asyncio.sleep(0.2)
+    assert loop._react_task is None or loop._react_task.done()
+
+    # interrupt 后立即 feedback
+    await loop.put_message({
+        "type": "feedback",
+        "correction": "中断原因是我看错了图",
+        "session_id": "sess-1",
+    })
+    await asyncio.sleep(0.1)
+
+    received = [m for m in sent if m.get("type") == "feedback_received"]
+    assert len(received) == 1, f"expected 1 feedback ack, got {sent}"
+    assert len(repo._store) == 1
+    stored = next(iter(repo._store.values()))
+    assert "看错了图" in stored.content.summary
+
+    await loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_interrupt_after_react_completed_is_noop():
+    """react_task 已完成后再 interrupt → noop (区分 '从未启动' vs '已完成').
+
+    边界: line 348 检查 self._react_task.done() — 已完成的 task 视同未启动.
+    """
+    deps, _ = _make_deps()
+    deps.capability.llm_provider = MockLLMProvider()
+    sent: list[dict] = []
+    loop = AgentLoop(
+        deps=deps,
+        event_log=EventLog(case_id=CaseId(value="test")),
+        send_json=_make_send_json(sent),
+    )
+    await loop.start()
+
+    # 跑完 chat
+    await loop.put_message({"type": "chat", "message": "你好", "session_id": "sess-1"})
+    await loop.wait_for_react_idle(timeout=5.0)
+    assert loop._react_task is not None and loop._react_task.done()
+
+    # react_task 已完成, 发 interrupt
+    await loop.put_message({"type": "interrupt", "session_id": "sess-1"})
+    await asyncio.sleep(0.1)
+
+    # 已完成的 react_task → interrupt noop, 不发 interrupted
     assert not any(m.get("type") == "interrupted" for m in sent)
 
     await loop.stop()

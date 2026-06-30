@@ -7,6 +7,8 @@ from cognitiveplane.shared.ports.knowledge import CaseLibraryQueryPort
 class SearchCasesTool(BrainTool):
     """Search historical case library for similar defect cases."""
 
+    phase = 3
+
     def __init__(self, port: CaseLibraryQueryPort) -> None:
         self._port = port
 
@@ -48,7 +50,7 @@ class SearchCasesTool(BrainTool):
 
     async def execute(self, **kwargs) -> ToolResult:
         from cognitiveplane.shared.ports.knowledge import CaseLibraryQueryInput
-        from cognitiveplane.shared.dto_knowledge import CaseLibraryQuery
+        from cognitiveplane.shared.dto.knowledge import CaseLibraryQuery
 
         query = CaseLibraryQuery(
             defect_type=kwargs.get("defect_type") or kwargs.get("query"),

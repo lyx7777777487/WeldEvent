@@ -8,8 +8,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from cognitiveplane.shared.dto_context import ContextSnapshot
-from cognitiveplane.shared.dto_memory import (
+from cognitiveplane.shared.dto.context import ContextSnapshot
+from cognitiveplane.shared.dto.memory import (
     MemoryContent,
     MemoryRecord,
     MemorySearchQuery,

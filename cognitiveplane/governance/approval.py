@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from cognitiveplane.governance.review import HumanReviewWorkflow
-from cognitiveplane.shared.dto_collaboration import (
+from cognitiveplane.shared.dto.collaboration import (
     HumanReviewRequest,
     ResolutionContent,
     ReviewContent,

@@ -10,6 +10,8 @@ from cognitiveplane.shared.ports.knowledge import StandardsQueryPort
 class SearchStandardsTool(BrainTool):
     """Query welding standards (NB/T47014, ISO 3834, etc.)."""
 
+    phase = 3
+
     def __init__(self, port: StandardsQueryPort) -> None:
         self._port = port
 
@@ -47,7 +49,7 @@ class SearchStandardsTool(BrainTool):
 
     async def execute(self, **kwargs) -> ToolResult:
         from cognitiveplane.shared.ports.knowledge import StandardsQueryInput
-        from cognitiveplane.shared.dto_knowledge import StandardsQuery
+        from cognitiveplane.shared.dto.knowledge import StandardsQuery
 
         query = StandardsQuery(
             standard_id=kwargs.get("standard_id"),

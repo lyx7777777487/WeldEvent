@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_learning import LearningContent, LearningEvent
+from cognitiveplane.shared.dto.learning import LearningContent, LearningEvent
 from cognitiveplane.shared.enums import LearningEventType, ProcessingStatus
 from cognitiveplane.shared.types import DecisionId, LearningEventId
 from cognitiveplane.memory.learning.adapters.stub import StubLearningAdapter

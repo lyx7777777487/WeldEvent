@@ -5,9 +5,9 @@ Source: 7-plane redesign spec §6 CognitiveGateway.
 
 from abc import ABC, abstractmethod
 
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     CaseData,
     Escalation,
     PublishResult,

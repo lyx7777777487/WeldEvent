@@ -8,7 +8,7 @@ backs the same interface with a PG read-replica fed from WeldMap events.
 from __future__ import annotations
 
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine
-from cognitiveplane.shared.dto_gateway import WorkflowState
+from cognitiveplane.shared.dto.gateway import WorkflowState
 from cognitiveplane.shared.types import CaseId
 
 

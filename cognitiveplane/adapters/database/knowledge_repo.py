@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine
-from cognitiveplane.shared.dto_knowledge import KnowledgeResult, RAGQuery
+from cognitiveplane.shared.dto.knowledge import KnowledgeResult, RAGQuery
 from cognitiveplane.shared.enums import KnowledgeType
 from cognitiveplane.shared.ports.knowledge import KnowledgeRepository
 from cognitiveplane.shared.types import KnowledgeId

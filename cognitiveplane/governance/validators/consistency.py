@@ -9,7 +9,7 @@ INCONSISTENT if severe contradictions found, otherwise CONSISTENT.
 
 from datetime import datetime, timezone
 
-from cognitiveplane.shared.dto_validation import InconsistencyDetail
+from cognitiveplane.shared.dto.validation import InconsistencyDetail
 from cognitiveplane.shared.ports.validation import (
     ConsistencyValidatorInput,
     ConsistencyValidatorOutput,

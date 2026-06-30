@@ -24,6 +24,8 @@ class RequestConfirmationTool(BrainTool):
     subsystem can push the question to the operator.
     """
 
+    phase = 3
+
     def __init__(self, gateway_write: CognitiveGatewayWritePort | None = None) -> None:
         self._gateway = gateway_write
 

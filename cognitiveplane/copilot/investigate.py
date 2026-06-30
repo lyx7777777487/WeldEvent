@@ -1,5 +1,8 @@
 """CopilotInvestigate — Anomaly root cause analysis (spec §11).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4/5 rewrite as /chat preset, do not extend. See copilot/__init__.py.
+
 Given an anomaly description (defect type / symptoms / case context), runs a
 coordinated retrieval over Knowledge (similar cases + process knowledge) and
 Memory (prior matched cases) to surface candidate root causes.
@@ -11,13 +14,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from cognitiveplane.capability.provider import LLMProvider, LLMRequest
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     CaseLibraryResult,
     ProcessKnowledgeQuery,
     ProcessKnowledgeResult,
 )
-from cognitiveplane.shared.dto_memory import MemorySearchQuery, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemorySearchQuery, MemorySearchResult
 from cognitiveplane.shared.ports.knowledge import (
     CaseLibraryQueryInput,
     CaseLibraryQueryPort,

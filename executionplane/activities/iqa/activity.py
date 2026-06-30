@@ -25,6 +25,7 @@ Source: WeldEvent架构方案 §5.1 (IQA职责)
 """
 
 import asyncio
+import logging
 from typing import Any
 
 from numpy.typing import NDArray
@@ -37,7 +38,7 @@ from ..base import (
     ActivityStatus,
     ActivityMetadata,
 )
-from .config import QualityStandard, QualityStandardRegistry
+from ...config.quality_standard import QualityStandard, QualityStandardRegistry
 from ...capabilities.cv_rules import (
     CVRuleChecker,
     RuleEngineOutput,
@@ -58,6 +59,26 @@ from ...weldmap.models import (
     FocusCheck,
     CompletenessCheck,
 )
+
+
+def _parse_resolution_from_detail(detail: str) -> tuple[int, int]:
+    """从 RuleResult.detail 解析 width/height（格式 "WxH" 或 "WxH < minWxminH"）。
+
+    P1-4 fix: r.value 是 w*h 总像素数，不能直接当 width 用。
+    """
+    if not detail:
+        return 0, 0
+    head = detail.split("<")[0].strip()
+    parts = head.lower().split("x")
+    if len(parts) == 2:
+        try:
+            return int(parts[0]), int(parts[1])
+        except ValueError:
+            pass
+    return 0, 0
+
+
+logger = logging.getLogger(__name__)
 
 
 class IqaActivity(BaseActivity):
@@ -189,7 +210,7 @@ class IqaActivity(BaseActivity):
                             rule_output.route_decision,
                             deep_anomalies,
                         )
-                except asyncio.TimeoutError:
+                except (asyncio.TimeoutError, TimeoutError):  # P2-3 fix: 兼容 3.11+ TimeoutError
                     mllm_error = "MLLM超时"
                 except Exception as e:
                     mllm_error = f"MLLM出错: {e}"
@@ -203,13 +224,15 @@ class IqaActivity(BaseActivity):
         )
         
         # 6. 写入WeldMap
+        # P3-4 fix: 写入失败改抛异常（而非返回 ERROR），让 Temporal RetryPolicy
+        # 自动重试瞬时故障（如 WeldMap 服务短暂不可用）。返回 ERROR 不会触发重试，
+        # 持久性故障由 RetryPolicy.maximum_attempts 限制重试次数后转 ERROR。
         try:
             await self._weldmap.write_image_quality(wf_id, report)
         except Exception as e:
-            return ActivityOutput(
-                status=ActivityStatus.ERROR,
-                error=f"WeldMap写入失败: {e}",
-            )
+            logger.error("WeldMap写入失败 (workflow=%s): %s: %s — 将由 Temporal 重试",
+                         wf_id, type(e).__name__, e, exc_info=True)
+            raise RuntimeError(f"WeldMap写入失败: {type(e).__name__}: {e}") from e
         
         # 7. 返回结果
         return self._map_to_output(report, mllm_triggered, mllm_error)
@@ -470,9 +493,12 @@ class IqaActivity(BaseActivity):
         
         for r in rule_output.results:
             if "RES" in r.rule_id:
+                # P1-4 fix: r.value 是 w*h 总像素数（不能当 width 用）
+                # 从 detail 解析真实 width/height（格式 "WxH" 或 "WxH < minWxminH"）
+                w, h = _parse_resolution_from_detail(r.detail)
                 resolution = ResolutionCheck(
-                    width=int(r.value) if r.value else 0,
-                    height=0,
+                    width=w,
+                    height=h,
                     min_required=(standard.resolution_min_width, standard.resolution_min_height),
                     passed=r.passed,
                     detail=r.detail,

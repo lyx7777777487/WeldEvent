@@ -23,6 +23,8 @@ class ExplainDecisionTool(BrainTool):
     structured explanation. Audience parameter adjusts verbosity.
     """
 
+    phase = 7
+
     def __init__(self, decision_repo: BrainDecisionRepository | None = None) -> None:
         self._repo = decision_repo
 

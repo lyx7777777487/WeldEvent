@@ -1,5 +1,8 @@
 """CopilotOperate — Production line operation guidance (spec §11).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4/5 rewrite as /chat preset, do not extend. See copilot/__init__.py.
+
 Reads current case state from the CognitiveGateway and emits a `LiveInstruction`
 that can be published via `CognitiveGatewayWritePort.publish_instruction()`.
 This is the B-level "what should the operator do right now" surface.
@@ -17,8 +20,8 @@ from cognitiveplane.gateway.ports import (
     CognitiveGatewayWritePort,
 )
 from cognitiveplane.interaction.signals.instruction import LiveInstruction
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
-from cognitiveplane.shared.dto_gateway import PublishResult
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
+from cognitiveplane.shared.dto.gateway import PublishResult
 from cognitiveplane.shared.enums import (
     InstructionStatus,
     InstructionType,

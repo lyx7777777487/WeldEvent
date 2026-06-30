@@ -11,8 +11,8 @@ from cognitiveplane.shared.dto_decision.outputs import (
     ParameterRecommendation,
     ParameterSet,
 )
-from cognitiveplane.shared.dto_gateway import Escalation
-from cognitiveplane.shared.dto_weldmap_events import (
+from cognitiveplane.shared.dto.gateway import Escalation
+from cognitiveplane.shared.dto.weldmap_events import (
     WeldMapDomainEvent,
     WeldMapEventType,
     decision_made_event,

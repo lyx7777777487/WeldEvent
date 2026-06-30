@@ -15,22 +15,22 @@ from cognitiveplane.control.tools.search_standards import SearchStandardsTool
 from cognitiveplane.control.tools.search_cases import SearchCasesTool
 from cognitiveplane.control.tools.search_process import SearchProcessTool
 from cognitiveplane.control.tools.read_weldmap import ReadWeldMapTool
-from cognitiveplane.control.tools.adjust_parameter import AdjustParameterTool
+# AdjustParameterTool removed 2026-06-26 (industrial verb → executionplane ToolPool, boundary-pinning §2.1)
 from cognitiveplane.control.tools.request_confirmation import RequestConfirmationTool
 from cognitiveplane.control.tools.escalate import EscalateTool
 from cognitiveplane.control.tools.explain_decision import ExplainDecisionTool
 from cognitiveplane.control.tools.archive_memory import ArchiveMemoryTool
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     StandardsResult,
     CaseLibraryResult,
     ProcessKnowledgeResult,
 )
 from cognitiveplane.shared.dto_decision.outputs import ParameterSet
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
-from cognitiveplane.shared.dto_gateway import PublishResult
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
+from cognitiveplane.shared.dto.gateway import PublishResult
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
 from cognitiveplane.shared.dto_decision.recommendation import RoutingRecommendation
-from cognitiveplane.shared.dto_memory import MemoryContent
+from cognitiveplane.shared.dto.memory import MemoryContent
 from cognitiveplane.shared.enums import (
     AggregatedValidationResult,
     BrainStateType,
@@ -246,19 +246,6 @@ async def test_read_weldmap_tool_returns_snapshot():
     result = await tool.execute(case_id="case-001")
     assert result.error is None
     assert "workflow_state" in result.output
-
-
-@pytest.mark.asyncio
-async def test_adjust_parameter_tool_publishes_patch():
-    gw = _StubGatewayWrite()
-    tool = AdjustParameterTool(gw)
-    result = await tool.execute(
-        parameter_name="current", proposed_value="220A", reason="optimization", case_id="case-001"
-    )
-    assert result.error is None
-    assert result.output["success"] is True
-    assert len(gw.published) == 1
-    assert gw.published[0][0] == "patch"
 
 
 @pytest.mark.asyncio

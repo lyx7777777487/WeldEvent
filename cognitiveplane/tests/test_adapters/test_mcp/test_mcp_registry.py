@@ -68,7 +68,7 @@ async def test_register_all_creates_adapters_in_tool_registry():
     server = _make_echo_server()
     await registry.register_server(server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
 
     definitions = tool_registry.get_llm_tool_definitions()
@@ -83,7 +83,7 @@ async def test_register_all_adapter_is_callable_through_tool_registry():
     server = _make_echo_server()
     await registry.register_server(server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
 
     result = await tool_registry._tools["echo_tool"].execute(text="hello")
@@ -115,7 +115,7 @@ async def test_register_multiple_servers():
     ping_server = MCPServer(client=ping_client, name="ping_server")
     await registry.register_server(ping_server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
 
     names = [d["function"]["name"] for d in tool_registry.get_llm_tool_definitions()]
@@ -130,7 +130,7 @@ async def test_list_changed_adds_new_tool():
     server = _make_echo_server()
     await registry.register_server(server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
 
     assert "ping_tool" not in [d["function"]["name"] for d in tool_registry.get_llm_tool_definitions()]
@@ -159,7 +159,7 @@ async def test_list_changed_removes_offline_tool():
     server = _make_echo_server()
     await registry.register_server(server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
     assert "echo_tool" in [d["function"]["name"] for d in tool_registry.get_llm_tool_definitions()]
 

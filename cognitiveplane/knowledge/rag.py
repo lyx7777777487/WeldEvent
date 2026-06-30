@@ -9,7 +9,7 @@ introduced in Phase 2e (Milvus); for now this delegates to whatever
 
 from __future__ import annotations
 
-from cognitiveplane.shared.dto_knowledge import KnowledgeResult, RAGQuery
+from cognitiveplane.shared.dto.knowledge import KnowledgeResult, RAGQuery
 
 from .ports import RAGQueryInput, RAGQueryPort
 

@@ -8,13 +8,13 @@ from uuid import uuid4
 
 import pytest
 
-from cognitiveplane.shared.dto_context import ContextSnapshot, WeldMapSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot, WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
 from cognitiveplane.shared.dto_decision.outputs import (
     ParameterRecommendation,
     ParameterSet,
 )
-from cognitiveplane.shared.dto_memory import MemoryContent, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemoryContent, MemorySearchResult
 from cognitiveplane.shared.enums import (
     ConsistencyStatus,
     EventType,

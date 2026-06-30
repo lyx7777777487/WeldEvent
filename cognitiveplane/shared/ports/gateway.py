@@ -8,9 +8,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from cognitiveplane.shared.dto_context import DomainEvent, WeldMapSnapshot
+from cognitiveplane.shared.dto.context import DomainEvent, WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     AuditEntry,
     CaseData,
     Escalation,
@@ -24,7 +24,7 @@ from cognitiveplane.shared.dto_gateway import (
     RiskAlert,
     WorkflowState,
 )
-from cognitiveplane.shared.dto_collaboration import FeedbackContent
+from cognitiveplane.shared.dto.collaboration import FeedbackContent
 from cognitiveplane.shared.types import CaseId
 
 

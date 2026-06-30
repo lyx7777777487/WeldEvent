@@ -7,7 +7,7 @@ from cognitiveplane.gateway.weldmap_client import WeldMapHTTPClient, WeldMapConf
 from cognitiveplane.gateway.write_gateway import WeldMapWriteGateway
 from cognitiveplane.gateway.read_gateway import WeldMapReadGateway
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
-from cognitiveplane.shared.dto_gateway import Escalation, PublishResult
+from cognitiveplane.shared.dto.gateway import Escalation, PublishResult
 from cognitiveplane.shared.enums import (
     AggregatedValidationResult,
     BrainStateType,

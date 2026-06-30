@@ -7,10 +7,11 @@ Source: Complete_architecture_V1.docx §3.1 (深度视觉层)
   - VDA 判定推理：结合图像+标准做风险评估
   - CAA 对话交互：用户发图问答
 
-Cognitive Plane 和 Execution Plane 共享同一个 MLLM 实例，
-但调用模式不同:
-  - Cognitive: 对话式，低频，面向用户
-  - Agent: 批处理式，高频，结构化输出
+L3 Execution Plane 独立的 MLLM 实例（不与 L1 Cognitive Plane 共享，
+见 boundary-pinning §1.1 — 认知 MCP vs 工业执行 MCP 不共享实现）。
+调用模式:
+  - L1 Cognitive: 对话式，低频，面向用户
+  - L3 Execution: 批处理式，高频，结构化输出
 """
 
 from abc import ABC, abstractmethod

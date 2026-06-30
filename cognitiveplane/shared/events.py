@@ -1,12 +1,12 @@
 """L1 Cognitive Plane -- Event schemas.
 
-Re-exports domain events and brain-internal events from dto_context for
-convenient access via ``src.shared.events``.
+Re-exports domain events and brain-internal events from ``shared.dto.context``
+for convenient access via ``shared.events``.
 
 Source: L1_Port_and_Contract_Design.md (Phase 4, Sections 3.advice.md--3.3).
 """
 
-from cognitiveplane.shared.dto_context import (  # noqa: F401
+from cognitiveplane.shared.dto.context import (  # noqa: F401
     BrainInternalEvent,
     BrainInternalEventType,
     DomainEvent,

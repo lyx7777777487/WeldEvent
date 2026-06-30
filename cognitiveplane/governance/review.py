@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_collaboration import (
+from cognitiveplane.shared.dto.collaboration import (
     HumanReviewRequest,
     ResolutionContent,
     ReviewContent,

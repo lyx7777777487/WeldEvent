@@ -1,45 +1,27 @@
-"""Bridge — translator + connector + launcher tests (spec §6.1).
+"""Bridge — EventConnector + WorkflowLauncher tests (boundary-pinning §6.2).
 
-Pins the L1→L2 hand-off contract: a published BrainDecision turns into
-a JSON-serialisable WorkflowTemplate, and only decisions whose primary
-output declares a non-generic kind launch a workflow.
+Pins the L1→L2 hand-off contract: a WorkflowSpec produced by design_workflow
+is submitted to Temporal via EventConnector → WorkflowLauncher → WorkflowLaunchPort.
+
+P2-11 fix (2026-06-26): 完全重写匹配新 API。旧测试调 legacy
+on_decision_published/_should_launch/WorkflowTemplate，已随 §6.2 改向废弃。
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from uuid import UUID
-
 import pytest
 
-from cognitiveplane.bridge.decision_translator import (
-    GENERIC_KIND,
-    DecisionTranslator,
-    WorkflowTemplate,
-)
 from cognitiveplane.bridge.event_connector import EventConnector
 from cognitiveplane.bridge.workflow_launcher import (
     WorkflowLaunchPort,
     WorkflowLaunchResult,
     WorkflowLauncher,
 )
-from cognitiveplane.shared.dto_decision.decision import (
-    BrainDecision,
-    DecisionOutput,
+from cognitiveplane.shared.dto_workflow import (
+    CallerContext,
+    WorkflowNode,
+    WorkflowSpec,
 )
-from cognitiveplane.shared.dto_decision.recommendation import (
-    RoutingRecommendation,
-)
-from cognitiveplane.shared.enums import (
-    AggregatedValidationResult,
-    BrainStateType,
-    DecisionPointType,
-    EventType,
-    PersonaType,
-    ReasoningMode,
-    RoutingDecision,
-)
-from cognitiveplane.shared.types import CaseId, DecisionId
 
 
 # ---------------------------------------------------------------------------
@@ -47,70 +29,60 @@ from cognitiveplane.shared.types import CaseId, DecisionId
 # ---------------------------------------------------------------------------
 
 
-def _routing_recommendation() -> RoutingRecommendation:
-    return RoutingRecommendation(
-        route=RoutingDecision.ACCEPT,
-        destination="next-stage",
-        confidence=0.9,
-        rationale="all checks passed",
-    )
-
-
-def _build_decision(
+def _make_spec(
     *,
-    output_content: object | None,
-) -> BrainDecision:
-    outputs: list[DecisionOutput]
-    if output_content is None:
-        outputs = []
-    else:
-        outputs = [DecisionOutput(content=output_content, confidence=0.85)]
-    return BrainDecision(
-        decision_id=DecisionId(value=UUID(int=1)),
-        case_id=CaseId(value="case-0002"),
-        trigger_event_type=EventType.WORKFLOW_ENTERED,
-        decision_point=DecisionPointType.DP0,
-        persona=PersonaType.PLANNER,
-        reasoning_mode=ReasoningMode.ROUTINE,
-        state=BrainStateType.PUBLICATION,
-        outputs=outputs,
-        validation_result=AggregatedValidationResult.APPROVED,
-        confidence=0.9,
-        created_at=datetime(2026, 6, 15, tzinfo=UTC),
+    objective: str = "Inspect weld seam for defects",
+    nodes: list[WorkflowNode] | None = None,
+    case_id: str = "case-0002",
+) -> WorkflowSpec:
+    """Build a minimal valid WorkflowSpec for testing."""
+    if nodes is None:
+        nodes = [
+            WorkflowNode(
+                node_id="node-1",
+                type="tool_task",
+                capability="defect_detection",
+                caller_context=CallerContext(case_id=case_id),
+            ),
+        ]
+    return WorkflowSpec(
+        workflow_id="wf-test-001",
+        objective=objective,
+        nodes=nodes,
     )
 
 
-# ---------------------------------------------------------------------------
-# DecisionTranslator
-# ---------------------------------------------------------------------------
+class _RecordingPort(WorkflowLaunchPort):
+    """Fake port that records submitted specs."""
+
+    def __init__(self, *, accept: bool = True) -> None:
+        self.submitted: list[WorkflowSpec] = []
+        self._accept = accept
+
+    async def submit(self, spec: WorkflowSpec) -> WorkflowLaunchResult:
+        self.submitted.append(spec)
+        return WorkflowLaunchResult(
+            workflow_id=spec.workflow_id,
+            run_id="run-fake-001",
+            accepted=self._accept,
+            adapter="fake",
+            error=None if self._accept else "fake rejection",
+        )
 
 
-def test_translator_projects_primary_output_into_template() -> None:
-    decision = _build_decision(output_content=_routing_recommendation())
+class _RecordingGatewayWrite:
+    """Fake CognitiveGatewayWritePort that records notify_workflow_trigger calls."""
 
-    template = DecisionTranslator().translate(decision)
+    def __init__(self) -> None:
+        self.triggered: list[tuple[str, dict]] = []
 
-    assert isinstance(template, WorkflowTemplate)
-    assert template.template_id == f"tmpl-{decision.decision_id.value}"
-    assert template.case_id == "case-0002"
-    assert template.decision_id == str(decision.decision_id.value)
-    assert template.workflow_kind == "routing_recommendation"
-    assert template.parameters["route"] == RoutingDecision.ACCEPT.value
-    assert template.parameters["destination"] == "next-stage"
-    assert template.metadata == {
-        "persona": PersonaType.PLANNER.value,
-        "reasoning_mode": ReasoningMode.ROUTINE.value,
-        "confidence": 0.9,
-    }
+    async def notify_workflow_trigger(self, case_id, workflow_config: dict) -> None:
+        self.triggered.append((str(case_id.value), workflow_config))
 
-
-def test_translator_falls_back_to_generic_kind_when_outputs_empty() -> None:
-    decision = _build_decision(output_content=None)
-
-    template = DecisionTranslator().translate(decision)
-
-    assert template.workflow_kind == GENERIC_KIND
-    assert template.parameters == {}
+    # Other abstract methods not needed for bridge tests
+    async def publish_decision(self, decision): ...
+    async def publish_escalation(self, escalation): ...
+    async def publish_instruction(self, instruction): ...
 
 
 # ---------------------------------------------------------------------------
@@ -118,111 +90,196 @@ def test_translator_falls_back_to_generic_kind_when_outputs_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _RecordingLauncher(WorkflowLauncher):
-    def __init__(self) -> None:
-        super().__init__()
-        self.launched: list[WorkflowTemplate] = []
-
-    async def launch(self, template: WorkflowTemplate) -> WorkflowLaunchResult:
-        self.launched.append(template)
-        return await super().launch(template)
-
-
 @pytest.mark.asyncio
-async def test_connector_skips_decisions_without_actionable_kind() -> None:
-    connector = EventConnector(DecisionTranslator(), _RecordingLauncher())
-    decision = _build_decision(output_content=None)
-
-    result = await connector.on_decision_published(decision)
-
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_connector_launches_actionable_decisions() -> None:
-    launcher = _RecordingLauncher()
-    connector = EventConnector(DecisionTranslator(), launcher)
-    decision = _build_decision(output_content=_routing_recommendation())
-
-    result = await connector.on_decision_published(decision)
-
-    assert result is not None
-    assert result.accepted is True
-    assert result.template_id == f"tmpl-{decision.decision_id.value}"
-    assert result.metadata == {"adapter": "in-memory"}
-    assert len(launcher.launched) == 1
-    assert launcher.launched[0].workflow_kind == "routing_recommendation"
-
-
-def test_should_launch_filter_rejects_generic_kind() -> None:
-    class _GenericContent:
-        type = GENERIC_KIND
-
-    decision = _build_decision(output_content=None)
-    decision = decision.model_copy(
-        update={"outputs": [DecisionOutput.model_construct(content=_GenericContent(), confidence=0.5)]}
-    )
-
-    assert EventConnector._should_launch(decision) is False
-
-
-def test_should_launch_filter_accepts_typed_content() -> None:
-    decision = _build_decision(output_content=_routing_recommendation())
-
-    assert EventConnector._should_launch(decision) is True
-
-
-# ---------------------------------------------------------------------------
-# WorkflowLauncher + custom port
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_default_launcher_emits_in_memory_metadata() -> None:
-    launcher = WorkflowLauncher()
-    template = WorkflowTemplate(
-        template_id="tmpl-x",
-        case_id="case-x",
-        decision_id="dec-x",
-        workflow_kind="routing_recommendation",
-    )
-
-    result = await launcher.launch(template)
-
-    assert result.template_id == "tmpl-x"
-    assert result.workflow_id.startswith("wf-")
-    assert result.run_id.startswith("run-")
-    assert result.accepted is True
-    assert result.metadata == {"adapter": "in-memory"}
-
-
-@pytest.mark.asyncio
-async def test_custom_workflow_launch_port_is_honoured() -> None:
-    class _FakePort(WorkflowLaunchPort):
-        def __init__(self) -> None:
-            self.received: WorkflowTemplate | None = None
-
-        async def submit(self, template: WorkflowTemplate) -> WorkflowLaunchResult:
-            self.received = template
-            return WorkflowLaunchResult(
-                workflow_id="wf-custom",
-                run_id="run-custom",
-                template_id=template.template_id,
-                accepted=True,
-                metadata={"adapter": "fake"},
-            )
-
-    port = _FakePort()
+async def test_connector_submits_workflow_spec_to_launcher() -> None:
+    """正常路径: WorkflowSpec → EventConnector → Launcher → Port."""
+    port = _RecordingPort()
     launcher = WorkflowLauncher(port=port)
-    template = WorkflowTemplate(
-        template_id="tmpl-y",
-        case_id="case-y",
-        decision_id="dec-y",
-        workflow_kind="routing_recommendation",
-    )
+    connector = EventConnector(launcher=launcher)
+    spec = _make_spec()
 
-    result = await launcher.launch(template)
+    result = await connector.on_workflow_spec(spec)
 
-    assert port.received is template
-    assert result.workflow_id == "wf-custom"
-    assert result.metadata == {"adapter": "fake"}
+    assert result.accepted is True
+    assert result.workflow_id == "wf-test-001"
+    assert result.run_id == "run-fake-001"
+    assert result.adapter == "fake"
+    assert len(port.submitted) == 1
+    assert port.submitted[0].workflow_id == "wf-test-001"
+
+
+@pytest.mark.asyncio
+async def test_connector_skips_spec_with_no_nodes() -> None:
+    """空 nodes 的 spec 不提交，返回 accepted=False."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+    spec = _make_spec(nodes=[])
+
+    result = await connector.on_workflow_spec(spec)
+
+    assert result.accepted is False
+    assert result.adapter == "null"
+    assert "no nodes" in (result.error or "").lower()
+    assert len(port.submitted) == 0
+
+
+@pytest.mark.asyncio
+async def test_connector_propagates_launch_failure() -> None:
+    """Port 拒绝时，result.accepted=False 透传."""
+    port = _RecordingPort(accept=False)
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+    spec = _make_spec()
+
+    result = await connector.on_workflow_spec(spec)
+
+    assert result.accepted is False
+    assert result.error == "fake rejection"
+    assert len(port.submitted) == 1
+
+
+@pytest.mark.asyncio
+async def test_connector_notifies_gateway_before_launch() -> None:
+    """P2-9: 提交 Temporal 前先调 gateway.notify_workflow_trigger."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    gateway = _RecordingGatewayWrite()
+    connector = EventConnector(launcher=launcher, gateway_write=gateway)
+    spec = _make_spec(case_id="case-bridge-001")
+
+    await connector.on_workflow_spec(spec)
+
+    assert len(gateway.triggered) == 1
+    case_id, config = gateway.triggered[0]
+    assert case_id == "case-bridge-001"
+    assert config["workflow_id"] == "wf-test-001"
+    assert config["objective"] == "Inspect weld seam for defects"
+    assert config["node_count"] == 1
+    # Temporal 也被提交（gateway 通知不阻断）
+    assert len(port.submitted) == 1
+
+
+@pytest.mark.asyncio
+async def test_connector_gateway_failure_does_not_block_launch() -> None:
+    """P2-9: gateway 通知失败不阻断 Temporal 提交."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+
+    class _FailingGateway(_RecordingGatewayWrite):
+        async def notify_workflow_trigger(self, case_id, workflow_config):
+            raise RuntimeError("WeldMap unavailable")
+
+    gateway = _FailingGateway()
+    connector = EventConnector(launcher=launcher, gateway_write=gateway)
+    spec = _make_spec()
+
+    result = await connector.on_workflow_spec(spec)
+
+    assert result.accepted is True  # Temporal 仍提交成功
+    assert len(port.submitted) == 1
+
+
+@pytest.mark.asyncio
+async def test_connector_without_gateway_skips_notification() -> None:
+    """gateway_write=None 时跳过通知（开发/测试降级）."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher, gateway_write=None)
+    spec = _make_spec()
+
+    result = await connector.on_workflow_spec(spec)
+
+    assert result.accepted is True
+    assert len(port.submitted) == 1
+
+
+@pytest.mark.asyncio
+async def test_connector_aclose_forwards_to_launcher() -> None:
+    """P2-3: aclose 转发到 launcher."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+
+    # 不应抛异常
+    await connector.aclose()
+
+
+@pytest.mark.asyncio
+async def test_connector_is_healthy_forwards_to_launcher() -> None:
+    """P2-R3-5: is_healthy 转发到 launcher."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+
+    healthy = await connector.is_healthy()
+    # _RecordingPort 没有 is_healthy 方法 → launcher 默认返回 True
+    assert healthy is True
+
+
+# ---------------------------------------------------------------------------
+# WorkflowLauncher + port
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_default_launcher_uses_null_port() -> None:
+    """无 port 时用 _NullWorkflowLaunchPort，返回 accepted=False."""
+    launcher = WorkflowLauncher()
+    spec = _make_spec()
+
+    result = await launcher.launch(spec)
+
+    assert result.accepted is False
+    assert result.adapter == "null"
+    assert "adapter" in (result.error or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_custom_port_is_honoured() -> None:
+    """自定义 port 的 submit 被调用."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    spec = _make_spec()
+
+    result = await launcher.launch(spec)
+
+    assert result.accepted is True
+    assert result.adapter == "fake"
+    assert port.submitted[0] is spec
+
+
+@pytest.mark.asyncio
+async def test_launcher_aclose_forwards_to_port() -> None:
+    """P2-3: launcher.aclose 转发到 port（若 port 支持）."""
+
+    class _ClosablePort(_RecordingPort):
+        def __init__(self) -> None:
+            super().__init__()
+            self.closed = False
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    port = _ClosablePort()
+    launcher = WorkflowLauncher(port=port)
+
+    await launcher.aclose()
+
+    assert port.closed is True
+
+
+@pytest.mark.asyncio
+async def test_launcher_is_healthy_forwards_to_port() -> None:
+    """P2-R3-5: launcher.is_healthy 转发到 port（若 port 支持）."""
+
+    class _HealthyPort(_RecordingPort):
+        async def is_healthy(self) -> bool:
+            return False  # 模拟不健康
+
+    port = _HealthyPort()
+    launcher = WorkflowLauncher(port=port)
+
+    healthy = await launcher.is_healthy()
+
+    assert healthy is False

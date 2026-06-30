@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from cognitiveplane.memory.dual_write import DualWriteMemoryService, VectorStorePort
-from cognitiveplane.shared.dto_memory import MemoryContent, MemorySearchQuery, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemoryContent, MemorySearchQuery, MemorySearchResult
 from cognitiveplane.shared.enums import MemoryType, PromotionStatus
 from cognitiveplane.shared.types import MemoryId
 

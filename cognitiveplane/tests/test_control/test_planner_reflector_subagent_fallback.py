@@ -18,14 +18,14 @@ from cognitiveplane.control.sub_agent import (
     SubAgentResult,
     SubAgentTask,
 )
-from cognitiveplane.shared.dto_collaboration import FeedbackContent
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.collaboration import FeedbackContent
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
 from cognitiveplane.shared.dto_decision.outputs import (
     ParameterRecommendation,
     ParameterSet,
 )
-from cognitiveplane.shared.dto_validation import (
+from cognitiveplane.shared.dto.validation import (
     SafetyValidationResult,
     ValidationResult,
 )

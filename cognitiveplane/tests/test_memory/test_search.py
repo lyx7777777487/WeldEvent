@@ -24,7 +24,7 @@ from cognitiveplane.memory.search import (
     HybridMemorySearch,
     HybridSearchConfig,
 )
-from cognitiveplane.shared.dto_memory import (
+from cognitiveplane.shared.dto.memory import (
     MemorySearchQuery,
     MemorySearchResult,
 )

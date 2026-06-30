@@ -30,14 +30,20 @@ class ToolRegistry:
         self,
         deps: CognitiveDependencies | None = None,
         image_store: "ImageStore | None" = None,
+        current_phase: int = 3,
     ) -> None:
         """Construct registry. If deps given, auto-register tools from deps.
 
         image_store: session-scoped image storage (plan §A.3). Passed explicitly
             rather than via CapabilityDeps because it's runtime state, not a
             Provider. When None, AnalyzeImageTool is not registered.
+        current_phase: 系统当前阶段 (boundary-pinning 2026-06-25). 工具的
+            BrainTool.phase > current_phase 时仍注册 (execute() 可显式调用) 但
+            get_llm_tool_definitions() 不暴露 — LLM 看不到也调不到. 默认 3 = 当前
+            Phase 3 (2026-06-26 从 2 上调). 推进到 Phase 4+ 时调高即可隐藏未就绪工具.
         """
         self._tools: dict[str, BrainTool] = {}
+        self._current_phase = current_phase
         if deps is not None:
             self._register_tools(deps, image_store)
 
@@ -62,14 +68,13 @@ class ToolRegistry:
         from cognitiveplane.control.tools.search_process import SearchProcessTool
         from cognitiveplane.control.tools.read_weldmap import ReadWeldMapTool
         from cognitiveplane.control.tools.design_workflow import DesignWorkflowTool
-        from cognitiveplane.control.tools.adjust_parameter import AdjustParameterTool
+        from cognitiveplane.control.tools.launch_workflow import LaunchWorkflowTool
         from cognitiveplane.control.tools.request_confirmation import RequestConfirmationTool
         from cognitiveplane.control.tools.escalate import EscalateTool
         from cognitiveplane.control.tools.explain_decision import ExplainDecisionTool
         from cognitiveplane.control.tools.archive_memory import ArchiveMemoryTool
         from cognitiveplane.control.tools.web_search import WebSearchTool
         from cognitiveplane.control.tools.analyze_image import AnalyzeImageTool
-        from cognitiveplane.control.tools.manage_plan import ManagePlanTool
 
         # Knowledge tools
         if deps.knowledge.standards_query is not None:
@@ -90,10 +95,18 @@ class ToolRegistry:
         # Gateway tools
         if deps.gateway.read is not None:
             self.register(ReadWeldMapTool(deps.gateway.read))
+        # AdjustParameterTool removed 2026-06-26 — industrial verb "adjust" belongs to
+        # executionplane ToolPool (boundary-pinning §2.1). Phase 5 will re-implement there.
+        # Governance policy (tool_policy.py / hooks.py / permissions.py) retained as no-op.
         if deps.gateway.write is not None:
-            self.register(AdjustParameterTool(deps.gateway.write))
-        if deps.control.orchestrator is not None:
-            self.register(DesignWorkflowTool(deps.control.orchestrator, deps))
+            self.register(DesignWorkflowTool(deps))
+
+        # L1→L2 Bridge tool — 提交 WorkflowSpec 到 Temporal（boundary-pinning §6.2）
+        # 需要 bridge.event_connector 已装配（app.py 注入 TemporalWorkflowLaunchPort）
+        # P4 fix: 注入 image_store 让 launch_workflow 能解析 design_workflow 产出的
+        # image_refs（PENDING:session_id:index）→ 磁盘 image_path，供 L3 IQA/PPA 读取
+        if deps.bridge.event_connector is not None:
+            self.register(LaunchWorkflowTool(deps, image_store=image_store))
 
         # Human interaction tools
         if deps.gateway.write is not None:
@@ -118,13 +131,32 @@ class ToolRegistry:
             self.register(WebSearchTool(deps.capability.web_search))
 
         # Self-management tools (plan §3.1 line 452, §7 line 1193)
-        # manage_plan: phase 2 — LLM 自主任务拆解 (Claude Code TodoWrite 借鉴)
-        # Always registered — LLM decides whether to use it per conversation.
-        self.register(ManagePlanTool())
+        # manage_plan 暂不默认注册 — 边界钉死 (2026-06-25): LLM 可见工具集过宽会把
+        # 未来带向 "LLM 直接执行一切". manage_plan 留作 phase 3+ AgentLoop 批量任务
+        # 场景按需 opt-in (见 boundary-pinning spec §BrainToolRegistry profile).
+        # 工具类本身保留, 测试可直接构造 ManagePlanTool() 验证功能.
 
     def get_llm_tool_definitions(self) -> list[dict]:
-        """Return tool definitions in LLM Function Calling format."""
-        return [tool.to_function_definition() for tool in self._tools.values()]
+        """Return tool definitions in LLM Function Calling format.
+
+        Boundary-pinning 2026-06-25: 过滤 phase > current_phase 的工具 — 它们仍
+        在注册表里 (execute() 可显式调用), 但不出现在 LLM 工具表里, 防止未就绪
+        工具被 LLM 误调用.
+        """
+        return [
+            tool.to_function_definition()
+            for tool in self._tools.values()
+            if self.is_llm_visible(tool.name)
+        ]
+
+    def is_llm_visible(self, tool_name: str) -> bool:
+        """Whether a tool is visible/callable from the Brain LLM at this phase."""
+        tool = self._tools.get(tool_name)
+        return tool is not None and getattr(tool, "phase", 1) <= self._current_phase
+
+    def list_llm_tools(self) -> list[str]:
+        """List tools visible to the Brain LLM at this phase."""
+        return [name for name in self._tools if self.is_llm_visible(name)]
 
     def validate_arguments(self, tool_name: str, arguments: dict) -> tuple[bool, str | None]:
         """Plan §3.5 原则 5: validate arguments against tool's JSON Schema before execution.

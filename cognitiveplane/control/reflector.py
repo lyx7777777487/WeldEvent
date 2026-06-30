@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from cognitiveplane.shared.dto_collaboration import FeedbackContent
-from cognitiveplane.shared.dto_context import ContextSnapshot
-from cognitiveplane.shared.dto_deepagents import Gap, Suggestion
+from cognitiveplane.shared.dto.collaboration import FeedbackContent
+from cognitiveplane.shared.dto.context import ContextSnapshot
+from cognitiveplane.shared.dto.deepagents import Gap, Suggestion
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_validation import ValidationResult
+from cognitiveplane.shared.dto.validation import ValidationResult
 from cognitiveplane.shared.enums import (
     AggregatedValidationResult,
     SafetyStatus,

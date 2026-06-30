@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cognitiveplane.shared.dto_knowledge import CaseLibraryQuery, CaseLibraryResult
+from cognitiveplane.shared.dto.knowledge import CaseLibraryQuery, CaseLibraryResult
 
 from .ports import CaseLibraryQueryInput, CaseLibraryQueryPort
 

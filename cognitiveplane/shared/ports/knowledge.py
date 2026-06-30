@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     CaseLibraryResult,
     EquipmentKnowledgeQuery,

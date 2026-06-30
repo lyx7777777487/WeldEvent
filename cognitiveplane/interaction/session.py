@@ -49,6 +49,36 @@ class SessionManager:
         self._sessions[operator_id][str(session.session_id.value)] = session
         return session
 
+    def get_or_create_session(
+        self,
+        operator_id: str,
+        session_id: str | None,
+        case_id: str | None = None,
+    ) -> Session:
+        """按 session_id 获取会话；不存在则用该 session_id 创建（复用前端 id）。
+
+        前端 localStorage 维护会话列表，每条会话有稳定 id（如 'sess_1719xxx'）。
+        后端需复用该 id，否则每次请求都创建新 UUID，历史对话无法累积。
+        L1 重启后内存清空，前端传的 id 在后端查不到时也用同一 id 重建，
+        保证重启后前端会话 id 不变。
+        """
+        if session_id:
+            existing = self._sessions.get(operator_id, {}).get(session_id)
+            if existing is not None:
+                return existing
+            # 用前端传的 session_id 创建（而非随机 UUID），保证跨轮次稳定
+            session = Session(
+                session_id=SessionId(value=session_id),
+                operator_id=operator_id,
+                case_id=case_id,
+            )
+            if operator_id not in self._sessions:
+                self._sessions[operator_id] = {}
+            self._sessions[operator_id][session_id] = session
+            return session
+        # 没传 session_id → 创建全新会话（随机 UUID）
+        return self.create_session(operator_id, case_id)
+
     def get_session(self, operator_id: str, session_id: str) -> Session | None:
         """Get a session by operator and session ID."""
         return self._sessions.get(operator_id, {}).get(session_id)

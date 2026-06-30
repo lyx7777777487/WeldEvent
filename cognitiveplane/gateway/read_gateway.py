@@ -5,8 +5,8 @@ Delegates to WeldMapHTTPClient for actual reads from WeldMap Store.
 
 from cognitiveplane.gateway.ports import CognitiveGatewayReadPort
 from cognitiveplane.gateway.weldmap_client import WeldMapHTTPClient
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
-from cognitiveplane.shared.dto_gateway import CaseData, WorkflowState
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
+from cognitiveplane.shared.dto.gateway import CaseData, WorkflowState
 from cognitiveplane.shared.types import CaseId
 
 

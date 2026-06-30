@@ -1,0 +1,1671 @@
+entries:
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:33.061665+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:33.062511+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:33.063755+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T12:58:33.071346+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T12:58:33.072640+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:33.073794+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:41.985492+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:41.988930+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:41.992080+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T12:58:42.000766+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T12:58:42.003884+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T12:58:42.005691+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:22:27.056297+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:22:27.060654+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:22:27.107425+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:22:27.111705+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:22:27.113947+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:23:14.096829+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:23:14.102616+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:23:14.108198+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:23:14.120206+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:23:14.126204+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:23:14.129009+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: test_tool
+  failure_pattern: 'Unknown tool: test_tool'
+  suggested_rule: Consider pre-validating test_tool required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.879029+00:00'
+  arguments_preview:
+    query: x
+  session_id: ''
+- tool_name: test_tool
+  failure_pattern: 'Unknown tool: test_tool'
+  suggested_rule: Consider pre-validating test_tool required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.886362+00:00'
+  arguments_preview:
+    query: x
+  session_id: ''
+- tool_name: test_tool
+  failure_pattern: 'Unknown tool: test_tool'
+  suggested_rule: Consider pre-validating test_tool required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.894080+00:00'
+  arguments_preview:
+    query: x
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.901694+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.909377+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Unknown tool: adjust_parameter'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.917299+00:00'
+  arguments_preview:
+    parameter: current
+    value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:26:04.954028+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:26:04.962055+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:26:04.965865+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:27:34.911172+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:27:34.921068+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Unknown tool: adjust_parameter'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:27:34.930725+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:28:24.364636+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:28:24.375097+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:28:24.386078+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:28:24.403354+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:28:24.413956+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:28:24.418563+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:30:20.250929+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:30:20.289212+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:30:20.301754+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:30:20.319852+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-24T13:30:20.332044+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-24T13:30:20.337295+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:51:02.397913+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:51:02.449305+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:51:02.463282+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:51:02.483046+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:51:02.496804+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:51:02.502672+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:38.987950+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:39.004013+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:39.019468+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:53:39.041901+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:53:39.057387+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:39.064039+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:49.847299+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:49.889327+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:49.906172+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:53:49.929249+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T01:53:49.946020+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T01:53:49.953013+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:22.036050+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:22.055374+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:22.073778+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T03:48:22.098555+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T03:48:22.117119+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:22.124933+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:54.950140+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:54.973368+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:54.993942+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T03:48:55.019729+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T03:48:55.040121+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T03:48:55.048522+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T07:00:23.667618+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T07:00:23.694006+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T07:00:23.716721+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T07:00:23.744315+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T07:00:23.766207+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T07:00:23.775528+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:27:05.314529+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:27:05.338745+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:27:05.362453+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T09:27:05.392972+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T09:27:05.416554+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:27:05.426364+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:33:07.196033+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:33:07.226603+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:33:07.252063+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T09:33:07.283816+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T09:33:07.310122+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T09:33:07.320714+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:01:43.674781+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:01:43.702682+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:01:43.729521+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:01:43.763515+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:01:43.790162+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:01:43.801259+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:02:02.125865+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:02:02.158031+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:02:02.185950+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:02:02.219918+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:02:02.248094+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:02:02.259407+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:04:15.918316+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:04:15.952406+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:04:15.981987+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:04:16.017258+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:04:16.047186+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:04:16.059521+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:14:07.908740+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:14:07.944483+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:14:07.976369+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:14:08.013453+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:14:08.045044+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:14:08.058206+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:16:22.009352+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:16:22.047173+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:16:22.080247+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:16:22.119365+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-25T10:16:22.152766+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-25T10:16:22.166235+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T02:26:16.936748+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T02:26:16.979618+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T02:26:17.015568+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T02:26:17.057185+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T02:26:17.093456+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T02:26:17.109644+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:22:02.252319+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:22:02.295133+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:22:02.332974+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:22:02.378409+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:22:02.415518+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:22:02.430141+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:25:37.278882+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:25:37.324385+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:25:37.362844+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:25:37.430440+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:25:37.468799+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:25:37.484506+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:27:13.883001+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:27:13.928859+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:27:13.969627+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:27:14.016422+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:27:14.056639+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:27:14.073065+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:46:14.323186+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:46:14.369038+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:46:14.410805+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:46:14.458645+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-26T03:46:14.499759+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-26T03:46:14.516393+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: ''
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-26T10:23:12.489687+00:00'
+  arguments_preview:
+    image_ref: PENDING:5b1b692b-b1cc-4066-86dd-12387962b078:0
+    question: 请全面检测该焊缝图片，识别是否存在气孔、裂纹、夹渣、未熔合、咬边等缺陷，并评估焊缝质量等级
+  session_id: 5b1b692b-b1cc-4066-86dd-12387962b078
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-26T10:28:06.385779+00:00'
+  arguments_preview:
+    image_ref: PENDING:52509533-d89f-4433-96c7-977a1290a539:0
+    question: 请全面分析该焊缝图像：检测所有缺陷类型（气孔、夹渣、裂纹、未熔合、未焊透、咬边等），评估质量等级，并给出改进建议
+  session_id: 52509533-d89f-4433-96c7-977a1290a539
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-26T10:28:38.131847+00:00'
+  arguments_preview:
+    image_ref: PENDING:52509533-d89f-4433-96c7-977a1290a539:0
+    question: 请全面分析该焊缝图像：检测所有缺陷类型（气孔、夹渣、裂纹、未熔合、未焊透、咬边等），评估质量等级，并给出改进建议
+  session_id: 52509533-d89f-4433-96c7-977a1290a539
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-28T10:10:33.131011+00:00'
+  arguments_preview:
+    image_ref: PENDING:61860b66-9d34-4873-b51f-f063e5d9cc45:0
+    question: 请全面检测该焊缝的缺陷类型、位置、严重程度，并评估焊缝质量等级
+  session_id: 61860b66-9d34-4873-b51f-f063e5d9cc45
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-28T10:11:04.759251+00:00'
+  arguments_preview:
+    image_ref: PENDING:61860b66-9d34-4873-b51f-f063e5d9cc45:0
+    question: 焊缝质量检测：是否存在气孔、裂纹、未熔合、咬边等缺陷？
+  session_id: 61860b66-9d34-4873-b51f-f063e5d9cc45
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:00:10.397269+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:00:10.453193+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:00:10.500352+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-28T12:00:10.554201+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-28T12:00:10.602017+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:00:10.622531+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:14:54.107156+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:14:54.157012+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:14:54.206931+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-28T12:14:54.263615+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-28T12:14:54.313488+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-28T12:14:54.335346+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T07:51:40.145259+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782805853826:0
+    question: 全面分析这张焊缝图像的质量，检测是否存在缺陷（气孔、夹渣、裂纹、未熔合、咬边等），评估图像质量和焊缝质量等级
+  session_id: sess_1782805853826

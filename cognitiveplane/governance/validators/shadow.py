@@ -12,7 +12,7 @@ secondary reasoning pass.
 
 from datetime import datetime, timezone
 
-from cognitiveplane.shared.dto_validation import ShadowDecision, DivergencePoint
+from cognitiveplane.shared.dto.validation import ShadowDecision, DivergencePoint
 from cognitiveplane.shared.ports.validation import (
     ShadowValidatorInput,
     ShadowValidatorOutput,

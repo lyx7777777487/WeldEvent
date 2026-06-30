@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from cognitiveplane.shared.dto_validation import (
+from cognitiveplane.shared.dto.validation import (
     SafetyValidationResult,
     StageResult,
     ValidationResult,

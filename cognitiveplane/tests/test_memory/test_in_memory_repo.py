@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_memory import MemoryContent, MemoryRecord, MemorySearchQuery
+from cognitiveplane.shared.dto.memory import MemoryContent, MemoryRecord, MemorySearchQuery
 from cognitiveplane.shared.enums import MemoryType, PromotionStatus
 from cognitiveplane.shared.types import DecisionId, MemoryId
 from cognitiveplane.memory.repositories.in_memory import InMemoryMemoryRepository

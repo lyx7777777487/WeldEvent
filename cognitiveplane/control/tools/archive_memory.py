@@ -5,11 +5,16 @@ Inspired by Letta archival_memory_insert — agent controls what to archive.
 """
 
 from cognitiveplane.control.tools import BrainTool, ToolResult
+from cognitiveplane.shared.enums import MemoryType
 from cognitiveplane.shared.ports.memory import MemoryWritePort
+
+_MEMORY_TYPE_ENUM = [e.value for e in MemoryType]
 
 
 class ArchiveMemoryTool(BrainTool):
     """Archive knowledge to long-term memory. Agent-controlled, no auto-promotion."""
+
+    phase = 6
 
     def __init__(self, port: MemoryWritePort) -> None:
         self._port = port
@@ -37,7 +42,8 @@ class ArchiveMemoryTool(BrainTool):
                 },
                 "memory_type": {
                     "type": "string",
-                    "description": "Type of memory (approved_decision, experience, knowledge)",
+                    "enum": _MEMORY_TYPE_ENUM,
+                    "description": "Type of memory. Must be one of the enum values.",
                 },
                 "tags": {
                     "type": "array",
@@ -50,7 +56,7 @@ class ArchiveMemoryTool(BrainTool):
 
     async def execute(self, **kwargs) -> ToolResult:
         from cognitiveplane.shared.ports.memory import MemoryWriteInput
-        from cognitiveplane.shared.dto_memory import MemoryContent
+        from cognitiveplane.shared.dto.memory import MemoryContent
         from cognitiveplane.shared.enums import MemoryType
         from uuid import uuid4
 

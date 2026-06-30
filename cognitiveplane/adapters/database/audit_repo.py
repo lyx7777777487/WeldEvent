@@ -8,7 +8,7 @@ forwarding to a SIEM.
 from __future__ import annotations
 
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine
-from cognitiveplane.shared.dto_gateway import AuditEntry
+from cognitiveplane.shared.dto.gateway import AuditEntry
 from cognitiveplane.shared.types import CaseId
 
 

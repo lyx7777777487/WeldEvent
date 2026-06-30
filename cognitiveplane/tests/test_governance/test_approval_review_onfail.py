@@ -23,7 +23,7 @@ from cognitiveplane.governance.review import (
     HumanReviewWorkflow,
     ReviewNotFoundError,
 )
-from cognitiveplane.shared.dto_collaboration import (
+from cognitiveplane.shared.dto.collaboration import (
     ResolutionContent,
     ReviewContent,
 )

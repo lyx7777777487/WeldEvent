@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
 
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import SafetyStatus
 
 
@@ -28,7 +28,7 @@ class HookResult:
 class BeforeToolHook(ABC):
     @abstractmethod
     async def before_execute(
-        self, tool_name: str, arguments: dict, context: ContextSnapshot
+        self, tool_name: str, arguments: dict, context: ContextSnapshot, session_id: str = "default"
     ) -> HookResult: ...
 
 
@@ -36,7 +36,7 @@ class SafetyHook(BeforeToolHook):
     """Block dangerous operations based on safety status."""
 
     async def before_execute(
-        self, tool_name: str, arguments: dict, context: ContextSnapshot
+        self, tool_name: str, arguments: dict, context: ContextSnapshot, session_id: str = "default"
     ) -> HookResult:
         if tool_name == "adjust_parameter":
             safety_status = getattr(context, "safety_status", None)
@@ -55,7 +55,7 @@ class PolicyHook(BeforeToolHook):
         self._policy = policy
 
     async def before_execute(
-        self, tool_name: str, arguments: dict, context: ContextSnapshot
+        self, tool_name: str, arguments: dict, context: ContextSnapshot, session_id: str = "default"
     ) -> HookResult:
         rule = self._policy.get_rule(tool_name)
         if not rule.enabled:
@@ -66,7 +66,7 @@ class PolicyHook(BeforeToolHook):
         if rule.auto_approve:
             return HookResult(decision=HookDecision.ALLOW)
         # Needs approval — route to ApprovalService
-        approval = await self._policy.request_approval(tool_name, arguments, context)
+        approval = await self._policy.request_approval(tool_name, arguments, context, session_id=session_id)
         if not approval.approved:
             return HookResult(
                 decision=HookDecision.DENY,

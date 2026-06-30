@@ -7,7 +7,7 @@ Phase 2: switch to PG (L2-L5) with Redis (L0-L1) cache via `redis_client`.
 from __future__ import annotations
 
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine
-from cognitiveplane.shared.dto_memory import (
+from cognitiveplane.shared.dto.memory import (
     MemoryRecord,
     MemorySearchQuery,
     MemorySearchResult,

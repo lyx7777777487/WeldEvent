@@ -3,6 +3,7 @@
 生产环境应替换为 Redis / MinIO+DB 等持久化实现。
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,6 +25,7 @@ class InMemoryStateWatcher(StateWatcher):
     
     def __init__(self) -> None:
         self._subscriptions: dict[str, list] = {}  # wf_id -> [Subscription]
+        self._lock = asyncio.Lock()  # P2-1: 并发保护 subscriptions
     
     async def subscribe(self, subscription) -> None:
         key = f"{subscription.workflow_id}"
@@ -63,11 +65,13 @@ class InMemoryWeldMapClient(WeldMapClient):
     def __init__(self, watcher: StateWatcher | None = None) -> None:
         self._stores: dict[str, WeldMapSnapshot] = {}
         self._watcher = watcher or InMemoryStateWatcher()
+        self._lock = asyncio.Lock()  # P2-1: 并发保护 CAS 检查+写入原子性
 
     async def initialize(self, workflow_id: WorkflowId) -> WeldMapSnapshot:
-        snapshot = WeldMapSnapshot(workflow_id=str(workflow_id))
-        self._stores[str(workflow_id)] = snapshot
-        return snapshot
+        async with self._lock:
+            snapshot = WeldMapSnapshot(workflow_id=str(workflow_id))
+            self._stores[str(workflow_id)] = snapshot
+            return snapshot
 
     async def read_snapshot(self, workflow_id: WorkflowId) -> WeldMapSnapshot | None:
         return self._stores.get(str(workflow_id))
@@ -99,40 +103,39 @@ class InMemoryWeldMapClient(WeldMapClient):
         source: str = "",
     ) -> WriteResult:
         key = str(workflow_id)
-        snapshot = self._stores.get(key)
-        
-        if snapshot is None:
-            # 自动初始化
-            snapshot = await self.initialize(workflow_id)
-        
-        # CAS 检查
-        if expected_version is not None and snapshot.version != expected_version:
-            return WriteResult(
-                success=False,
+        # P2-1 fix: CAS 检查 + 写入 + version++ 必须原子，加锁保护
+        async with self._lock:
+            snapshot = self._stores.get(key)
+
+            if snapshot is None:
+                snapshot = WeldMapSnapshot(workflow_id=str(workflow_id))
+                self._stores[key] = snapshot
+
+            if expected_version is not None and snapshot.version != expected_version:
+                return WriteResult(
+                    success=False,
+                    path=str(path),
+                    version=snapshot.version,
+                    conflict=True,
+                )
+
+            old_value = self._get_path_value(snapshot, str(path))
+            self._set_path_value(snapshot, str(path), value)
+            snapshot.version += 1
+            snapshot.updated_at = datetime.now(timezone.utc)
+
+            event = WeldMapEvent(
+                event_type=f"{path.replace('/', '_')}_updated",
                 path=str(path),
-                version=snapshot.version,
-                conflict=True,
+                old_value=old_value,
+                new_value=value,
+                source=source or "unknown",
             )
-        
-        # 写入
-        old_value = self._get_path_value(snapshot, str(path))
-        self._set_path_value(snapshot, str(path), value)
-        snapshot.version += 1
-        snapshot.updated_at = datetime.now(timezone.utc)
-        
-        # 记录事件
-        event = WeldMapEvent(
-            event_type=f"{path.replace('/', '_')}_updated",
-            path=str(path),
-            old_value=old_value,
-            new_value=value,
-            source=source or "unknown",
-        )
-        snapshot.events.append(event.model_dump())
-        
-        # 通知订阅者
+            snapshot.events.append(event.model_dump())
+
+        # 通知订阅者在锁外执行（避免回调内调 write_path 死锁）
         await self._watcher.notify_write(workflow_id, path, value)
-        
+
         return WriteResult(
             success=True,
             path=str(path),
@@ -141,9 +144,10 @@ class InMemoryWeldMapClient(WeldMapClient):
         )
 
     async def append_event(self, workflow_id: WorkflowId, event: WeldMapEvent) -> None:
-        snapshot = self._stores.get(str(workflow_id))
-        if snapshot:
-            snapshot.events.append(event.model_dump())
+        async with self._lock:
+            snapshot = self._stores.get(str(workflow_id))
+            if snapshot:
+                snapshot.events.append(event.model_dump())
 
     async def read_events(
         self, workflow_id: WorkflowId, since: int | None = None

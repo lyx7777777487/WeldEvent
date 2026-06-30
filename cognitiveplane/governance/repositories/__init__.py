@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from cognitiveplane.shared.dto_validation import ValidationResult
+from cognitiveplane.shared.dto.validation import ValidationResult
 from cognitiveplane.shared.enums import AggregatedValidationResult
 from cognitiveplane.shared.ports.validation import ValidationResultRepository
 from cognitiveplane.shared.types import DecisionId

@@ -10,7 +10,7 @@ from cognitiveplane.control.tools import BrainTool, ToolResult
 from cognitiveplane.control.hooks import SafetyHook, PolicyHook
 from cognitiveplane.governance.tool_policy import ToolPolicy
 from cognitiveplane.interaction.session import SessionManager
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
 from cognitiveplane.shared.types import CaseId
 from datetime import datetime, timezone
@@ -358,13 +358,19 @@ class _AdjustParamScriptedLLM(LLMProvider):
             if m.get("role") == "tool":
                 self.received_tool_messages.append(m.get("content", ""))
         if self._call_count == 1:
+            # Schema-valid args (correct field names, valid types) but NO 'reason' —
+            # this passes schema pre-validation (test tools use empty schema) and lets
+            # PolicyHook deny based on require_reason=True policy rule.
             return LLMResponse(
                 content="",
                 tool_calls=[{
                     "id": f"call-{self._call_count}",
                     "function": {
                         "name": "adjust_parameter",
-                        "arguments": __import__("json").dumps({"parameter": "current", "value": "200A"}),
+                        "arguments": __import__("json").dumps({
+                            "parameter_name": "current",
+                            "proposed_value": "200A",
+                        }),
                     },
                 }],
                 model_used="scripted",
@@ -473,19 +479,32 @@ class TestHookInterception:
         call_log: list[str] = []
 
         class _FirstDenyHook(BeforeToolHook):
-            async def before_execute(self, tool_name, arguments, context):
+            async def before_execute(self, tool_name, arguments, context, session_id="default"):
                 call_log.append(f"first:{tool_name}")
                 return HookResult(decision=HookDecision.DENY, reason="first-deny")
 
         class _SecondHook(BeforeToolHook):
-            async def before_execute(self, tool_name, arguments, context):
+            async def before_execute(self, tool_name, arguments, context, session_id="default"):
                 call_log.append(f"second:{tool_name}")
                 return HookResult(decision=HookDecision.ALLOW)
 
         llm = _AdjustParamScriptedLLM()
+
+        class _StubAdjustTool(BrainTool):
+            @property
+            def name(self) -> str: return "adjust_parameter"
+            @property
+            def description(self) -> str: return "test"
+            @property
+            def parameters_schema(self) -> dict: return {"type": "object", "properties": {}}
+            async def execute(self, **kwargs) -> ToolResult:
+                return ToolResult(output={"applied": True})
+
+        registry = ToolRegistry()
+        registry.register(_StubAdjustTool())
         engine = ReActEngine(
             _make_deps_with_llm(llm),
-            tool_registry=ToolRegistry(),
+            tool_registry=registry,
             hooks=[_FirstDenyHook(), _SecondHook()],
         )
         await engine.run("test", _make_context())
@@ -639,3 +658,723 @@ class TestContrastStability:
         assert reply == "final answer"
         assert tools == ("test_tool",)
         assert tier == "react_function_calling"
+
+
+# ===================================================================
+# P0-2: §5.1 line 894-902 Worldview injection tests
+# ===================================================================
+
+
+def _make_context_with_case_data() -> ContextSnapshot:
+    """Context with non-empty case_data — exercises CASE_BRIEF injection."""
+    return ContextSnapshot(
+        case_id=CaseId(value="CASE-2026-001"),
+        event_type=EventType.WORKFLOW_ENTERED,
+        workflow_state={"stage": "welding", "operator": "op-001"},
+        case_data={"material": "Q345R", "thickness": 12.5},
+        measurements=[],
+        memory_match_confidence=0.5,
+        knowledge_coverage=0.5,
+        event_novelty=NoveltyLevel.KNOWN,
+        validation_critical_count=0,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
+class _CapturingLLM(LLMProvider):
+    """LLM that captures the system prompt for inspection, returns immediate final reply."""
+
+    def __init__(self) -> None:
+        self.captured_system: str | None = None
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        for m in request.messages:
+            if m.get("role") == "system":
+                self.captured_system = m.get("content", "")
+                break
+        return LLMResponse(content="ok", model_used="capturing")
+
+    async def stream(self, request: LLMRequest):
+        yield "ok"
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] for _ in texts]
+
+    def health_check(self) -> bool:
+        return True
+
+
+class _StubMemorySearch:
+    """Stub MemorySearchPort that returns scripted hits."""
+
+    def __init__(self, hits: list) -> None:
+        self._hits = hits
+
+    async def search(self, input_data) -> object:
+        from cognitiveplane.shared.ports.memory import MemorySearchOutput
+        return MemorySearchOutput(results=self._hits)
+
+
+class TestWorldviewInjection:
+    """P0-2: §5.1 line 894-902 system prompt auto-injection."""
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_injects_case_brief(self) -> None:
+        """CASE_BRIEF from ContextSnapshot is injected into system prompt."""
+        llm = _CapturingLLM()
+        engine = ReActEngine(_make_deps_with_llm(llm))
+        await engine.run("hi", _make_context_with_case_data())
+        assert llm.captured_system is not None
+        assert "CASE-2026-001" in llm.captured_system
+        assert "Q345R" in llm.captured_system
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_injects_memory_search(self) -> None:
+        """Memory.search hits are injected when MemoryDeps.search is wired."""
+        from cognitiveplane.shared.dto.memory import MemorySearchResult, MemoryContent
+        from cognitiveplane.shared.enums import MemoryType, PromotionStatus
+        from cognitiveplane.shared.types import MemoryId
+        from datetime import datetime, timezone
+        import uuid
+
+        hit = MemorySearchResult(
+            memory_id=MemoryId(value=uuid.uuid4()),
+            content=MemoryContent(
+                summary="过去对 Q345R 角焊的修正：气孔判为 II 级",
+                details={"defect": "气孔", "grade": "II", "material": "Q345R"},
+                feature_vector=[0.1, 0.2, 0.3],
+            ),
+            similarity_score=0.87,
+            promotion_status=PromotionStatus.PROMOTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        llm = _CapturingLLM()
+        deps = _make_deps_with_llm(llm)
+        deps.memory.search = _StubMemorySearch([hit])  # type: ignore[assignment]
+        engine = ReActEngine(deps)
+        await engine.run("hi", _make_context_with_case_data())
+        assert llm.captured_system is not None
+        assert "Memory.search" in llm.captured_system
+        assert "Q345R 角焊" in llm.captured_system  # summary content
+        assert "0.87" in llm.captured_system  # similarity score
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_skips_missing_worldview_files(self) -> None:
+        """WELDEVENT.md / OPERATOR.md don't exist in test env — system prompt
+        builds without those sections. CASE_BRIEF still includes event_type
+        (always set) but skips case_id/workflow/case_data when empty."""
+        llm = _CapturingLLM()
+        engine = ReActEngine(_make_deps_with_llm(llm))
+        empty_context = ContextSnapshot(
+            case_id=CaseId(value="unknown"),
+            event_type=EventType.WORKFLOW_ENTERED,
+            workflow_state={},
+            case_data={},
+            measurements=[],
+            memory_match_confidence=0.5,
+            knowledge_coverage=0.5,
+            event_novelty=NoveltyLevel.KNOWN,
+            validation_critical_count=0,
+            timestamp=datetime.now(timezone.utc),
+        )
+        await engine.run("hi", empty_context)
+        assert llm.captured_system is not None
+        # Tools + rules section always present
+        assert "你可以使用以下工具" in llm.captured_system
+        # WELDEVENT.md / OPERATOR.md files don't exist in test env — not in prompt
+        assert "项目规约" not in llm.captured_system
+        assert "操作员偏好" not in llm.captured_system
+        # Memory.search not wired — not in prompt
+        assert "相关历史" not in llm.captured_system
+        # CASE_BRIEF still present (event_type always has value)
+        assert "Event Type" in llm.captured_system
+        # But case_id="unknown" is filtered out
+        assert "Case ID" not in llm.captured_system
+
+    @pytest.mark.asyncio
+    async def test_memory_search_failure_does_not_break_react(self) -> None:
+        """Memory.search raising must not break the ReAct loop (§5.1: worldview is optional)."""
+
+        class _FailingMemorySearch:
+            async def search(self, input_data):
+                raise RuntimeError("Memory backend down")
+
+        llm = _CapturingLLM()
+        deps = _make_deps_with_llm(llm)
+        deps.memory.search = _FailingMemorySearch()  # type: ignore[assignment]
+        engine = ReActEngine(deps)
+        response = await engine.run("hi", _make_context())
+        # Engine did not crash; still produced a reply
+        assert response.text_reply == "ok"
+
+    @pytest.mark.asyncio
+    async def test_worldview_injection_recorded_in_eventlog(self) -> None:
+        """§0.1 规则 1: 架构替 LLM 做的 worldview 注入必须记进 EventLog."""
+        from cognitiveplane.control.event_log import EventLog, BrainEventType
+        from cognitiveplane.shared.types import CaseId
+
+        event_log = EventLog(case_id=CaseId(value="test-eventlog"))
+        llm = _CapturingLLM()
+        engine = ReActEngine(_make_deps_with_llm(llm), event_log=event_log)
+        await engine.run("hi", _make_context_with_case_data())
+
+        # Find the worldview_injected event
+        injected_events = [
+            e for e in event_log._events
+            if e.event_type == BrainEventType.STATE_TRANSITION
+            and e.data.get("phase") == "worldview_injected"
+        ]
+        assert len(injected_events) == 1, (
+            f"Expected 1 worldview_injected event, got {len(injected_events)}"
+        )
+        meta = injected_events[0].data
+        # CASE_BRIEF always injected when context has case_data
+        assert "case_brief" in meta["sections"]
+        assert injected_events[0].source == "react_engine"
+
+    @pytest.mark.asyncio
+    async def test_worldview_injection_records_memory_hit_ids(self) -> None:
+        """§0.1 规则 1: Memory hit ids 记进 EventLog, LLM 下一轮可查."""
+        from cognitiveplane.control.event_log import EventLog, BrainEventType
+        from cognitiveplane.shared.dto.memory import MemorySearchResult, MemoryContent
+        from cognitiveplane.shared.enums import MemoryType, PromotionStatus
+        from cognitiveplane.shared.types import MemoryId
+        from datetime import datetime, timezone
+        import uuid
+
+        hit_id = uuid.uuid4()
+        hit = MemorySearchResult(
+            memory_id=MemoryId(value=hit_id),
+            content=MemoryContent(
+                summary="Q345R 角焊历史修正",
+                details={"defect": "气孔"},
+                feature_vector=[0.1],
+            ),
+            similarity_score=0.87,
+            promotion_status=PromotionStatus.PROMOTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        event_log = EventLog(case_id=CaseId(value="test-eventlog"))
+        llm = _CapturingLLM()
+        deps = _make_deps_with_llm(llm)
+        deps.memory.search = _StubMemorySearch([hit])  # type: ignore[assignment]
+        engine = ReActEngine(deps, event_log=event_log)
+        await engine.run("hi", _make_context_with_case_data())
+
+        injected_events = [
+            e for e in event_log._events
+            if e.data.get("phase") == "worldview_injected"
+        ]
+        assert len(injected_events) == 1
+        meta = injected_events[0].data
+        assert "memory_search" in meta["sections"]
+        assert meta["memory_hit_count"] == 1
+        assert str(hit_id) in meta["memory_hit_ids"]
+
+    @pytest.mark.asyncio
+    async def test_no_eventlog_no_crash(self) -> None:
+        """When event_log is None (default), worldview injection still works, just no logging."""
+        llm = _CapturingLLM()
+        engine = ReActEngine(_make_deps_with_llm(llm))  # no event_log
+        response = await engine.run("hi", _make_context_with_case_data())
+        assert response.text_reply == "ok"
+        assert llm.captured_system is not None
+        assert "世界观" in llm.captured_system  # injection still happened
+
+
+# ===================================================================
+# P0-3: §3.6 line 601 Tier-A schema retry tests
+# ===================================================================
+
+
+class _ScriptedMalformedLLM(LLMProvider):
+    """LLM that returns malformed JSON arguments on first call, valid on retry,
+    then a final text reply after the successful tool execution.
+
+    retry_count: how many times to emit malformed JSON before returning valid args.
+    """
+
+    def __init__(self, tool_name: str, malformed: str, valid_args: dict, final_text: str, retry_count: int = 1) -> None:
+        self._tool_name = tool_name
+        self._malformed = malformed
+        self._valid_args = valid_args
+        self._final_text = final_text
+        self._retry_budget = retry_count
+        self._call_count = 0
+        self._emitted_valid = False
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self._call_count += 1
+        import json
+        # Phase 1: emit malformed args until retry budget exhausted
+        if self._retry_budget > 0:
+            self._retry_budget -= 1
+            return LLMResponse(
+                content="",
+                tool_calls=[{
+                    "id": f"call-{self._call_count}",
+                    "function": {
+                        "name": self._tool_name,
+                        "arguments": self._malformed,
+                    },
+                }],
+                model_used="scripted",
+            )
+        # Phase 2: emit valid args once
+        if not self._emitted_valid:
+            self._emitted_valid = True
+            return LLMResponse(
+                content="",
+                tool_calls=[{
+                    "id": f"call-{self._call_count}",
+                    "function": {
+                        "name": self._tool_name,
+                        "arguments": json.dumps(self._valid_args),
+                    },
+                }],
+                model_used="scripted",
+            )
+        # Phase 3: final text reply (no more tool calls)
+        return LLMResponse(content=self._final_text, model_used="scripted")
+
+    async def stream(self, request: LLMRequest):
+        yield ""
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] for _ in texts]
+
+    def health_check(self) -> bool:
+        return True
+
+
+class _AlwaysMalformedLLM(LLMProvider):
+    """LLM that always returns malformed JSON — used to test exhausted retries."""
+
+    def __init__(self, tool_name: str) -> None:
+        self._tool_name = tool_name
+        self._call_count = 0
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self._call_count += 1
+        # After 5 calls (enough for retry+failure+new-attempt+retry+failure), return text
+        if self._call_count >= 6:
+            return LLMResponse(content="I give up", model_used="scripted")
+        return LLMResponse(
+            content="",
+            tool_calls=[{
+                "id": f"call-{self._call_count}",
+                "function": {
+                    "name": self._tool_name,
+                    "arguments": "{not valid json",  # always malformed
+                },
+            }],
+            model_used="scripted",
+        )
+
+    async def stream(self, request: LLMRequest):
+        yield ""
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] for _ in texts]
+
+    def health_check(self) -> bool:
+        return True
+
+
+class _TierATestTool(BrainTool):
+    """A test tool registered under a Tier-A name (web_search)."""
+
+    @property
+    def name(self) -> str:
+        return "web_search"
+
+    @property
+    def description(self) -> str:
+        return "Test Tier-A tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {"type": "object", "properties": {"query": {"type": "string"}}}
+
+    async def execute(self, **kwargs) -> ToolResult:
+        return ToolResult(output={"hits": ["result"]})
+
+
+class _TierBTestTool(BrainTool):
+    """A test tool registered under a Tier-B name (adjust_parameter)."""
+
+    @property
+    def name(self) -> str:
+        return "adjust_parameter"
+
+    @property
+    def description(self) -> str:
+        return "Test Tier-B tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {"type": "object", "properties": {"param": {"type": "string"}}}
+
+    async def execute(self, **kwargs) -> ToolResult:
+        return ToolResult(output={"adjusted": True})
+
+
+class TestTierARetry:
+    """P0-3: §3.6 line 601 Tier-A schema failure → retry 1 time."""
+
+    @pytest.mark.asyncio
+    async def test_tier_a_json_parse_failure_retries_once(self) -> None:
+        """Tier-A tool with malformed JSON args → LLM gets error, retries, succeeds."""
+        llm = _ScriptedMalformedLLM(
+            tool_name="web_search",
+            malformed="{not valid json",
+            valid_args={"query": "Q345R"},
+            final_text="found it",
+            retry_count=1,
+        )
+        registry = ToolRegistry()
+        registry.register(_TierATestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry)
+        response = await engine.run("search", _make_context())
+        # Tool was eventually called after retry
+        assert "web_search" in response.tools_used
+        assert response.text_reply == "found it"
+
+    @pytest.mark.asyncio
+    async def test_tier_a_exhausted_retries_emits_failure(self) -> None:
+        """Tier-A tool with persistent malformed JSON → after 1 retry, ToolFailureObservation."""
+        llm = _AlwaysMalformedLLM(tool_name="web_search")
+        registry = ToolRegistry()
+        registry.register(_TierATestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry)
+        response = await engine.run("search", _make_context())
+        # Tool was added to tools_used (fatal failure path tracks it)
+        assert "web_search" in response.tools_used
+        # Engine didn't crash, produced some reply
+        assert response.text_reply is not None
+
+    @pytest.mark.asyncio
+    async def test_tier_b_json_parse_failure_no_retry(self) -> None:
+        """Tier-B tool with malformed JSON → immediate rejection, no retry."""
+        llm = _ScriptedMalformedLLM(
+            tool_name="adjust_parameter",
+            malformed="{not valid json",
+            valid_args={"param": "current"},
+            final_text="done",
+            retry_count=1,  # Would retry if it were Tier-A
+        )
+        registry = ToolRegistry()
+        registry.register(_TierBTestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry)
+        response = await engine.run("adjust", _make_context())
+        # Tier-B immediate rejection — tool_call counted, but real execute was never called
+        # (the rejection still adds it to tools_used per the fatal-failure path)
+        assert "adjust_parameter" in response.tools_used
+        # LLM did get a chance to retry (its scripted retry), but Tier-B rejects
+        # both times — so tool was never actually executed successfully
+        assert response.text_reply == "done"
+
+
+class _FCDisabledLLM(_ScriptedLLM):
+    """LLM that supports JSON mode but NOT function calling — exercises LLMTier-2."""
+
+    @property
+    def supports_function_calling(self) -> bool:
+        return False
+
+    @property
+    def supports_json_mode(self) -> bool:
+        return True
+
+
+class _MinimalLLM(_ScriptedLLM):
+    """LLM that supports neither FC nor JSON mode — exercises LLMTier-3."""
+
+    @property
+    def supports_function_calling(self) -> bool:
+        return False
+
+    @property
+    def supports_json_mode(self) -> bool:
+        return False
+
+
+class TestLLMTierSelection:
+    """Plan §2.2: LLMTier selected at startup per LLM capability, three tiers."""
+
+    def test_tier_1_when_function_calling_available(self) -> None:
+        llm = _ScriptedLLM("test_tool", {"query": "x"}, "done")
+        engine = ReActEngine(_make_deps_with_llm(llm))
+        assert engine._select_tier() == InteractionTier.REACT_FUNCTION_CALLING
+
+    def test_tier_2_when_json_mode_only(self) -> None:
+        llm = _FCDisabledLLM("test_tool", {"query": "x"}, "done")
+        engine = ReActEngine(_make_deps_with_llm(llm))
+        assert engine._select_tier() == InteractionTier.STRUCTURED_OUTPUT
+
+    def test_tier_3_when_no_llm_capabilities(self) -> None:
+        llm = _MinimalLLM("test_tool", {"query": "x"}, "done")
+        engine = ReActEngine(_make_deps_with_llm(llm))
+        assert engine._select_tier() == InteractionTier.EMBEDDING_RULES
+
+    def test_tier_3_when_no_llm_provider(self) -> None:
+        deps = CognitiveDependencies()
+        deps.capability.llm_provider = None
+        engine = ReActEngine(deps)
+        assert engine._select_tier() == InteractionTier.EMBEDDING_RULES
+
+
+class _SlowTool(BrainTool):
+    """Tool that sleeps beyond §4.2.2 30s timeout — for ratchet timeout trigger test.
+
+    Registered under a Tier-A name (web_search) so hooks don't block it.
+    """
+
+    @property
+    def name(self) -> str:
+        return "web_search"
+
+    @property
+    def description(self) -> str:
+        return "Slow test tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {"type": "object", "properties": {"query": {"type": "string"}}}
+
+    async def execute(self, **kwargs) -> ToolResult:
+        import asyncio
+        await asyncio.sleep(60)  # Exceeds 30s timeout
+        return ToolResult(output={"slow": True})
+
+
+class _TierBNoReasonLLM(LLMProvider):
+    """LLM that calls adjust_parameter without 'reason' — triggers PolicyHook DENY.
+
+    Phase 1: emit tool_call without reason (PolicyHook rejects).
+    Phase 2: emit text reply.
+    """
+
+    def __init__(self) -> None:
+        self._call_count = 0
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self._call_count += 1
+        if self._call_count == 1:
+            import json
+            return LLMResponse(
+                content="",
+                tool_calls=[{
+                    "id": "call-1",
+                    "function": {
+                        "name": "adjust_parameter",
+                        "arguments": json.dumps({"parameter_name": "voltage", "proposed_value": "12V"}),
+                    },
+                }],
+                model_used="scripted",
+            )
+        return LLMResponse(content="ok got it", model_used="scripted")
+
+    async def stream(self, request: LLMRequest):
+        yield ""
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] for _ in texts]
+
+    def health_check(self) -> bool:
+        return True
+
+
+class TestPolicyRatchetIntegration:
+    """Plan §4.2.2 棘轮机制: failure events append to draft store."""
+
+    @pytest.mark.asyncio
+    async def test_tier_a_exhausted_retries_records_schema_fail(self, tmp_path) -> None:
+        """Tier-A 2x schema fail → ratchet.record(trigger=schema_fail)."""
+        from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_SCHEMA_FAIL
+        ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
+        llm = _AlwaysMalformedLLM(tool_name="web_search")
+        registry = ToolRegistry()
+        registry.register(_TierATestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry, policy_ratchet=ratchet)
+        await engine.run("search", _make_context())
+        # Ratchet should have at least one schema_fail entry for web_search
+        entries = ratchet.list_entries()
+        schema_fail_entries = [e for e in entries if e["trigger_event"] == TRIGGER_SCHEMA_FAIL]
+        assert len(schema_fail_entries) >= 1
+        assert schema_fail_entries[0]["tool_name"] == "web_search"
+
+    @pytest.mark.asyncio
+    async def test_tier_b_schema_fail_records_reask_reject(self, tmp_path) -> None:
+        """Tier-B schema fail → ratchet.record(trigger=reask_reject)."""
+        from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_REASK_REJECT
+        ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
+        llm = _ScriptedMalformedLLM(
+            tool_name="adjust_parameter",
+            malformed="{not valid",
+            valid_args={"param": "x"},
+            final_text="done",
+            retry_count=1,
+        )
+        registry = ToolRegistry()
+        registry.register(_TierBTestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry, policy_ratchet=ratchet)
+        await engine.run("adjust", _make_context())
+        entries = ratchet.list_entries()
+        reask_entries = [e for e in entries if e["trigger_event"] == TRIGGER_REASK_REJECT]
+        assert len(reask_entries) >= 1
+        assert reask_entries[0]["tool_name"] == "adjust_parameter"
+
+    @pytest.mark.asyncio
+    async def test_policyhook_deny_on_tier_b_records_reask_reject(self, tmp_path) -> None:
+        """PolicyHook denies Tier-B (missing reason) → ratchet.record(reask_reject)."""
+        from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_REASK_REJECT
+        from cognitiveplane.control.hooks import PolicyHook
+        from cognitiveplane.governance.tool_policy import ToolPolicy
+        ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
+        llm = _TierBNoReasonLLM()
+        registry = ToolRegistry()
+        registry.register(_TierBTestTool())
+        engine = ReActEngine(
+            _make_deps_with_llm(llm),
+            tool_registry=registry,
+            hooks=[PolicyHook(ToolPolicy())],
+            policy_ratchet=ratchet,
+        )
+        await engine.run("adjust", _make_context())
+        entries = ratchet.list_entries()
+        reask_entries = [e for e in entries if e["trigger_event"] == TRIGGER_REASK_REJECT]
+        assert len(reask_entries) >= 1
+        assert "DENY" in reask_entries[0]["failure_pattern"] or "reason" in reask_entries[0]["failure_pattern"].lower()
+
+    @pytest.mark.asyncio
+    async def test_tool_timeout_records_timeout_trigger(self, tmp_path, monkeypatch) -> None:
+        """Tool execution exceeds 30s → ratchet.record(trigger=timeout)."""
+        from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_TIMEOUT
+        import cognitiveplane.control.react as react_module
+        # Lower timeout to 0.1s so test doesn't wait 30s
+        monkeypatch.setattr(react_module, "TOOL_TIMEOUT_SECONDS", 0.1)
+        ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
+        # _ScriptedLLM emits tool_call then final reply
+        llm = _ScriptedLLM("web_search", {"query": "x"}, "done after timeout")
+        registry = ToolRegistry()
+        registry.register(_SlowTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry, policy_ratchet=ratchet)
+        await engine.run("slow", _make_context())
+        entries = ratchet.list_entries()
+        timeout_entries = [e for e in entries if e["trigger_event"] == TRIGGER_TIMEOUT]
+        assert len(timeout_entries) == 1
+        assert timeout_entries[0]["tool_name"] == "web_search"
+
+    @pytest.mark.asyncio
+    async def test_successful_run_records_nothing(self, tmp_path) -> None:
+        """No failures → ratchet stays empty."""
+        from cognitiveplane.governance.policy_ratchet import PolicyRatchet
+        ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
+        llm = _ScriptedLLM("web_search", {"query": "x"}, "ok")
+        registry = ToolRegistry()
+        registry.register(_TierATestTool())
+        engine = ReActEngine(_make_deps_with_llm(llm), tool_registry=registry, policy_ratchet=ratchet)
+        await engine.run("search", _make_context())
+        assert ratchet.count() == 0
+
+
+class _DesignWorkflowCaptureTool(BrainTool):
+    """Captures the arguments design_workflow was called with — verifies fallback
+    paths use the WorkflowSpec entry shape (objective + reason), not legacy query."""
+
+    phase = 3
+
+    def __init__(self) -> None:
+        self.captured_args: dict | None = None
+
+    @property
+    def name(self) -> str:
+        return "design_workflow"
+
+    @property
+    def description(self) -> str:
+        return "capture-only test stub"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "objective": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["objective", "reason"],
+        }
+
+    async def execute(self, **kwargs) -> ToolResult:
+        self.captured_args = dict(kwargs)
+        return ToolResult(output={"status": "draft", "workflow_spec": {"nodes": []}})
+
+
+class TestFallbackDesignWorkflowShape:
+    """Boundary-pinning 2026-06-25: Tier-2/Tier-3 fallback must call design_workflow
+    with the WorkflowSpec entry shape (objective + reason), not legacy {"query": ...}."""
+
+    @pytest.mark.asyncio
+    async def test_tier_3_fallback_uses_workflow_spec_shape(self) -> None:
+        """Tier-3 keyword routing → design_workflow gets {objective, reason}."""
+        deps = CognitiveDependencies()  # No LLM → Tier-3
+        registry = ToolRegistry(current_phase=3)
+        capture = _DesignWorkflowCaptureTool()
+        registry.register(capture)
+        engine = ReActEngine(deps, tool_registry=registry)
+        # Keyword map routes "设计"/"方案"/"检测" to design_workflow
+        response = await engine.run("请帮我设计检测方案", _make_context())
+        assert response.tier_used == InteractionTier.EMBEDDING_RULES
+        assert "design_workflow" in response.tools_used
+        assert capture.captured_args is not None
+        assert "objective" in capture.captured_args
+        assert "reason" in capture.captured_args
+        assert "query" not in capture.captured_args
+
+    @pytest.mark.asyncio
+    async def test_tier_2_fallback_uses_workflow_spec_shape(self) -> None:
+        """Tier-2 structured-output routing → design_workflow gets {objective, reason}."""
+        # LLM that classifies intent as workflow_design
+        class _IntentLLM(LLMProvider):
+            def __init__(self) -> None:
+                self._n = 0
+
+            async def complete(self, request: LLMRequest) -> LLMResponse:
+                self._n += 1
+                # First call = intent classification → "workflow_design"
+                if self._n == 1:
+                    return LLMResponse(content="workflow_design", model_used="intent")
+                return LLMResponse(content="ok", model_used="intent")
+
+            async def stream(self, request: LLMRequest):
+                yield "ok"
+
+            async def embed(self, texts: list[str]) -> list[list[float]]:
+                return [[0.0] for _ in texts]
+
+            def health_check(self) -> bool:
+                return True
+
+            @property
+            def supports_function_calling(self) -> bool:
+                return False
+
+            @property
+            def supports_json_mode(self) -> bool:
+                return True
+
+        deps = CognitiveDependencies()
+        deps.capability.llm_provider = _IntentLLM()
+        registry = ToolRegistry(current_phase=3)
+        capture = _DesignWorkflowCaptureTool()
+        registry.register(capture)
+        engine = ReActEngine(deps, tool_registry=registry)
+        response = await engine.run("设计一个方案", _make_context())
+        assert response.tier_used == InteractionTier.STRUCTURED_OUTPUT
+        assert "design_workflow" in response.tools_used
+        assert capture.captured_args is not None
+        assert "objective" in capture.captured_args
+        assert "reason" in capture.captured_args
+        assert "query" not in capture.captured_args

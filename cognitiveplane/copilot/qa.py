@@ -1,5 +1,8 @@
 """CopilotQA — Standard / process / case Q&A (spec §11).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4/5 rewrite as /chat preset, do not extend. See copilot/__init__.py.
+
 Routes a natural-language query through the Knowledge ports (RAG, standards,
 process, cases) and synthesizes a single textual answer using LLMProvider.
 LLM is optional — if not provided, a deterministic baseline summary is used.
@@ -11,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from cognitiveplane.capability.provider import LLMProvider, LLMRequest
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     CaseLibraryResult,
     KnowledgeResult,

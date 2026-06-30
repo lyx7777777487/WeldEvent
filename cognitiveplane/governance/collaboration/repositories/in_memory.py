@@ -3,7 +3,7 @@
 Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.5).
 """
 
-from cognitiveplane.shared.dto_collaboration import HumanReviewRequest
+from cognitiveplane.shared.dto.collaboration import HumanReviewRequest
 from cognitiveplane.shared.enums import CollaborationLayer, ReviewStatus
 from cognitiveplane.shared.ports.collaboration import HumanReviewRequestRepository
 from cognitiveplane.shared.types import DecisionId, ReviewRequestId

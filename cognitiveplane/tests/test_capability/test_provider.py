@@ -2,7 +2,7 @@
 
 import pytest
 
-from cognitiveplane.capability.mock_provider import MockLLMProvider
+from cognitiveplane.capability.mock import MockLLMProvider
 from cognitiveplane.capability.provider import (
     LLMProvider,
     LLMRequest,

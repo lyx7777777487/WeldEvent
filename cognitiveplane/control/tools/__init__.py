@@ -25,7 +25,15 @@ class ToolResult:
 
 
 class BrainTool(ABC):
-    """Base class for all Brain tools. Each tool wraps one or more ports."""
+    """Base class for all Brain tools. Each tool wraps one or more ports.
+
+    Phase gate (boundary-pinning 2026-06-25): subclass 可声明 class attribute `phase`
+    控制该工具对 LLM 可见的最早系统阶段. ToolRegistry.current_phase < tool.phase 时,
+    工具仍注册 (execute() 可被显式调用) 但不出现在 get_llm_tool_definitions() 里,
+    LLM 看不到也调不到. 默认 phase=1 表示从阶段 1 起就可见.
+    """
+
+    phase: int = 1
 
     @property
     @abstractmethod

@@ -5,7 +5,7 @@ Implements HumanReviewRequestRepository ABC so it can be wired through the
 port system without AttributeError.
 """
 
-from cognitiveplane.shared.dto_collaboration import HumanReviewRequest
+from cognitiveplane.shared.dto.collaboration import HumanReviewRequest
 from cognitiveplane.shared.enums import CollaborationLayer, ReviewStatus
 from cognitiveplane.shared.ports.collaboration import HumanReviewRequestRepository
 from cognitiveplane.shared.types import DecisionId, ReviewRequestId

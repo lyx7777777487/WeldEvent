@@ -1,5 +1,8 @@
 """CopilotGovern — Approval/compliance assistance (spec §11).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4/5 rewrite as /chat preset, do not extend. See copilot/__init__.py.
+
 Surfaces governance state for an operator/auditor:
 - pending review queue summary by collaboration layer
 - decision approval history (which decisions had reviews, how they resolved)
@@ -10,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from cognitiveplane.control.ports import BrainDecisionRepository
-from cognitiveplane.shared.dto_collaboration import HumanReviewRequest
+from cognitiveplane.shared.dto.collaboration import HumanReviewRequest
 from cognitiveplane.shared.enums import (
     CollaborationLayer,
     ReviewStatus,

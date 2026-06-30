@@ -7,7 +7,7 @@
 
 示例:
   ```python
-  from executionplane.interface.iqa_interface import run_iqa, IqaResult
+  from executionplane.interface import run_iqa, IqaResult
   
   # 单张图片检测
   result = await run_iqa("/path/to/image.png")
@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 import json
 
-from ..activities.iqa_activity import IqaActivity
+from ..activities.iqa.activity import IqaActivity
 from ..activities.base import ActivityInput, ActivityOutput, ActivityStatus
 from ..capabilities.numpy_cv_checker import NumpyCVRuleChecker
 from ..capabilities.mllm_provider import MllmProvider
@@ -297,8 +297,8 @@ async def run_iqa(
     
     # 执行检测
     output = await iqa.execute(ActivityInput(
-        workflow_id=wf_id,
         control_point_id="CP0",
+        workflow_context={"workflow_id": wf_id},
         params={"image_path": str(path.absolute())},
     ))
     
@@ -461,7 +461,7 @@ def _convert_output_to_result(
 ) -> IqaResult:
     """将ActivityOutput转换为IqaResult"""
     
-    if output.is_error:
+    if output.status == ActivityStatus.ERROR:
         return IqaResult(
             image_path=image_path,
             workflow_id=workflow_id,

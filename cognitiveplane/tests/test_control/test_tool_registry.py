@@ -49,7 +49,8 @@ class TestToolRegistry:
         assert result.error is not None
 
     def test_get_llm_tool_definitions(self):
-        registry = ToolRegistry()
+        # RequestConfirmationTool is phase=3 — registry must opt in via current_phase.
+        registry = ToolRegistry(current_phase=3)
         registry.register(RequestConfirmationTool())
         defs = registry.get_llm_tool_definitions()
         assert len(defs) == 1
@@ -118,7 +119,7 @@ class TestToolPolicy:
 
     @pytest.mark.asyncio
     async def test_auto_approve(self):
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -143,7 +144,7 @@ class TestToolPolicy:
 class TestSafetyHook:
     @pytest.mark.asyncio
     async def test_allow_normal(self):
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel, SafetyStatus
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -172,7 +173,7 @@ class TestMaxCallsPerSessionIsolation:
 
     @pytest.mark.asyncio
     async def test_max_calls_isolated_per_session(self) -> None:
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -210,7 +211,7 @@ class TestMaxCallsPerSessionIsolation:
 
     @pytest.mark.asyncio
     async def test_default_session_when_not_specified(self) -> None:
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -244,7 +245,7 @@ class TestMaxCallsPerSessionIsolation:
         """End-to-end: ReActEngine → PolicyHook → ToolPolicy with real session_id."""
         from cognitiveplane.control.hooks import PolicyHook
         from cognitiveplane.governance.tool_policy import ToolPolicy, ToolRule
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -473,3 +474,77 @@ def test_unregister_nonexistent_silent():
     # Should not raise
     registry.unregister("nonexistent_tool")
     assert "nonexistent_tool" not in registry._tools
+
+
+class TestPhaseGate:
+    """Boundary-pinning 2026-06-25 — BrainTool.phase 控制 LLM 可见性."""
+
+    def _make_tool(self, name: str, phase: int):
+        class _T(BrainTool):
+            @property
+            def name(self):
+                return name
+
+            @property
+            def description(self):
+                return "d"
+
+            @property
+            def parameters_schema(self):
+                return {}
+
+            async def execute(self, **kwargs):
+                return ToolResult()
+
+        _T.phase = phase
+        return _T()
+
+    def test_phase_le_current_visible_by_default(self):
+        """phase=1 工具在 current_phase=2 (默认) 下对 LLM 可见."""
+        registry = ToolRegistry()
+        registry.register(self._make_tool("visible_tool", phase=1))
+        defs = registry.get_llm_tool_definitions()
+        assert len(defs) == 1
+        assert defs[0]["function"]["name"] == "visible_tool"
+
+    def test_phase_gt_current_hidden_from_llm(self):
+        """phase=3 工具在 current_phase=2 下对 LLM 不可见, 但仍注册可显式调."""
+        registry = ToolRegistry(current_phase=2)
+        registry.register(self._make_tool("future_tool", phase=3))
+        defs = registry.get_llm_tool_definitions()
+        assert len(defs) == 0
+        assert registry.get_tool("future_tool") is not None
+        assert "future_tool" in registry.list_tools()
+
+    def test_current_phase_lift_reveals_hidden_tool(self):
+        """current_phase 提到 3 后, phase=3 工具变可见."""
+        registry = ToolRegistry(current_phase=3)
+        registry.register(self._make_tool("now_ready", phase=3))
+        defs = registry.get_llm_tool_definitions()
+        assert len(defs) == 1
+        assert defs[0]["function"]["name"] == "now_ready"
+
+    def test_default_phase_is_1(self):
+        """BrainTool 子类不声明 phase 时默认 1 — 向后兼容."""
+        registry = ToolRegistry()
+
+        class PlainTool(BrainTool):
+            @property
+            def name(self):
+                return "plain"
+
+            @property
+            def description(self):
+                return "d"
+
+            @property
+            def parameters_schema(self):
+                return {}
+
+            async def execute(self, **kwargs):
+                return ToolResult()
+
+        registry.register(PlainTool())
+        assert PlainTool.phase == 1
+        defs = registry.get_llm_tool_definitions()
+        assert len(defs) == 1

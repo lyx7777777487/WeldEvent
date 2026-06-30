@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine
-from cognitiveplane.shared.dto_collaboration import HumanReviewRequest
+from cognitiveplane.shared.dto.collaboration import HumanReviewRequest
 from cognitiveplane.shared.enums import CollaborationLayer, ReviewStatus
 from cognitiveplane.shared.ports.collaboration import HumanReviewRequestRepository
 from cognitiveplane.shared.types import DecisionId, ReviewRequestId

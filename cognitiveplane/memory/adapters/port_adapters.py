@@ -39,7 +39,7 @@ class MemoryWriteAdapter(MemoryWritePort):
         self._repo = repo
 
     async def write(self, input_data: MemoryWriteInput) -> MemoryWriteOutput:
-        from cognitiveplane.shared.dto_memory import MemoryRecord
+        from cognitiveplane.shared.dto.memory import MemoryRecord
 
         now = datetime.now(timezone.utc)
         memory_id = MemoryId(value=uuid4())

@@ -65,6 +65,29 @@ class LLMProvider(ABC):
         """
         return False
 
+    @property
+    def supports_function_calling(self) -> bool:
+        """Whether the primary model supports OpenAI-style function calling
+        (tool_calls in the response). Plan §2.2 LLMTier-1 requires this.
+
+        Default True — realistic LLM providers (OpenAI, DeepSeek, etc.) all
+        support function calling. Mocks / stubs that can't produce tool_calls
+        should override to False so ReActEngine falls back to LLMTier-2/3.
+        """
+        return True
+
+    @property
+    def supports_json_mode(self) -> bool:
+        """Whether the primary model supports JSON mode (response_format=
+        {"type":"json_object"}). Plan §2.2 LLMTier-2 requires this as the
+        fallback when function calling is unavailable.
+
+        Default True — most OpenAI-compatible APIs support JSON mode. Mocks
+        that can't produce structured JSON should override to False so
+        ReActEngine falls back to LLMTier-3 (keyword rules).
+        """
+        return True
+
     @abstractmethod
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Synchronous completion (chat completions)."""

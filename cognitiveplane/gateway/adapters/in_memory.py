@@ -7,9 +7,9 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from cognitiveplane.shared.dto_context import DomainEvent, WeldMapSnapshot
+from cognitiveplane.shared.dto.context import DomainEvent, WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     AuditEntry,
     CaseData,
     Escalation,
@@ -23,7 +23,7 @@ from cognitiveplane.shared.dto_gateway import (
     RiskAlert,
     WorkflowState,
 )
-from cognitiveplane.shared.dto_collaboration import FeedbackContent
+from cognitiveplane.shared.dto.collaboration import FeedbackContent
 from cognitiveplane.shared.ports.gateway import (
     EventSubscriptionConfig,
     GatewayEventSubscriptionPort,
@@ -34,6 +34,7 @@ from cognitiveplane.shared.ports.gateway import (
     SubscriptionStatus,
 )
 from cognitiveplane.shared.types import CaseId
+from cognitiveplane.gateway.ports import CognitiveGatewayWritePort
 
 
 class InMemoryGatewayAdapter(
@@ -41,6 +42,7 @@ class InMemoryGatewayAdapter(
     GatewayWritePort,
     GatewayEventSubscriptionPort,
     GatewayHealthPort,
+    CognitiveGatewayWritePort,
 ):
     """In-memory gateway adapter for testing and development.
 
@@ -230,6 +232,36 @@ class InMemoryGatewayAdapter(
         now = datetime.now(timezone.utc)
         path = f"/promotion_requests/{request.memory_id.value}"
         self._brain_writes[path] = request
+        self._last_write = now
+        return PublishResult(success=True, weldmap_path=path, timestamp=now)
+
+    # ------------------------------------------------------------------
+    # CognitiveGatewayWritePort — P1-2 fix: 补齐 notify_workflow_trigger
+    # 和 publish_instruction，让 InMemoryGatewayAdapter 真正实现该接口
+    # ------------------------------------------------------------------
+
+    async def notify_workflow_trigger(
+        self, case_id: CaseId, workflow_config: dict
+    ) -> None:
+        """P1-2 fix: 写 WeldMap workflow domain 记录 workflow 触发事件。
+
+        EventConnector 提交 Temporal 前调此方法（§6.2 契约 2）。
+        """
+        now = datetime.now(timezone.utc)
+        path = f"/workflow_triggers/{case_id.value}/{workflow_config.get('workflow_id', 'unknown')}"
+        self._brain_writes[path] = {
+            "case_id": case_id.value,
+            "workflow_config": workflow_config,
+            "triggered_at": now,
+        }
+        self._last_write = now
+
+    async def publish_instruction(self, instruction) -> PublishResult:
+        """CognitiveGatewayWritePort.publish_instruction 实现。"""
+        now = datetime.now(timezone.utc)
+        instr_id = getattr(instruction, "instruction_id", "unknown")
+        path = f"/instructions/{instr_id}"
+        self._brain_writes[path] = instruction
         self._last_write = now
         return PublishResult(success=True, weldmap_path=path, timestamp=now)
 

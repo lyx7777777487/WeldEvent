@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cognitiveplane.shared.dto_context import ContextSnapshot
-from cognitiveplane.shared.dto_deepagents import Plan, Strategy
+from cognitiveplane.shared.dto.context import ContextSnapshot
+from cognitiveplane.shared.dto.deepagents import Plan, Strategy
 from cognitiveplane.shared.dto_decision.outputs import Constraint
-from cognitiveplane.shared.dto_knowledge import KnowledgeResult
-from cognitiveplane.shared.dto_memory import MemorySearchResult
+from cognitiveplane.shared.dto.knowledge import KnowledgeResult
+from cognitiveplane.shared.dto.memory import MemorySearchResult
 
 
 @dataclass

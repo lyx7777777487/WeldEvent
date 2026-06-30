@@ -156,8 +156,13 @@ class FileHandler:
         self,
         uploaded_files: list[UploadedFile],
         user_message: str = "",
+        session_id: str = "default",
     ) -> FileProcessResult:
-        """处理 multipart 上传的文件（推荐方式，无大小限制）。"""
+        """处理 multipart 上传的文件（推荐方式，无大小限制）。
+
+        session_id: 用于生成 PENDING:{session_id}:{index} 格式的 image_id
+            (plan §2.3 line 345-348). 同一 session 多张图按 0,1,2... 编号。
+        """
         result = FileProcessResult()
         all_image_ids: list[str] = []
         all_thumbnails: list[str] = []
@@ -167,7 +172,8 @@ class FileHandler:
             try:
                 file_type = _detect_file_type(uf.filename, uf.content_type)
                 parsed = await self._process_single(
-                    uf.filename, file_type, uf.content_type or "application/octet-stream", uf.data
+                    uf.filename, file_type, uf.content_type or "application/octet-stream", uf.data,
+                    session_id=session_id,
                 )
                 result.files.append(parsed)
 
@@ -266,6 +272,7 @@ class FileHandler:
         file_type: FileType,
         mime_type: str,
         raw_bytes: bytes,
+        session_id: str = "default",
     ) -> ParsedFile:
         """处理单个文件。"""
         parsed = ParsedFile(
@@ -277,12 +284,13 @@ class FileHandler:
 
         if file_type == FileType.IMAGE:
             # plan §A.3: 存原图 + 生成 thumbnail
-            stored = self._images.store(raw_bytes, mime_type)
+            # plan §2.3: image_id 格式 PENDING:{session_id}:{index}
+            stored = self._images.store(raw_bytes, mime_type, session_id=session_id)
             parsed.image_id = stored.image_id
             parsed.thumbnail = stored.thumbnail_data_url
 
         elif file_type == FileType.ZIP:
-            parsed.children = self._handle_zip(raw_bytes)
+            parsed.children = self._handle_zip(raw_bytes, session_id=session_id)
             parsed.text_content = f"ZIP压缩包，包含 {len(parsed.children)} 个文件"
 
         elif file_type == FileType.PDF:
@@ -307,7 +315,7 @@ class FileHandler:
 
     # ── ZIP ──
 
-    def _handle_zip(self, raw_bytes: bytes) -> list[ParsedFile]:
+    def _handle_zip(self, raw_bytes: bytes, session_id: str = "default") -> list[ParsedFile]:
         """解压ZIP，提取图片和文档。"""
         children: list[ParsedFile] = []
         try:
@@ -321,7 +329,7 @@ class FileHandler:
 
                     if ft == FileType.IMAGE:
                         mime_guess = mimetypes.guess_type(name)[0] or "image/jpeg"
-                        stored = self._images.store(entry_bytes, mime_guess)
+                        stored = self._images.store(entry_bytes, mime_guess, session_id=session_id)
                         children.append(ParsedFile(
                             filename=os.path.basename(name),
                             file_type=ft,

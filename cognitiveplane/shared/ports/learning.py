@@ -5,7 +5,7 @@ Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.6).
 
 from abc import ABC, abstractmethod
 
-from cognitiveplane.shared.dto_learning import LearningEvent
+from cognitiveplane.shared.dto.learning import LearningEvent
 from cognitiveplane.shared.types import DecisionId, LearningEventId
 
 

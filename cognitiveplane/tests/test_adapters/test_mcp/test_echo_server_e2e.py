@@ -44,7 +44,7 @@ from cognitiveplane.control.hooks import SafetyHook
 from cognitiveplane.control.mcp_registry import MCPRegistry
 from cognitiveplane.control.react import ReActEngine
 from cognitiveplane.control.tool_registry import ToolRegistry
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
 from cognitiveplane.shared.types import CaseId
 
@@ -119,7 +119,7 @@ async def test_echo_server_e2e_pipeline():
     echo_server = create_echo_server()
     await registry.register_server(echo_server)
 
-    tool_registry = ToolRegistry()
+    tool_registry = ToolRegistry(current_phase=4)
     await registry.register_all(tool_registry)
 
     definitions = tool_registry.get_llm_tool_definitions()

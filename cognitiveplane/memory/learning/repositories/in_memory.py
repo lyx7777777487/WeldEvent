@@ -3,7 +3,7 @@
 Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.6).
 """
 
-from cognitiveplane.shared.dto_learning import LearningEvent
+from cognitiveplane.shared.dto.learning import LearningEvent
 from cognitiveplane.shared.enums import ProcessingStatus
 from cognitiveplane.shared.ports.learning import LearningEventRepository
 from cognitiveplane.shared.types import DecisionId, LearningEventId

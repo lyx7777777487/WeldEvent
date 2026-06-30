@@ -161,6 +161,12 @@ class DecodeStep(PreprocessStep):
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
             if img is None:
                 return None
+            # P2-2 fix: cv2.imread 默认返回 BGR/BGRA 顺序，但下游 ColorConvertStep
+            # 假设 RGB 顺序。这里统一转成 RGB（保持通道数）。
+            if img.ndim == 3 and img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            elif img.ndim == 3 and img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
             img = img.astype(np.uint8)
 
             # 推断格式
@@ -270,12 +276,12 @@ class ValidateStep(PreprocessStep):
         if gray_mean < 1.0:
             metadata.is_valid = False
             metadata.error = "图像可能为全黑"
-            return None, image, metadata  # type: ignore[return-value]
+            return None, metadata
 
         if gray_mean > 254.0:
             metadata.is_valid = False
             metadata.error = "图像可能为全白"
-            return None, image, metadata  # type: ignore[return-value]
+            return None, metadata
 
         metadata.is_valid = True
         return image, metadata

@@ -1,5 +1,8 @@
 """Bridge — DecisionTranslator (spec §6.1 lines 340-344).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4+ Temporal bridge rewrite per boundary-pinning §6, do not extend.
+
 Translates a published `BrainDecision` (decision domain on WeldMap)
 into a `WorkflowTemplate` payload that the L2 Temporal control plane
 knows how to launch. The template is intentionally a plain dataclass

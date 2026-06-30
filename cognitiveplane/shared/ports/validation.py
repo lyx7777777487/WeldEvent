@@ -13,10 +13,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from cognitiveplane.shared.dto_context import ContextSnapshot, WeldMapSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot, WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_memory import MemorySearchResult
-from cognitiveplane.shared.dto_validation import (
+from cognitiveplane.shared.dto.memory import MemorySearchResult
+from cognitiveplane.shared.dto.validation import (
     DivergencePoint,
     InconsistencyDetail,
     ShadowDecision,

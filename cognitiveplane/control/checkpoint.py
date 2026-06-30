@@ -17,7 +17,7 @@ from uuid import uuid4
 from cognitiveplane.control.event_log import EventLog
 from cognitiveplane.control.exceptions import CheckpointNotFoundError
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_memory import MemoryContent
+from cognitiveplane.shared.dto.memory import MemoryContent
 from cognitiveplane.shared.enums import BrainStateType, MemoryType
 from cognitiveplane.shared.ports.memory import MemoryWriteInput, MemoryWritePort
 from cognitiveplane.shared.types import CaseId, DecisionId

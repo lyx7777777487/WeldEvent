@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cognitiveplane.shared.dto_knowledge import StandardsQuery, StandardsResult
+from cognitiveplane.shared.dto.knowledge import StandardsQuery, StandardsResult
 
 from .ports import StandardsQueryInput, StandardsQueryPort
 

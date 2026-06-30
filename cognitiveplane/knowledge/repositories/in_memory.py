@@ -3,7 +3,7 @@
 Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.4).
 """
 
-from cognitiveplane.shared.dto_knowledge import KnowledgeResult, RAGQuery
+from cognitiveplane.shared.dto.knowledge import KnowledgeResult, RAGQuery
 from cognitiveplane.shared.enums import KnowledgeType
 from cognitiveplane.shared.ports.knowledge import KnowledgeRepository
 from cognitiveplane.shared.types import KnowledgeId

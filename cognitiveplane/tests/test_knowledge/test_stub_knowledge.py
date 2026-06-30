@@ -7,7 +7,7 @@ StandardsQueryPort.query() returns [].
 import pytest
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     EquipmentKnowledgeQuery,
     KnowledgeResult,

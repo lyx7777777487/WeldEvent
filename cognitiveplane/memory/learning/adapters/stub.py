@@ -7,7 +7,7 @@ port system without AttributeError.
 
 from datetime import datetime, timezone
 
-from cognitiveplane.shared.dto_learning import LearningContent, LearningEvent
+from cognitiveplane.shared.dto.learning import LearningContent, LearningEvent
 from cognitiveplane.shared.enums import LearningEventType, ProcessingStatus
 from cognitiveplane.shared.ports.learning import LearningEventRepository
 from cognitiveplane.shared.types import DecisionId, LearningEventId

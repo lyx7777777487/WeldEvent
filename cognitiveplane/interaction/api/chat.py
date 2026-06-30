@@ -16,10 +16,24 @@ Source: 7-plane redesign spec §7 FastAPI + plan §2.3 + §A.3.
 """
 
 from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Any, Optional
+import json
+import logging
 
 from cognitiveplane.control.deps import CognitiveDependencies
+
+logger = logging.getLogger("chat_api")
+# 确保 INFO 级别日志能输出到 stdout（uvicorn 默认只配自己的 logger）
+if not logger.handlers:
+    import sys
+    h = logging.StreamHandler(sys.stdout)
+    h.setLevel(logging.INFO)
+    h.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S"))
+    logger.addHandler(h)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # 避免重复输出
 
 
 class ChatRequest(BaseModel):
@@ -37,6 +51,9 @@ class ChatResponse(BaseModel):
     tools_used: list[str] = []
     tier: str = "react_function_calling"
     error: str | None = None
+    # P3-5 fix: 结构化回传 launch_workflow 产出的 workflow_id，
+    # 避免消费者从 LLM 回复文本正则提取（脆弱）。
+    workflow_ids: list[str] = []
 
 
 def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
@@ -49,7 +66,7 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     from cognitiveplane.interaction.file_handler import FileHandler
     from cognitiveplane.interaction.image_store import ImageStore
     from cognitiveplane.interaction.api.image_session import ImageSessionRegistry
-    from cognitiveplane.shared.dto_context import ContextSnapshot
+    from cognitiveplane.shared.dto.context import ContextSnapshot
     from cognitiveplane.shared.enums import EventType, NoveltyLevel
     from cognitiveplane.shared.types import CaseId
     from datetime import datetime, timezone
@@ -70,11 +87,19 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     )
     file_handler = FileHandler(llm_provider=deps.capability.llm_provider, image_store=image_store)
 
+    # 暴露 tool_registry 给 app.py，用于挂载 MCP server（协议化工具层）
+    # router.engine 也暴露，供 app.py 做健康检查等
+    router.tool_registry = engine._tools
+    router.engine = engine
+    router.image_store = image_store
+
     # ── JSON 纯文本聊天 ──
 
     @router.post("/", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:
         session = _get_or_create_session(session_manager, request.operator_id, request.session_id, request.case_id)
+        logger.info("[CHAT] session=%s user=%r case=%s",
+                    session.session_id.value, request.message, request.case_id)
 
         context = ContextSnapshot(
             case_id=CaseId(value=request.case_id or "unknown"),
@@ -92,8 +117,24 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
         response = await engine.run(
             user_input=request.message,
             context=context,
-            session={"session_id": str(session.session_id.value)},
+            session={
+                "session_id": str(session.session_id.value),
+                "history": session.messages,  # 传入历史对话，避免 LLM 失忆
+            },
         )
+
+        # 追加本轮对话到 session.messages，供下一轮作为历史
+        session.messages.append({"role": "user", "content": request.message})
+        if response.text_reply:
+            session.messages.append({"role": "assistant", "content": response.text_reply})
+
+        logger.info("[CHAT] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
+                    session.session_id.value,
+                    response.tools_used,
+                    getattr(response, "workflow_ids", []),
+                    len(response.text_reply or ""),
+                    response.error)
+        logger.info("[CHAT] reply=\n%s", response.text_reply)
 
         return ChatResponse(
             reply=response.text_reply,
@@ -101,6 +142,7 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
             tools_used=response.tools_used,
             tier=response.tier_used.value,
             error=response.error,
+            workflow_ids=getattr(response, "workflow_ids", []),
         )
 
     # ── multipart/form-data 文件上传聊天 ──
@@ -120,6 +162,8 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
           - image_id 给工具层 (LLM 调 analyze_image 拿原图)
         """
         session = _get_or_create_session(session_manager, operator_id, session_id, case_id)
+        logger.info("[UPLOAD] session=%s user=%r case=%s files=%d",
+                    session.session_id.value, message, case_id, len(files))
 
         if not files:
             # 没有文件，走普通聊天
@@ -138,24 +182,131 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
             response = await engine.run(
                 user_input=message,
                 context=context,
-                session={"session_id": str(session.session_id.value)},
+                session={
+                    "session_id": str(session.session_id.value),
+                    "history": session.messages,
+                },
             )
+            session.messages.append({"role": "user", "content": message})
+            if response.text_reply:
+                session.messages.append({"role": "assistant", "content": response.text_reply})
+            logger.info("[UPLOAD] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
+                        session.session_id.value,
+                        response.tools_used,
+                        getattr(response, "workflow_ids", []),
+                        len(response.text_reply or ""),
+                        response.error)
+            logger.info("[UPLOAD] reply=\n%s", response.text_reply)
             return ChatResponse(
                 reply=response.text_reply,
                 session_id=str(session.session_id.value),
                 tools_used=response.tools_used,
                 tier=response.tier_used.value,
                 error=response.error,
+                workflow_ids=getattr(response, "workflow_ids", []),
             )
 
         # 有文件：解析文件，构建多模态消息，走 ReAct 引擎
-        return await _handle_file_upload_via_react(
+        response = await _handle_file_upload_via_react(
             message=message,
             session=session,
             files=files,
             file_handler=file_handler,
             engine=engine,
             image_sessions=image_sessions,
+        )
+        session.messages.append({"role": "user", "content": message})
+        if response.reply:
+            session.messages.append({"role": "assistant", "content": response.reply})
+        logger.info("[UPLOAD] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
+                    session.session_id.value,
+                    response.tools_used,
+                    getattr(response, "workflow_ids", []),
+                    len(response.reply or ""),
+                    response.error)
+        logger.info("[UPLOAD] reply=\n%s", response.reply)
+        return response
+
+    # ── 流式聊天 (SSE) ──
+
+    @router.post("/stream")
+    async def chat_stream(request: ChatRequest):
+        """流式聊天端点 — SSE (Server-Sent Events)。
+
+        返回 text/event-stream，逐事件推送：
+          - thinking:    ReAct 新迭代
+          - tool_call:   工具调用（含 rejected/retry 信息）
+          - tool_result: 工具返回
+          - token:       最终轮 LLM 流式 token（打字机效果）
+          - final:       流式结束（含完整 reply + tools_used + workflow_ids）
+          - error:       异常
+
+        前端用 fetch + ReadableStream 消费（EventSource 不支持 POST）。
+        与 /chat/ 的差异：最终回复逐 token 流式输出，工具调用实时推送，
+        用户能看到 LLM 思考过程，减少等待焦虑。
+        """
+        session = _get_or_create_session(session_manager, request.operator_id, request.session_id, request.case_id)
+        logger.info("[STREAM] session=%s user=%r case=%s",
+                    session.session_id.value, request.message, request.case_id)
+
+        context = ContextSnapshot(
+            case_id=CaseId(value=request.case_id or "unknown"),
+            event_type=EventType.WORKFLOW_ENTERED,
+            workflow_state={},
+            case_data={},
+            measurements=[],
+            memory_match_confidence=0.5,
+            knowledge_coverage=0.5,
+            event_novelty=NoveltyLevel.PARTIAL,
+            validation_critical_count=0,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        session_id_str = str(session.session_id.value)
+        user_msg = request.message
+
+        async def event_generator():
+            """SSE 事件生成器 — 桥接 engine.run_stream()。
+
+            流结束后在 finally 块追加对话到 session.messages，供下一轮作为历史。
+            客户端断开时 generator 被取消，finally 仍执行（只追加已收到的内容）。
+            """
+            final_reply = ""
+            tools_used_list: list[str] = []
+            workflow_ids_list: list[str] = []
+            try:
+                async for event in engine.run_stream(
+                    user_input=user_msg,
+                    context=context,
+                    session={
+                        "session_id": session_id_str,
+                        "history": session.messages,
+                    },
+                ):
+                    if event["event"] == "final":
+                        final_reply = event["data"].get("reply", "")
+                        tools_used_list = event["data"].get("tools_used", [])
+                        workflow_ids_list = event["data"].get("workflow_ids", [])
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                err_event = {"event": "error", "data": {"message": f"stream error: {e}"}}
+                yield f"data: {json.dumps(err_event, ensure_ascii=False)}\n\n"
+            finally:
+                # 流结束后追加对话到 session.messages，供下一轮作为历史
+                session.messages.append({"role": "user", "content": user_msg})
+                if final_reply:
+                    session.messages.append({"role": "assistant", "content": final_reply})
+                logger.info("[STREAM] session=%s tools=%s wf_ids=%s reply_len=%d",
+                            session_id_str, tools_used_list, workflow_ids_list, len(final_reply))
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲，确保 token 实时推送
+            },
         )
 
     # ── WebSocket ── (Phase 3 子项目 D: AgentLoop 双 task)
@@ -172,10 +323,13 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
         async def send_json(data: dict) -> None:
             await websocket.send_json(data)
 
+        # 治理一致: /ws 路径必须与 HTTP /api/v1/chat 用同一套 hooks (SafetyHook + PolicyHook).
+        # 不能让同一工具调用因入口不同而绕过 ToolPolicy.
         loop = AgentLoop(
             deps=deps,
             event_log=event_log,
             send_json=send_json,
+            hooks=hooks,
         )
         await loop.start()
 
@@ -192,13 +346,8 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
 
 
 def _get_or_create_session(session_manager, operator_id, session_id, case_id):
-    """获取或创建会话。"""
-    session = None
-    if session_id:
-        session = session_manager.get_session(operator_id, session_id)
-    if session is None:
-        session = session_manager.create_session(operator_id, case_id)
-    return session
+    """获取或创建会话（复用前端传的 session_id，保证历史对话累积）。"""
+    return session_manager.get_or_create_session(operator_id, session_id, case_id)
 
 
 async def _handle_file_upload_via_react(
@@ -226,7 +375,7 @@ async def _handle_file_upload_via_react(
     文档: 文本附加到消息 text 部分。
     """
     from cognitiveplane.interaction.file_handler import UploadedFile
-    from cognitiveplane.shared.dto_context import ContextSnapshot
+    from cognitiveplane.shared.dto.context import ContextSnapshot
     from cognitiveplane.shared.enums import EventType, NoveltyLevel
     from cognitiveplane.shared.types import CaseId
     from datetime import datetime, timezone
@@ -266,6 +415,10 @@ async def _handle_file_upload_via_react(
             f"图片 image_ref 清单（按上传顺序）：{id_list}。"
             f"调用 analyze_image(image_ref=\"<ref>\", question=\"...\") 分析图片。"
             f"工具会取原图送给视觉模型分析。]"
+            f"\n[重要] 当你调用 design_workflow 编排工作流时，必须把上述 image_ref 清单"
+            f"完整传入 image_refs 参数（数组形式，如 [\"{image_ids[0]}\"]），"
+            f"否则下游 L3 activity（如 IQA 图像质量评估）将无法获取图片导致执行失败。"
+            f"即使用户只说\"分析这张图\"，也要把 image_refs 传给 design_workflow。"
         )
     if result.text_context.strip():
         text_parts.append(f"\n\n[附带的文档内容：]\n{result.text_context[:4000]}")
@@ -304,7 +457,10 @@ async def _handle_file_upload_via_react(
     response = await engine.run(
         user_input=user_message,
         context=context,
-        session={"session_id": session_id_str},
+        session={
+            "session_id": session_id_str,
+            "history": session.messages,
+        },
     )
 
     return ChatResponse(
@@ -313,4 +469,5 @@ async def _handle_file_upload_via_react(
         tools_used=response.tools_used,
         tier=response.tier_used.value,
         error=response.error,
+        workflow_ids=getattr(response, "workflow_ids", []),
     )

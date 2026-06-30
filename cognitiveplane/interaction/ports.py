@@ -6,7 +6,7 @@ Source: 7-plane redesign spec §7. InstructionPublishPort moved here from shared
 from abc import ABC, abstractmethod
 
 from cognitiveplane.interaction.signals.instruction import LiveInstruction
-from cognitiveplane.shared.dto_gateway import PublishResult
+from cognitiveplane.shared.dto.gateway import PublishResult
 
 
 class InstructionPublishPort(ABC):

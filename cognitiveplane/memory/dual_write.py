@@ -8,7 +8,7 @@ Phase 1: PG + Redis stub. Phase 2: PG + Milvus.
 import logging
 from typing import Any, Protocol
 
-from cognitiveplane.shared.dto_memory import MemorySearchQuery, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemorySearchQuery, MemorySearchResult
 from cognitiveplane.shared.types import MemoryId
 
 logger = logging.getLogger(__name__)

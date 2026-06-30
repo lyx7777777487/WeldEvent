@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
 from cognitiveplane.shared.dto_decision.outputs import (
     InspectionStrategy,

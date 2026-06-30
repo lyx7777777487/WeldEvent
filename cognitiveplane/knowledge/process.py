@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     ProcessKnowledgeQuery,
     ProcessKnowledgeResult,
 )

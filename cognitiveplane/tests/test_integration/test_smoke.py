@@ -54,11 +54,11 @@ from cognitiveplane.shared.types import CaseId, DecisionId, EventId
 # ---------------------------------------------------------------------------
 # DTOs
 # ---------------------------------------------------------------------------
-from cognitiveplane.shared.dto_context import DomainEvent, ContextSnapshot
+from cognitiveplane.shared.dto.context import DomainEvent, ContextSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision
 from cognitiveplane.shared.ports.validation import ValidationPipelineInput
 from cognitiveplane.shared.ports.knowledge import RAGQueryInput
-from cognitiveplane.shared.dto_knowledge import RAGQuery
+from cognitiveplane.shared.dto.knowledge import RAGQuery
 
 
 # =====================================================================

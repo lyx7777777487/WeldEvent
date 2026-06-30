@@ -1,9 +1,11 @@
 """ReasoningModeSelector — choose ReasoningMode based on ContextSnapshot.
 
-Spec §5: extracted from BrainOrchestrator._select_reasoning_mode.
+Spec §5: extracted from legacy BrainOrchestrator._select_reasoning_mode
+(orchestrator.py deleted 2026-06-26 as DEAD CODE; ReActEngine is now the
+single L1 executor).
 """
 
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import NoveltyLevel, ReasoningMode
 
 

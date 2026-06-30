@@ -53,7 +53,7 @@ from cognitiveplane.shared.types import (
 )
 
 # Context DTOs
-from cognitiveplane.shared.dto_context import (
+from cognitiveplane.shared.dto.context import (
     BrainInternalEvent,
     ContextSnapshot,
     DomainEvent,
@@ -113,7 +113,7 @@ from cognitiveplane.shared.dto_decision.outputs import (
 )
 
 # Validation DTOs
-from cognitiveplane.shared.dto_validation import (
+from cognitiveplane.shared.dto.validation import (
     ConsistencyValidationResult,
     DivergencePoint,
     InconsistencyDetail,
@@ -126,7 +126,7 @@ from cognitiveplane.shared.dto_validation import (
 )
 
 # Memory DTOs
-from cognitiveplane.shared.dto_memory import (
+from cognitiveplane.shared.dto.memory import (
     MemoryContent,
     MemoryRecord,
     MemorySearchQuery,
@@ -134,7 +134,7 @@ from cognitiveplane.shared.dto_memory import (
 )
 
 # Knowledge DTOs
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     CaseLibraryResult,
     EquipmentKnowledgeQuery,
@@ -150,7 +150,7 @@ from cognitiveplane.shared.dto_knowledge import (
 )
 
 # Collaboration DTOs
-from cognitiveplane.shared.dto_collaboration import (
+from cognitiveplane.shared.dto.collaboration import (
     ConversationMessage,
     ConversationSession,
     FeedbackContent,
@@ -160,25 +160,25 @@ from cognitiveplane.shared.dto_collaboration import (
 )
 
 # Learning DTOs
-from cognitiveplane.shared.dto_learning import (
+from cognitiveplane.shared.dto.learning import (
     LearningContent,
     LearningEvent,
 )
 
 # Persona DTOs
-from cognitiveplane.shared.dto_persona import (
+from cognitiveplane.shared.dto.persona import (
     PersonaFrame,
     PersonaSelectionResult,
 )
 
 # Reasoning Mode DTOs
-from cognitiveplane.shared.dto_reasoning_mode import (
+from cognitiveplane.shared.dto.reasoning_mode import (
     ReasoningModeSelectionInput,
     ReasoningModeSelectionResult,
 )
 
 # Gateway DTOs
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     AuditEntry,
     CaseData,
     ConsensusRequest,

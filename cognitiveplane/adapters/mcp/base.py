@@ -118,6 +118,10 @@ class MCPAdapter(BrainTool):
     LLM 通过 ToolRegistry 看到的接口与内部工具完全一致。
     """
 
+    # Industrial/external MCP adapters should not be visible to Brain by default
+    # before the ToolPool/Activity boundary is in place.
+    phase = 4
+
     def __init__(
         self,
         server: MCPServer,

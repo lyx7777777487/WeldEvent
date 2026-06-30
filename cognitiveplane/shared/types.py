@@ -35,7 +35,9 @@ class KnowledgeId(BaseModel):
 
 
 class SessionId(BaseModel):
-    value: UUID
+    # 改为 str：前端 localStorage 传的 session_id 是 'sess_<timestamp>' 格式，
+    # 后端需复用该 id 才能累积历史对话。不再强制 UUID。
+    value: str = Field(min_length=1, max_length=128)
 
 
 class CaseId(BaseModel):

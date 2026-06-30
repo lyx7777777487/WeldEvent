@@ -16,28 +16,28 @@ from cognitiveplane.copilot import (
     QAQuery,
 )
 from cognitiveplane.copilot.explain import DecisionNotFoundError
-from cognitiveplane.shared.dto_collaboration import (
+from cognitiveplane.shared.dto.collaboration import (
     HumanReviewRequest,
     ReviewContent,
 )
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
 from cognitiveplane.shared.dto_decision.outputs import (
     ParameterRecommendation,
     ParameterSet,
 )
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     CaseData,
     PublishResult,
     WorkflowState,
 )
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryResult,
     KnowledgeResult,
     ProcessKnowledgeResult,
     StandardsResult,
 )
-from cognitiveplane.shared.dto_memory import MemoryContent, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemoryContent, MemorySearchResult
 from cognitiveplane.shared.enums import (
     BrainStateType,
     CollaborationLayer,

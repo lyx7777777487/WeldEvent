@@ -12,6 +12,8 @@ from cognitiveplane.capability.web_search import WebSearchProvider
 class WebSearchTool(BrainTool):
     """Search the web for current information on welding, standards, and technical topics."""
 
+    phase = 1
+
     def __init__(self, provider: WebSearchProvider) -> None:
         self._provider = provider
 

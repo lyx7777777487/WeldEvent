@@ -55,7 +55,7 @@ __all__ = [
     "ActivityMetadata",
     # Activity实现
     "IqaActivity",
-    "PqaActivity",
+    "PpaActivity",
     # IQA接口
     "run_iqa",
     "run_iqa_batch",

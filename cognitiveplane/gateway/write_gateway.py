@@ -12,7 +12,7 @@ from cognitiveplane.gateway.events import GatewayActionEvent, GatewayObservation
 from cognitiveplane.gateway.ports import CognitiveGatewayWritePort
 from cognitiveplane.gateway.weldmap_client import WeldMapHTTPClient
 from cognitiveplane.shared.dto_decision import BrainDecision
-from cognitiveplane.shared.dto_gateway import Escalation, PublishResult
+from cognitiveplane.shared.dto.gateway import Escalation, PublishResult
 from cognitiveplane.interaction.signals.instruction import LiveInstruction
 from cognitiveplane.shared.types import CaseId
 

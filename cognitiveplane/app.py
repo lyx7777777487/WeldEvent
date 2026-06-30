@@ -33,7 +33,6 @@ if _env_file.exists():
                     os.environ[key] = value
 
 from cognitiveplane.control.repositories.in_memory import InMemoryBrainDecisionRepository
-from cognitiveplane.control.orchestrator import BrainOrchestrator
 from cognitiveplane.capability import init_llm
 from cognitiveplane.capability.config import LLMConfig, OpenAIConfig
 from cognitiveplane.capability.mock import MockLLMProvider
@@ -48,7 +47,7 @@ from cognitiveplane.memory.adapters.port_adapters import (
 )
 from cognitiveplane.memory.repositories.in_memory import InMemoryMemoryRepository
 from cognitiveplane.memory.confidence import MemoryConfidenceService
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryResult,
     EquipmentKnowledgeResult,
     KnowledgeResult,
@@ -698,32 +697,55 @@ def _build_dependencies(llm_available: bool) -> "CognitiveDependencies":
     )
 
     # Governance
+    escalation_tracker = EscalationTracker()
     validation_pipeline = ValidationPipeline(
         safety=SafetyValidator(),
         rule=RuleValidator(),
         shadow=ShadowValidator(),
         consistency=ConsistencyValidator(),
-        escalation=EscalationTracker(),
+        escalation=escalation_tracker,
     )
     governance_deps = GovernanceDeps(
         validation=validation_pipeline,
-        escalation=EscalationTracker(),
+        escalation=escalation_tracker,
     )
 
     # Control
     decision_repo = InMemoryBrainDecisionRepository()
     control_deps = ControlDeps(
-        orchestrator=BrainOrchestrator(),
         decision_repo=decision_repo,
     )
 
-    # Capability
-    from cognitiveplane.interaction.image_store import ImageStore
+    # Capability — §7 line 2234 contract: only llm_provider + web_search.
+    # ImageStore is session-scoped state, constructed in chat router (not in Deps).
     capability_deps = CapabilityDeps(
         llm_provider=get_llm() if llm_available else None,
         web_search=AutoWebSearchProvider(),
-        image_store=ImageStore(),  # plan §A.3: app 级共享 ImageStore
     )
+
+    # Bridge — L1→L2 Temporal 桥接（boundary-pinning §6.2）
+    # 默认装配 TemporalWorkflowLaunchPort；若 Temporal Server 未启动，
+    # submit() 会返回 accepted=False + error，不影响 app 启动。
+    from cognitiveplane.control.deps import BridgeDeps
+    from cognitiveplane.bridge import (
+        EventConnector,
+        TemporalWorkflowLaunchPort,
+        WorkflowLauncher,
+    )
+    temporal_host = os.environ.get("TEMPORAL_HOST", "localhost:7233")
+    temporal_launch_port = TemporalWorkflowLaunchPort(
+        temporal_host=temporal_host,
+        namespace=os.environ.get("TEMPORAL_NAMESPACE", "default"),
+        task_queue=os.environ.get("TEMPORAL_TASK_QUEUE", "control-plane"),
+    )
+    workflow_launcher = WorkflowLauncher(port=temporal_launch_port)
+    # P2-9 fix: 注入 gateway write port，让 EventConnector 在提交 Temporal 前
+    # 调 notify_workflow_trigger 写 WeldMap workflow domain（§6.2 契约 2）
+    event_connector = EventConnector(
+        launcher=workflow_launcher,
+        gateway_write=gateway_adapter,
+    )
+    bridge_deps = BridgeDeps(event_connector=event_connector)
 
     return CognitiveDependencies(
         capability=capability_deps,
@@ -732,12 +754,29 @@ def _build_dependencies(llm_available: bool) -> "CognitiveDependencies":
         memory=memory_deps,
         gateway=gateway_deps,
         governance=governance_deps,
+        bridge=bridge_deps,
     )
 
 
 # ---------------------------------------------------------------------------
 # FastAPI Composition Root
 # ---------------------------------------------------------------------------
+
+
+def _build_tool_registry_for_mcp(deps: "CognitiveDependencies"):
+    """为 MCP server 构建独立的 ToolRegistry。
+
+    MCP server 需要一个 ToolRegistry 实例来发现工具。chat router 内部
+    也有自己的 ToolRegistry（在 ReActEngine 里），两者独立但工具相同
+    （都是从 deps 构建的无状态工具，除了 image_store）。
+
+    image_store 单独创建（MCP 调用 analyze_image 时用），与 chat 的
+    image_store 隔离 — MCP 客户端上传的图片需通过 MCP 路径管理。
+    生产环境可改为共享 image_store。
+    """
+    from cognitiveplane.control.tool_registry import ToolRegistry
+    from cognitiveplane.interaction.image_store import ImageStore
+    return ToolRegistry(deps, image_store=ImageStore())
 
 
 def create_app():
@@ -750,13 +789,53 @@ def create_app():
     llm_available = _bootstrap_llm()
     deps = _build_dependencies(llm_available)
 
-    app = FastAPI(title="WeldEvent Cognitive Plane", version="0.2.0")
+    # P2-3 fix: lifespan — shutdown 时关闭 Temporal Client 连接
+    # MCP server lifespan 也合并进来 — streamable_http_app 的 task group
+    # 必须在 lifespan 中初始化，否则 MCP 请求会 500
+    # (RuntimeError: Task group is not initialized)
+    from contextlib import asynccontextmanager
 
-    # CORS — 允许前端本地开发访问
+    # 提前构建 MCP app（需要在 lifespan 之前构建，才能合并其 lifespan）
+    from cognitiveplane.control.mcp_server import build_mcp_server_and_app
+    _mcp_app, _mcp_instance = build_mcp_server_and_app(
+        _build_tool_registry_for_mcp(deps)
+    )
+
+    @asynccontextmanager
+    async def lifespan(app):
+        # 启动 MCP app 的 lifespan（初始化 task group）
+        # streamable_http_app 返回 Starlette，lifespan_context 在 router 上
+        async with _mcp_app.router.lifespan_context(app):
+            yield
+            # shutdown: 释放 Temporal gRPC 连接
+            if deps.bridge and deps.bridge.event_connector:
+                try:
+                    await deps.bridge.event_connector.aclose()
+                except Exception:
+                    pass
+
+    app = FastAPI(title="WeldEvent Cognitive Plane", version="0.2.0", lifespan=lifespan)
+
+    # CORS — P2-13 fix: 通配符 origin + credentials 会被浏览器拒绝
+    # P3-7 fix: 不再静默使用硬编码默认值。未配置 CORS_ORIGINS 时回退到
+    # localhost 开发域并打 WARNING 日志，提醒生产部署必须显式配置。
     from fastapi.middleware.cors import CORSMiddleware
+    import logging as _logging
+    _cors_logger = _logging.getLogger("cognitiveplane.app")
+    cors_env = os.environ.get("CORS_ORIGINS", "").strip()
+    if cors_env:
+        cors_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+    else:
+        cors_origins = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"]
+        _cors_logger.warning(
+            "CORS_ORIGINS env var not set — falling back to localhost dev origins. "
+            "For production deployment, set CORS_ORIGINS to a comma-separated list "
+            "of allowed origins (e.g. 'https://app.example.com'). Current fallback: %s",
+            cors_origins,
+        )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -771,10 +850,32 @@ def create_app():
 
     @app.get("/api/v1/health")
     async def health() -> dict:
-        return {"status": "ok", "version": "0.2.0"}
+        # P2-R3-5: 探测 Temporal 连通性
+        temporal_ok = True
+        if deps.bridge and deps.bridge.event_connector:
+            try:
+                temporal_ok = await deps.bridge.event_connector.is_healthy()
+            except Exception:
+                temporal_ok = False
+        return {
+            "status": "ok" if temporal_ok else "degraded",
+            "version": "0.2.0",
+            "temporal": "connected" if temporal_ok else "unreachable",
+        }
 
-    app.include_router(create_chat_router(deps))
+    chat_router = create_chat_router(deps)
+    app.include_router(chat_router)
     app.include_router(create_notifications_router())
+
+    # MCP server — 协议化工具层（2026 MCP 标准）
+    # mcp_app 已在 lifespan 之前构建（_mcp_app），这里只负责挂载
+    # task group 初始化在 lifespan 中完成（见上方 lifespan 函数）
+    try:
+        from cognitiveplane.control.mcp_server import mount_mcp_server
+        mount_mcp_server(app, _mcp_app)
+    except Exception as e:
+        import logging as _logging
+        _logging.getLogger("app").warning("[APP] MCP server mount failed: %s", e)
 
     return app
 

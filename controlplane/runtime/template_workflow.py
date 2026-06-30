@@ -182,13 +182,17 @@ class TemplateWorkflow:
     async def _wait_human_gate(self, cp_def: ControlPointDefinition) -> tuple[GateAction, str | None]:
         self._gate_runtime.reset()
         timeout = cp_def.human_gate.timeout
-        try:
-            if timeout:
-                await workflow.wait_condition(lambda: not self._gate_runtime.is_awaiting, timeout=timeout)
-            else:
-                await workflow.wait_condition(lambda: not self._gate_runtime.is_awaiting)
-        except TimeoutError:
+        # P1-1b fix: wait_condition 超时返回 False（不抛 TimeoutError）
+        # 必须检查返回值，否则超时后 pending_action=None 会被当作 CONTINUE 静默放行
+        if timeout:
+            ok = await workflow.wait_condition(lambda: not self._gate_runtime.is_awaiting, timeout=timeout)
+        else:
+            ok = await workflow.wait_condition(lambda: not self._gate_runtime.is_awaiting)
+        if not ok:
             # Gate timeout expired without action — terminate workflow
+            workflow.logger.warning(
+                "HumanGate timeout (cp=%s) — terminating workflow", cp_def.id
+            )
             self._gate_runtime.set_action(GateAction.TERMINATE, None)
             return GateAction.TERMINATE, None
 

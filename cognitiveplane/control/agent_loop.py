@@ -64,6 +64,7 @@ from typing import Any, Awaitable, Callable
 
 from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.event_log import BrainEventType, EventLog
+from cognitiveplane.control.hooks import BeforeToolHook, SafetyHook
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,10 @@ class AgentLoop:
 
     receive_task 循环 await loop._drain_receive() — 子类/测试可注入消息源.
     默认实现从 self._incoming: asyncio.Queue 取消息 (生产者由 WebSocket handler put).
+
+    Governance: hooks 参数控制 ReActEngine 的 BeforeToolHook 链. 默认只有 SafetyHook,
+    生产入口 (chat.py /ws) 必须传入 [SafetyHook(), PolicyHook(tool_policy)] 与 HTTP 路径
+    保持治理一致 — 不能让同一工具调用因入口不同而绕过 ToolPolicy.
     """
 
     def __init__(
@@ -88,10 +93,12 @@ class AgentLoop:
         deps: CognitiveDependencies,
         event_log: EventLog,
         send_json: SendJsonFn,
+        hooks: list[BeforeToolHook] | None = None,
     ) -> None:
         self._deps = deps
         self._event_log = event_log
         self._send_json = send_json
+        self._hooks: list[BeforeToolHook] = hooks if hooks is not None else [SafetyHook()]
         self._incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self._feedback_queue: asyncio.Queue[FeedbackSummary] = asyncio.Queue(maxsize=10)
         self._receive_task: asyncio.Task | None = None
@@ -168,8 +175,7 @@ class AgentLoop:
     async def _run_react(self, message: dict[str, Any]) -> None:
         """react_task 主体 — 构造 ReActEngine + 跑 run() + 推 final 事件."""
         from cognitiveplane.control.react import ReActEngine
-        from cognitiveplane.control.hooks import SafetyHook
-        from cognitiveplane.shared.dto_context import ContextSnapshot
+        from cognitiveplane.shared.dto.context import ContextSnapshot
         from cognitiveplane.shared.enums import EventType, NoveltyLevel
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
@@ -177,7 +183,7 @@ class AgentLoop:
         try:
             engine = ReActEngine(
                 self._deps,
-                hooks=[SafetyHook()],
+                hooks=self._hooks,
                 event_callback=self._on_react_event,
                 event_log=self._event_log,
             )
@@ -288,7 +294,7 @@ class AgentLoop:
 
     async def _persist_feedback(self, msg: FeedbackMessage) -> str | None:
         """写 Memory. 失败返回 None + 发 feedback_rejected."""
-        from cognitiveplane.shared.dto_memory import MemoryContent
+        from cognitiveplane.shared.dto.memory import MemoryContent
         from cognitiveplane.shared.enums import MemoryType
         from cognitiveplane.shared.ports.memory import MemoryWriteInput
         from cognitiveplane.shared.types import DecisionId

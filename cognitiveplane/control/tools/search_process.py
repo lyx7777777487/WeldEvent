@@ -7,6 +7,8 @@ from cognitiveplane.shared.ports.knowledge import ProcessKnowledgePort
 class SearchProcessTool(BrainTool):
     """Search process knowledge for recommended welding parameters."""
 
+    phase = 4
+
     def __init__(self, port: ProcessKnowledgePort) -> None:
         self._port = port
 
@@ -48,7 +50,7 @@ class SearchProcessTool(BrainTool):
 
     async def execute(self, **kwargs) -> ToolResult:
         from cognitiveplane.shared.ports.knowledge import ProcessKnowledgeInput
-        from cognitiveplane.shared.dto_knowledge import ProcessKnowledgeQuery
+        from cognitiveplane.shared.dto.knowledge import ProcessKnowledgeQuery
 
         query = ProcessKnowledgeQuery(
             process_type=kwargs.get("process_type"),

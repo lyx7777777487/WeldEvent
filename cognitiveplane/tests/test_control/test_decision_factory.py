@@ -8,7 +8,7 @@ import pytest
 from cognitiveplane.control.decision_factory import DecisionFactory
 from cognitiveplane.control.persona import PersonaSelector
 from cognitiveplane.control.reasoning_mode import ReasoningModeSelector
-from cognitiveplane.shared.dto_context import ContextSnapshot
+from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.dto_decision.assessment import RootCauseHypotheses
 from cognitiveplane.shared.dto_decision.outputs import (
     ParameterRecommendation,

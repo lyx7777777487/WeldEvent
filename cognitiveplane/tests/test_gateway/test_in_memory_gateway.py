@@ -11,9 +11,9 @@ import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_context import DomainEvent
+from cognitiveplane.shared.dto.context import DomainEvent
 from cognitiveplane.shared.dto_decision import BrainDecision, DecisionOutput
-from cognitiveplane.shared.dto_gateway import (
+from cognitiveplane.shared.dto.gateway import (
     Escalation,
     Explanation,
     ParameterPatch,

@@ -7,7 +7,7 @@ import pytest
 from cognitiveplane.adapters.database.engine import AsyncDatabaseEngine, DatabaseConfig
 from cognitiveplane.adapters.database.workflow_repo import PostgresWorkflowStateRepository
 from cognitiveplane.adapters.database.audit_repo import PostgresAuditRepository
-from cognitiveplane.shared.dto_gateway import WorkflowState, AuditEntry
+from cognitiveplane.shared.dto.gateway import WorkflowState, AuditEntry
 from cognitiveplane.shared.types import CaseId
 
 

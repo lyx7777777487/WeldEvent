@@ -5,7 +5,7 @@ Source: L1_Port_and_Contract_Design.md (Phase 4, Section 6.3).
 
 from datetime import datetime, timezone
 
-from cognitiveplane.shared.dto_memory import MemoryRecord, MemorySearchQuery, MemorySearchResult
+from cognitiveplane.shared.dto.memory import MemoryRecord, MemorySearchQuery, MemorySearchResult
 from cognitiveplane.shared.enums import PromotionStatus
 from cognitiveplane.shared.ports.memory import MemoryRepository
 from cognitiveplane.shared.types import DecisionId, MemoryId

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cognitiveplane.shared.dto_memory import (
+from cognitiveplane.shared.dto.memory import (
     MemorySearchQuery,
     MemorySearchResult,
 )

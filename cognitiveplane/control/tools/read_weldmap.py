@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 class ReadWeldMapTool(BrainTool):
     """Read current WeldMap state: workflow progress, case data, decisions."""
 
+    phase = 3
+
     def __init__(self, port: GatewayReadPort) -> None:
         self._port = port
 

@@ -1,5 +1,8 @@
 """CopilotExplain — Decision explanation + reasoning trace (spec §11).
 
+⚠️ HISTORICAL LEGACY — not wired into running app (2026-06-26 audit).
+Phase 4/5 rewrite as /chat preset, do not extend. See copilot/__init__.py.
+
 Given a DecisionId, retrieves the BrainDecision and renders a human-readable
 explanation: persona, mode, outputs, confidence, and the reasoning path.
 LLM is optional; baseline mode produces a deterministic textual summary.

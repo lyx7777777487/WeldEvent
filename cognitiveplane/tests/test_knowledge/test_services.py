@@ -18,7 +18,7 @@ from cognitiveplane.knowledge.equipment import EquipmentKnowledgeService
 from cognitiveplane.knowledge.process import ProcessKnowledgeService
 from cognitiveplane.knowledge.rag import RAGService
 from cognitiveplane.knowledge.standards import StandardsService
-from cognitiveplane.shared.dto_knowledge import (
+from cognitiveplane.shared.dto.knowledge import (
     CaseLibraryQuery,
     CaseLibraryResult,
     EquipmentKnowledgeQuery,

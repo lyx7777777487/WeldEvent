@@ -14,12 +14,16 @@ if TYPE_CHECKING:
 class EscalateTool(BrainTool):
     """Escalate a decision to human intervention via WeldMap."""
 
+    phase = 3
+
     def __init__(
         self,
         validation_port: ValidationPipelinePort,
         gateway_write: CognitiveGatewayWritePort,
     ) -> None:
-        self._validation = validation_port
+        # validation_port retained in signature for backward compat with
+        # composition root (tool_registry.py wires EscalateTool(validation, write)).
+        # Field dropped 2026-06-26 — was dead (assigned but never read).
         self._gateway = gateway_write
 
     @property
@@ -56,7 +60,7 @@ class EscalateTool(BrainTool):
         }
 
     async def execute(self, **kwargs) -> ToolResult:
-        from cognitiveplane.shared.dto_gateway import Escalation
+        from cognitiveplane.shared.dto.gateway import Escalation
         from cognitiveplane.shared.dto_decision.outputs import EvidenceReference
         from cognitiveplane.shared.enums import UrgencyLevel, FallbackMode
         from cognitiveplane.shared.types import CaseId, DecisionId

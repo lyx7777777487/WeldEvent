@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from time import monotonic
 from uuid import uuid4
 
-from cognitiveplane.shared.dto_memory import MemorySearchResult
-from cognitiveplane.shared.dto_validation import (
+from cognitiveplane.shared.dto.memory import MemorySearchResult
+from cognitiveplane.shared.dto.validation import (
     ConsistencyValidationResult,
     RuleValidationResult,
     SafetyValidationResult,
@@ -52,7 +52,7 @@ from cognitiveplane.shared.ports.validation import (
     ValidationPipelinePort,
 )
 from cognitiveplane.shared.types import ValidationId
-from cognitiveplane.shared.dto_context import WeldMapSnapshot
+from cognitiveplane.shared.dto.context import WeldMapSnapshot
 
 
 class ValidationPipeline(ValidationPipelinePort):

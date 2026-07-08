@@ -181,7 +181,7 @@ class AgentLoop:
                     logger.warning("AgentLoop dispatch error: %s", e)
                     await self._send_json({"type": "error", "error": f"dispatch: {e}"})
         except asyncio.CancelledError:
-            logger.debug("agent_loop cleanup error", exc_info=True)
+            logger.debug("agent_loop receive_loop cancelled (normal)", exc_info=False)
 
     async def _dispatch(self, message: dict[str, Any]) -> None:
         """根据 type 字段分发 chat/feedback/interrupt."""
@@ -215,6 +215,10 @@ class AgentLoop:
         from cognitiveplane.shared.types import CaseId
         from datetime import datetime, timezone
 
+        session_id = message.get("session_id", "default")
+        # 与 HTTP /stream 路径对齐: 注入 session image_refs + 持久化 history.
+        user_msg, session_history = self._prepare_session_context(message, session_id)
+
         try:
             engine = ReActEngine(
                 self._deps,
@@ -242,18 +246,24 @@ class AgentLoop:
             await self._drain_feedback_queue()
 
             response = await engine.run(
-                user_input=message.get("message", ""),
+                user_input=user_msg,
                 context=context,
-                session={"session_id": message.get("session_id", "default")},
+                session={"session_id": session_id, "history": session_history},
             )
             await self._send_json({
                 "type": "final",
                 "reply": response.text_reply,
-                "session_id": message.get("session_id", "default"),
+                "session_id": session_id,
                 "tools_used": response.tools_used,
                 "tier": response.tier_used.value,
                 "error": response.error,
             })
+            # 非 stream 模式也需持久化，与 stream 路径行为一致
+            self._persist_session(
+                session_id, user_msg,
+                response.text_reply or "",
+                getattr(response, "reasoning_content", None),
+            )
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -335,9 +345,11 @@ class AgentLoop:
             (user_msg_with_image_refs, session_history)
         """
         from cognitiveplane.interaction.api._helpers import prepare_session_context
-        return prepare_session_context(
+        user_msg, session_history = prepare_session_context(
             message, session_id, self._session_manager, self._router,
         )
+        self._current_operator_id = message.get("operator_id", "operator-001")
+        return user_msg, session_history
 
     def _persist_session(
         self,
@@ -353,6 +365,7 @@ class AgentLoop:
         from cognitiveplane.interaction.api._helpers import persist_session
         persist_session(
             self._session_manager, session_id, user_msg, final_reply, final_reasoning,
+            operator_id=getattr(self, "_current_operator_id", "operator-001"),
         )
 
     async def _on_react_event(self, event_type: str, payload: dict[str, Any]) -> None:
@@ -487,7 +500,7 @@ class AgentLoop:
         try:
             await self._react_task
         except asyncio.CancelledError:
-            logger.debug("agent_loop cleanup error", exc_info=True)
+            logger.debug("react_task cancelled by interrupt (normal)", exc_info=False)
         self._react_task = None
 
         await self._send_json({

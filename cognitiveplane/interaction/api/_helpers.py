@@ -107,7 +107,8 @@ def prepare_session_context(
     session_history: list[dict] = []
     if session_manager is not None:
         try:
-            sess = session_manager.get_or_create_session("operator-001", session_id, None)
+            operator_id = message.get("operator_id", "operator-001")
+            sess = session_manager.get_or_create_session(operator_id, session_id, None)
             session_history = list(getattr(sess, "messages", []) or [])
         except Exception:
             logger.debug("get session history failed", exc_info=True)
@@ -117,6 +118,7 @@ def prepare_session_context(
 def persist_session(
     session_manager, session_id: str, user_msg: str,
     final_reply: str, final_reasoning: str | None,
+    operator_id: str = "operator-001",
 ) -> None:
     """共享: 流结束后把本轮 user/assistant 消息追加到 session.messages.
 
@@ -126,7 +128,7 @@ def persist_session(
     if session_manager is None or not final_reply:
         return
     try:
-        sess = session_manager.get_or_create_session("operator-001", session_id, None)
+        sess = session_manager.get_or_create_session(operator_id, session_id, None)
         sess.messages.append({"role": "user", "content": user_msg})
         assistant_msg: dict = {"role": "assistant", "content": final_reply}
         if final_reasoning:

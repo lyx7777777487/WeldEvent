@@ -8,6 +8,7 @@ Extracted from react.py. Contains:
 
 import asyncio
 import json
+import time as _time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -46,7 +47,7 @@ class ApprovalRequest:
     tool_name: str
     arguments: dict[str, Any]
     summary: str  # 供前端展示的工具调用摘要（人类可读）
-    created_at: float = field(default_factory=lambda: __import__("time").time())
+    created_at: float = field(default_factory=lambda: _time.time())
     event: asyncio.Event = field(default_factory=asyncio.Event)
     decision: str | None = None  # "approved" | "rejected" | "timeout"
     feedback: str | None = None

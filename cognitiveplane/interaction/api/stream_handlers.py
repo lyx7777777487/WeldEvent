@@ -125,7 +125,8 @@ async def handle_chat_stream(
         finally:
             # 流结束后追加对话到 session.messages，供下一轮作为历史
             # 共享 persist_session 函数, 与 WS /ws 路径行为一致
-            persist_session(session_manager, session_id_str, user_msg, final_reply, final_reasoning)
+            persist_session(session_manager, session_id_str, user_msg, final_reply, final_reasoning,
+            operator_id=request.operator_id)
             logger.info("[STREAM] session=%s tools=%s wf_ids=%s reply_len=%d",
                         session_id_str, tools_used_list, workflow_ids_list, len(final_reply))
             # Phase 5: 流式响应结束后异步评估

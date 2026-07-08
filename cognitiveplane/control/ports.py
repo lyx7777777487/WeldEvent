@@ -109,8 +109,8 @@ class ReflectionPort(ABC):
 class SubAgentDelegationPort(ABC):
     """Brain-internal sub-agent delegation — spawn a focused sub-task agent.
 
-    Implementations may bind to specialised sub-agent runtimes; in Phase 1
-    the local `control/sub_agent.py` adapter satisfies the contract.
+    Implementations may bind to specialised sub-agent runtimes; currently
+    pending — see AGENT_COMPARISON_REPORT P0 roadmap.
     """
 
     @abstractmethod

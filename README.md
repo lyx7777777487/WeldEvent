@@ -14,41 +14,41 @@
 ## 架构全景
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  L1 · Cognitive Plane  认知平面                                  │
-│  ┌──────────┐    ┌────────┐    ┌───────────────┐                │
-│  │ chat.html │───►│ Chat   │───►│ ReActEngine   │───► 14 tools  │
-│  │ (Web UI)  │    │ API    │    │ 3-tier LLM    │    + 10 MCP   │
-│  │ WS + SSE  │    │ 11端点 │    │ ApprovalGate  │    (Label     │
-│  └──────────┘    └────────┘    │ Stream 输出   │     Studio)   │
-│                                └───────────────┘                │
-│  技术栈: FastAPI · DeepSeek-Chat · Volc Doubao Vision · SSE/WS  │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ WorkflowSpec (DAG)
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  L2 · Control Plane   控制平面                                    │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  RunWorkflowSpec (DAG Runner)                               │ │
-│  │  ├── topological_sort(nodes)    拓扑排序                     │ │
-│  │  ├── execute_node → L3 Activity                              │ │
-│  │  ├── HumanGate (双重校验)       审批门禁                     │ │
-│  │  └── RetryPolicy(max=3, 2s)     自动重试                     │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  技术栈: Temporal (gRPC) · workflow-as-code                      │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ execute_node
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  L3 · Execution Plane  执行平面                                   │
-│  ┌──────────┐   ┌──────┐   ┌──────┐   ┌──────────────┐         │
-│  │ Activity │   │ IQA  │   │ PPA  │   │  Annotation  │         │
-│  │  Pool    │──►│ 品质 │──►│ 预处 │──►│  Label Studio│         │
-│  │ (9 cap)  │   │ 检控 │   │ 理   │   │  MCP 10 工具 │         │
-│  └──────────┘   └──────┘   └──────┘   └──────────────┘         │
-│  WeldMap 黑板 (CAS + Event Sourcing)                             │
-│  技术栈: OpenCV · NumPy · SciPy · MCP · Label Studio             │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│ L1 · COGNITIVE PLANE（认知平面）                                                     │
+│ LLM ReAct 推理 + 工具编排 + 用户交互                                                 │
+│                                                                                     │
+│  用户/前端 ──► Chat API ──► AgentLoop ──► ReActEngine ──► ToolRegistry ──► MCP 工具  │
+│  (chat.html)   (双路径)    (双 task)     (核心循环)      (14 L1 工具)    (10 标注)    │
+└───────────────────────────────────┬─────────────────────────────────────────────────┘
+                                    │
+                          Bridge L1↔L2
+                          WorkflowSpec ↓
+                          WorkflowEventBus ↑
+                          NotificationStore ↑
+                                    │
+┌───────────────────────────────────┴─────────────────────────────────────────────────┐
+│ L2 · CONTROL PLANE（控制平面）                                                       │
+│ Temporal workflow DAG runner + HumanGate 双重校验                                    │
+│                                                                                     │
+│  WorkflowLauncher ──► RunWorkflowSpec ──► HumanGate ──► Worker ──► WorkflowEventBus  │
+│  (LaunchPort)        (拓扑排序)        (双重校验)     (activity)   (→L1 注入 prompt)  │
+└───────────────────────────────────┬─────────────────────────────────────────────────┘
+                                    │
+                          Bridge L2↔L3
+                          NodeExecute (capability) ↓
+                          ActivityOutput (result) ↑
+                          WeldMap 黑板 (CAS + Event Sourcing) ↔
+                                    │
+┌───────────────────────────────────┴─────────────────────────────────────────────────┐
+│ L3 · EXECUTION PLANE（执行平面）                                                     │
+│ 工业质检 Activity 执行 + WeldMap 黑板 + Label Studio MCP                             │
+│                                                                                     │
+│  ActivityPool ──► IQA ──► PPA ──► Annotation ──► WeldMap 黑板                        │
+│  (9 capability)  (质量)  (预处理) (标注 10 工具)   (6 域 CAS)                        │
+│                  ↓       ↓                            ↑                              │
+│                  Label Studio MCP (远程 HTTP, 10 工具)┘                              │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

@@ -10,6 +10,7 @@ IQA 在执行规则层之前，需要对原始图像做轻量预处理:
 设计模式: Pipeline（链式处理），每步可独立替换/跳过。
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,6 +18,8 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +101,7 @@ class DecodeStep(PreprocessStep):
 
     支持的输入类型 (通过 params 指定):
       - "image_path": 文件路径
+      - "image_b64": base64 编码的图片 (JPEG/PNG raw bytes), 跨进程安全
       - "image_array": 已有的 numpy array
       - "image_bytes": 原始 bytes (PNG/JPEG/TIFF/BMP)
       - "image_url": 远程 URL (预留)
@@ -115,7 +119,7 @@ class DecodeStep(PreprocessStep):
     ) -> tuple[NDArray[np.uint8] | None, ImageMetadata]:
         params = params or {}
 
-        # 优先级: numpy array > 文件路径 > bytes > 无
+        # 优先级: numpy array > 文件路径 > base64 > bytes > 无
         if "image_array" in params:
             arr = params["image_array"]
             if isinstance(arr, np.ndarray):
@@ -134,9 +138,19 @@ class DecodeStep(PreprocessStep):
             metadata.error = f"无法解码图像文件: {params['image_path']}"
             return None, metadata
 
+        if "image_b64" in params:
+            decoded = await self._decode_from_b64(params["image_b64"], metadata)
+            if decoded is not None:
+                metadata.is_valid = True
+                return decoded, metadata
+            metadata.is_valid = False
+            metadata.error = "无法从 base64 解码图像"
+            return None, metadata
+
         if "image_bytes" in params:
             decoded = await self._decode_from_bytes(params["image_bytes"], metadata)
             if decoded is not None:
+                metadata.is_valid = True
                 return decoded, metadata
             metadata.is_valid = False
             metadata.error = "无法从 bytes 解码图像"
@@ -150,7 +164,7 @@ class DecodeStep(PreprocessStep):
 
         # 完全无输入
         metadata.is_valid = False
-        metadata.error = "未提供任何图像输入 (需要 image_path/image_array/image_bytes)"
+        metadata.error = "未提供任何图像输入 (需要 image_path/image_b64/image_array/image_bytes)"
         return None, metadata
 
     async def _decode_from_file(
@@ -206,6 +220,17 @@ class DecodeStep(PreprocessStep):
             return img
         except Exception:
             return None
+
+    async def _decode_from_b64(
+        self, b64: str, metadata: ImageMetadata
+    ) -> NDArray[np.uint8] | None:
+        """从 base64 字符串解码图片（跨进程安全的传输方式）。"""
+        import base64
+        try:
+            data = base64.b64decode(b64)
+        except Exception:
+            return None
+        return await self._decode_from_bytes(data, metadata)
 
     @staticmethod
     def _fill_metadata(image: NDArray[np.uint8], meta: ImageMetadata) -> None:
@@ -347,7 +372,7 @@ class ColorConvertStep(PreprocessStep):
                 elif from_channels == 1:
                     return cv2.cvtColor(image, cv2.COLOR_GRAY2RGBA)
         except ImportError:
-            pass
+            logger.warning("cv2 unavailable, color conversion may be inaccurate")
 
         # Fallback: numpy 转换
         if self._target == "GRAY" and from_channels == 3:
@@ -357,7 +382,9 @@ class ColorConvertStep(PreprocessStep):
         if self._target == "RGB" and from_channels == 1:
             return np.stack([image, image, image], axis=-1)
 
-        return None
+        raise RuntimeError(
+            f"cv2 unavailable, cannot convert {from_channels}-channel -> {self._target}"
+        )
 
 
 class ResizeStep(PreprocessStep):
@@ -490,14 +517,4 @@ class ImagePreprocessingPipeline:
             DecodeStep(),
             ValidateStep(min_size=64, max_dimension=16384),
             ColorConvertStep(target="RGB"),
-        ])
-
-    @classmethod
-    def default_iqa_strict_pipeline(cls) -> "ImagePreprocessingPipeline":
-        """严格版 IQA 流水线（强制缩放到标准分辨率）。"""
-        return cls(steps=[
-            DecodeStep(),
-            ValidateStep(min_size=64, max_dimension=16384),
-            ColorConvertStep(target="RGB"),
-            ResizeStep(target_width=2048, target_height=1536),
         ])

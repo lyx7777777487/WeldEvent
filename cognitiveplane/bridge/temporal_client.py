@@ -16,10 +16,13 @@ Source: boundary-pinning §6.2 + legacy bridge/workflow_launcher.py
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from cognitiveplane.shared.dto_workflow import WorkflowSpec
 from cognitiveplane.bridge.workflow_launcher import WorkflowLaunchPort, WorkflowLaunchResult
+
+logger = logging.getLogger(__name__)
 
 
 class TemporalWorkflowLaunchPort(WorkflowLaunchPort):
@@ -232,32 +235,82 @@ class TemporalWorkflowLaunchPort(WorkflowLaunchPort):
             self._maybe_invalidate_client(e)
             return False
 
+    async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
+        """取消一个正在运行的 Temporal workflow（terminate）。
+
+        调用 Temporal Client 的 terminate() API，
+        工作流收到终止信号后执行清理逻辑并退出。
+
+        Args:
+            workflow_id: 要取消的 Temporal workflow ID
+            reason: 取消原因（记录在 Temporal history 中）
+
+        Returns:
+            True=成功, False=失败
+        """
+        try:
+            client = await self._ensure_client()
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.terminate(reason=reason)
+            logger.info("Workflow %s terminated: %s", workflow_id, reason)
+            return True
+        except Exception as e:
+            self._maybe_invalidate_client(e)
+            logger.warning(
+                "cancel_workflow failed for %s: %s",
+                workflow_id, self._sanitize_error(e),
+            )
+            return False
+
+    async def send_signal(
+        self, workflow_id: str, signal_name: str, args: Any = None
+    ) -> bool:
+        """P1-6: 发送通用 Temporal signal — pause/resume/cancel_by_user。
+
+        LLM control_workflow 工具调此方法控制正在执行的 workflow:
+          - signal_name="pause"          → 暂停 workflow
+          - signal_name="resume"         → 恢复暂停的 workflow
+          - signal_name="cancel_by_user" → 用户取消 workflow
+
+        Args:
+            workflow_id: 目标 workflow ID
+            signal_name: dag_runner_workflow.py 的 @workflow.signal 方法名
+            args: signal 参数(无参 signal 传 None,python-client 接受空 args)
+
+        Returns:
+            True=成功, False=失败
+        """
+        try:
+            client = await self._ensure_client()
+            handle = client.get_workflow_handle(workflow_id)
+            # temporalio python-client: signal 无参时传 args=()
+            # 有参时传 args=(arg1, arg2, ...)
+            if args is None:
+                await handle.signal(signal_name)
+            elif isinstance(args, (list, tuple)):
+                await handle.signal(signal_name, *args)
+            else:
+                await handle.signal(signal_name, args)
+            logger.info(
+                "Signal '%s' sent to workflow %s", signal_name, workflow_id,
+            )
+            return True
+        except Exception as e:
+            self._maybe_invalidate_client(e)
+            logger.warning(
+                "send_signal failed for %s (signal=%s): %s",
+                workflow_id, signal_name, self._sanitize_error(e),
+            )
+            return False
+
     def _spec_to_dict(self, spec: WorkflowSpec) -> dict[str, Any]:
-        """WorkflowSpec → JSON 安全 dict（与 controlplane 的 workflow_spec_from_dict 对应）。"""
-        return {
-            "workflow_id": spec.workflow_id,
-            "objective": spec.objective,
-            "requirements": list(spec.requirements),
-            "nodes": [
-                {
-                    "node_id": n.node_id,
-                    "type": n.type,
-                    "capability": n.capability,
-                    "depends_on": list(n.depends_on),
-                    "input": dict(n.input),
-                    "condition": n.condition,
-                    "on_failure": n.on_failure,
-                    "caller_context": {
-                        "caller_type": n.caller_context.caller_type,
-                        "case_id": n.caller_context.case_id,
-                        "node_id": n.caller_context.node_id,
-                        "session_id": n.caller_context.session_id,
-                    },
-                }
-                for n in spec.nodes
-            ],
-            "metadata": dict(spec.metadata),
-        }
+        """WorkflowSpec → JSON 安全 dict（与 controlplane 的 workflow_spec_from_dict 对应）。
+
+        P2-1 fix: 用 pydantic model_dump 替代手工字段序列化。
+        原代码逐字段手写,WorkflowSpec 加字段时易遗漏同步(已导致 P0-1 类 bug)。
+        model_dump 保证 DTO 字段全集自动序列化,与 dto_workflow.py SSOT 同步。
+        """
+        return spec.model_dump()
 
 
 __all__ = ["TemporalWorkflowLaunchPort"]

@@ -14,6 +14,8 @@ class ToolResult:
     output: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     error_type: str | None = None  # "vision_unavailable" | "vision_transient" | "invalid_image" | None
+    # 中间进度事件（如 workflow node 逐步完成），由 ReActEngine 转发为 SSE 事件
+    progress_events: list[dict[str, Any]] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         result: dict[str, Any] = {"output": self.output}

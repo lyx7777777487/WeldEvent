@@ -1,6 +1,5 @@
 """Integration smoke test — wires up all skeleton components and validates
-that they can be instantiated, their port methods are callable, and the
-BrainStateMachine ROUTINE transition path works end-to-end.
+that they can be instantiated and their port methods are callable.
 """
 
 import asyncio
@@ -31,16 +30,10 @@ from cognitiveplane.governance.collaboration.repositories.in_memory import (
 from cognitiveplane.memory.learning.repositories.in_memory import InMemoryLearningEventRepository
 
 # ---------------------------------------------------------------------------
-# State machine
-# ---------------------------------------------------------------------------
-from cognitiveplane.control.state_machine import BrainStateMachine
-
-# ---------------------------------------------------------------------------
 # Enums & types
 # ---------------------------------------------------------------------------
 from cognitiveplane.shared.enums import (
     BrainStateType,
-    BrainTrigger,
     EventType,
     NoveltyLevel,
     ReasoningMode,
@@ -156,36 +149,7 @@ class TestIntegrationSmoke:
         event = _make_domain_event()
         assert event.event_type == EventType.WORKFLOW_ENTERED
 
-        # ---- 3. Drive BrainStateMachine through the ROUTINE path ----
-        state = BrainStateMachine.transition(
-            BrainStateType.IDLE, BrainTrigger.EVENT_DEQUEUED
-        )
-        assert state == BrainStateType.OBSERVING
-
-        state = BrainStateMachine.transition(
-            state, BrainTrigger.CONTEXT_LOADED_ROUTINE
-        )
-        assert state == BrainStateType.MEMORY_RETRIEVAL
-
-        state = BrainStateMachine.transition(
-            state, BrainTrigger.MEMORY_RECEIVED_ROUTINE
-        )
-        assert state == BrainStateType.MEMORY_MATCHING
-
-        state = BrainStateMachine.transition(state, BrainTrigger.MATCH_PRODUCED)
-        assert state == BrainStateType.VALIDATION
-
-        state = BrainStateMachine.transition(state, BrainTrigger.APPROVED)
-        assert state == BrainStateType.PUBLICATION
-
-        state = BrainStateMachine.transition(
-            state, BrainTrigger.PUBLISHED_ROUTINE_APPROVED
-        )
-
-        # ---- 4. Assert final returned state is IDLE ----
-        assert state == BrainStateType.IDLE
-
-        # ---- 5. Call StubKnowledgeAdapter.rag_query() and assert it returns [] ----
+        # ---- 3. Call StubKnowledgeAdapter.rag_query() and assert it returns [] ----
         rag_input = RAGQueryInput(
             query=RAGQuery(query_text="smoke test query")
         )

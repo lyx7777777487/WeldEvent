@@ -38,12 +38,12 @@ class SafetyHook(BeforeToolHook):
     async def before_execute(
         self, tool_name: str, arguments: dict, context: ContextSnapshot, session_id: str = "default"
     ) -> HookResult:
-        if tool_name == "adjust_parameter":
+        if tool_name == "escalate":
             safety_status = getattr(context, "safety_status", None)
             if safety_status == SafetyStatus.BLOCK:
                 return HookResult(
                     decision=HookDecision.DENY,
-                    reason="Safety BLOCK — parameter changes forbidden",
+                    reason="Safety BLOCK — escalation forbidden in current state",
                 )
         return HookResult(decision=HookDecision.ALLOW)
 

@@ -5,7 +5,8 @@ import pytest
 from cognitiveplane.capability.provider import LLMProvider, LLMRequest, LLMResponse
 from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.react import ReActEngine, InteractionTier, InteractionResponse
-from cognitiveplane.control.tool_registry import ToolRegistry
+from cognitiveplane.control.skills import Skill, SkillRegistry
+from cognitiveplane.control.registry.tool_registry import ToolRegistry
 from cognitiveplane.control.tools import BrainTool, ToolResult
 from cognitiveplane.control.hooks import SafetyHook, PolicyHook
 from cognitiveplane.governance.tool_policy import ToolPolicy
@@ -342,11 +343,11 @@ class TestMultimodalDegradation:
         assert result == "first\nsecond"
 
 
-class _AdjustParamScriptedLLM(LLMProvider):
-    """LLM that calls adjust_parameter without a reason on round 1, then
+class _EscalateScriptedLLM(LLMProvider):
+    """LLM that calls escalate without a reason on round 1, then
     produces a final text reply on round 2. Used to test Hook interception."""
 
-    def __init__(self, final_text: str = "已取消参数调整") -> None:
+    def __init__(self, final_text: str = "已取消升级") -> None:
         self._final_text = final_text
         self._call_count = 0
         self.received_tool_messages: list[str] = []
@@ -366,10 +367,10 @@ class _AdjustParamScriptedLLM(LLMProvider):
                 tool_calls=[{
                     "id": f"call-{self._call_count}",
                     "function": {
-                        "name": "adjust_parameter",
+                        "name": "escalate",
                         "arguments": __import__("json").dumps({
-                            "parameter_name": "current",
-                            "proposed_value": "200A",
+                            "target": "human_review",
+                            "summary": "需要人工介入",
                         }),
                     },
                 }],
@@ -388,11 +389,11 @@ class _AdjustParamScriptedLLM(LLMProvider):
 
 
 class TestHookInterception:
-    """§11.4.1 Hook interception test: phase 2 calls adjust_parameter without
+    """§11.4.1 Hook interception test: phase 2 calls escalate without
     a reason → PolicyHook DENY → rejection fed back to LLM as tool message.
 
     Verifies:
-      1. Hook denies before tool executes (tools_used excludes adjust_parameter).
+      1. Hook denies before tool executes (tools_used excludes escalate).
       2. Rejection reason is fed back to LLM via role=tool message.
       3. Engine emits tool_call event with rejected=True.
       4. first-DENY-wins: when multiple hooks are registered, the first DENY
@@ -400,12 +401,12 @@ class TestHookInterception:
     """
 
     @pytest.mark.asyncio
-    async def test_policy_hook_denies_adjust_parameter_without_reason(self) -> None:
+    async def test_policy_hook_denies_escalate_without_reason(self) -> None:
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
-        class _AdjustTool(BrainTool):
+        class _EscalateTool(BrainTool):
             @property
-            def name(self) -> str: return "adjust_parameter"
+            def name(self) -> str: return "escalate"
             @property
             def description(self) -> str: return "test"
             @property
@@ -413,9 +414,9 @@ class TestHookInterception:
             async def execute(self, **kwargs) -> ToolResult:
                 return ToolResult(output={"applied": True})
 
-        llm = _AdjustParamScriptedLLM()
+        llm = _EscalateScriptedLLM()
         registry = ToolRegistry()
-        registry.register(_AdjustTool())
+        registry.register(_EscalateTool())
         policy = ToolPolicy()
         hooks = [SafetyHook(), PolicyHook(policy)]
         engine = ReActEngine(
@@ -423,7 +424,7 @@ class TestHookInterception:
             tool_registry=registry,
             hooks=hooks,
         )
-        response = await engine.run("把电流调到200A", _make_context())
+        response = await engine.run("请升级到人工审核", _make_context())
 
         # Tool was NOT executed (hook denied before execute).
         assert response.tools_used == [], "denied tool must not appear in tools_used"
@@ -438,9 +439,9 @@ class TestHookInterception:
         """Engine emits tool_call event with rejected=True when a hook denies."""
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
-        class _AdjustTool(BrainTool):
+        class _EscalateTool(BrainTool):
             @property
-            def name(self) -> str: return "adjust_parameter"
+            def name(self) -> str: return "escalate"
             @property
             def description(self) -> str: return "test"
             @property
@@ -448,9 +449,9 @@ class TestHookInterception:
             async def execute(self, **kwargs) -> ToolResult:
                 return ToolResult(output={"applied": True})
 
-        llm = _AdjustParamScriptedLLM()
+        llm = _EscalateScriptedLLM()
         registry = ToolRegistry()
-        registry.register(_AdjustTool())
+        registry.register(_EscalateTool())
         policy = ToolPolicy()
         hooks = [PolicyHook(policy)]
         engine = ReActEngine(
@@ -460,14 +461,14 @@ class TestHookInterception:
         )
         callback = _RecordingCallback()
         engine._event_callback = callback
-        await engine.run("把电流调到200A", _make_context())
+        await engine.run("请升级到人工审核", _make_context())
 
         rejected_events = [
             (t, p) for t, p in callback.events
             if t == "tool_call" and p.get("rejected") is True
         ]
         assert len(rejected_events) == 1, f"expected 1 rejected event, got {rejected_events}"
-        assert rejected_events[0][1]["tool"] == "adjust_parameter"
+        assert rejected_events[0][1]["tool"] == "escalate"
         assert "reason" in rejected_events[0][1]
 
     @pytest.mark.asyncio
@@ -488,11 +489,11 @@ class TestHookInterception:
                 call_log.append(f"second:{tool_name}")
                 return HookResult(decision=HookDecision.ALLOW)
 
-        llm = _AdjustParamScriptedLLM()
+        llm = _ScriptedLLM("escalate", {"reason": "test"}, "done")
 
-        class _StubAdjustTool(BrainTool):
+        class _StubEscalateTool(BrainTool):
             @property
-            def name(self) -> str: return "adjust_parameter"
+            def name(self) -> str: return "escalate"
             @property
             def description(self) -> str: return "test"
             @property
@@ -501,7 +502,7 @@ class TestHookInterception:
                 return ToolResult(output={"applied": True})
 
         registry = ToolRegistry()
-        registry.register(_StubAdjustTool())
+        registry.register(_StubEscalateTool())
         engine = ReActEngine(
             _make_deps_with_llm(llm),
             tool_registry=registry,
@@ -509,7 +510,7 @@ class TestHookInterception:
         )
         await engine.run("test", _make_context())
 
-        assert call_log == ["first:adjust_parameter"], \
+        assert call_log == ["first:escalate"], \
             f"second hook must not run after first DENY; got {call_log}"
 
 
@@ -1001,11 +1002,11 @@ class _TierATestTool(BrainTool):
 
 
 class _TierBTestTool(BrainTool):
-    """A test tool registered under a Tier-B name (adjust_parameter)."""
+    """A test tool registered under a Tier-B name (escalate)."""
 
     @property
     def name(self) -> str:
-        return "adjust_parameter"
+        return "escalate"
 
     @property
     def description(self) -> str:
@@ -1057,7 +1058,7 @@ class TestTierARetry:
     async def test_tier_b_json_parse_failure_no_retry(self) -> None:
         """Tier-B tool with malformed JSON → immediate rejection, no retry."""
         llm = _ScriptedMalformedLLM(
-            tool_name="adjust_parameter",
+            tool_name="escalate",
             malformed="{not valid json",
             valid_args={"param": "current"},
             final_text="done",
@@ -1069,7 +1070,7 @@ class TestTierARetry:
         response = await engine.run("adjust", _make_context())
         # Tier-B immediate rejection — tool_call counted, but real execute was never called
         # (the rejection still adds it to tools_used per the fatal-failure path)
-        assert "adjust_parameter" in response.tools_used
+        assert "escalate" in response.tools_used
         # LLM did get a chance to retry (its scripted retry), but Tier-B rejects
         # both times — so tool was never actually executed successfully
         assert response.text_reply == "done"
@@ -1148,8 +1149,8 @@ class _SlowTool(BrainTool):
         return ToolResult(output={"slow": True})
 
 
-class _TierBNoReasonLLM(LLMProvider):
-    """LLM that calls adjust_parameter without 'reason' — triggers PolicyHook DENY.
+class _EscalateNoReasonLLM(LLMProvider):
+    """LLM that calls escalate without 'reason' — triggers PolicyHook DENY.
 
     Phase 1: emit tool_call without reason (PolicyHook rejects).
     Phase 2: emit text reply.
@@ -1167,8 +1168,8 @@ class _TierBNoReasonLLM(LLMProvider):
                 tool_calls=[{
                     "id": "call-1",
                     "function": {
-                        "name": "adjust_parameter",
-                        "arguments": json.dumps({"parameter_name": "voltage", "proposed_value": "12V"}),
+                        "name": "escalate",
+                        "arguments": json.dumps({"target": "human_review", "summary": "需要人工介入"}),
                     },
                 }],
                 model_used="scripted",
@@ -1210,7 +1211,7 @@ class TestPolicyRatchetIntegration:
         from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_REASK_REJECT
         ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
         llm = _ScriptedMalformedLLM(
-            tool_name="adjust_parameter",
+            tool_name="escalate",
             malformed="{not valid",
             valid_args={"param": "x"},
             final_text="done",
@@ -1223,7 +1224,7 @@ class TestPolicyRatchetIntegration:
         entries = ratchet.list_entries()
         reask_entries = [e for e in entries if e["trigger_event"] == TRIGGER_REASK_REJECT]
         assert len(reask_entries) >= 1
-        assert reask_entries[0]["tool_name"] == "adjust_parameter"
+        assert reask_entries[0]["tool_name"] == "escalate"
 
     @pytest.mark.asyncio
     async def test_policyhook_deny_on_tier_b_records_reask_reject(self, tmp_path) -> None:
@@ -1232,7 +1233,7 @@ class TestPolicyRatchetIntegration:
         from cognitiveplane.control.hooks import PolicyHook
         from cognitiveplane.governance.tool_policy import ToolPolicy
         ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
-        llm = _TierBNoReasonLLM()
+        llm = _EscalateNoReasonLLM()
         registry = ToolRegistry()
         registry.register(_TierBTestTool())
         engine = ReActEngine(
@@ -1251,9 +1252,11 @@ class TestPolicyRatchetIntegration:
     async def test_tool_timeout_records_timeout_trigger(self, tmp_path, monkeypatch) -> None:
         """Tool execution exceeds 30s → ratchet.record(trigger=timeout)."""
         from cognitiveplane.governance.policy_ratchet import PolicyRatchet, TRIGGER_TIMEOUT
-        import cognitiveplane.control.react as react_module
-        # Lower timeout to 0.1s so test doesn't wait 30s
-        monkeypatch.setattr(react_module, "TOOL_TIMEOUT_SECONDS", 0.1)
+        import cognitiveplane.control.engine.session_notes as session_notes_module
+        # Lower timeout to 0.1s so test doesn't wait 30s.
+        # Target engine.session_notes (where TOOL_TIMEOUT_SECONDS is defined)
+        # because tool_execution.execute_with_timeout lazy-imports it from there.
+        monkeypatch.setattr(session_notes_module, "TOOL_TIMEOUT_SECONDS", 0.1)
         ratchet = PolicyRatchet(path=tmp_path / "r.yaml")
         # _ScriptedLLM emits tool_call then final reply
         llm = _ScriptedLLM("web_search", {"query": "x"}, "done after timeout")
@@ -1378,3 +1381,125 @@ class TestFallbackDesignWorkflowShape:
         assert "objective" in capture.captured_args
         assert "reason" in capture.captured_args
         assert "query" not in capture.captured_args
+
+
+# ===================================================================
+# Phase 5: Agent Skills 模块化
+# ===================================================================
+
+
+class _ToolCaptureLLM(_ScriptedLLM):
+    """Scripted LLM that captures the tool definitions sent by ReActEngine."""
+
+    def __init__(self, tool_name: str, tool_args: dict, final_text: str) -> None:
+        super().__init__(tool_name, tool_args, final_text)
+        self.captured_tool_defs: list[dict] = []
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self.captured_tool_defs = request.tools or []
+        return await super().complete(request)
+
+
+class TestAgentSkills:
+    """Phase 5: Agent Skills — skill selection + tool whitelist filtering + prompt injection."""
+
+    @pytest.mark.asyncio
+    async def test_skill_filters_llm_tool_definitions(self) -> None:
+        """选中 skill 后，传给 LLM 的 tool definitions 只包含 allowed_tools。"""
+        registry = ToolRegistry()
+        registry.register(TestTool())
+        registry.register(_TierATestTool())
+        registry.register(_TierBTestTool())
+
+        skill = Skill(
+            name="web_only",
+            description="Only web search",
+            allowed_tools=["web_search"],
+            triggers=["web"],
+        )
+        skill_registry = SkillRegistry([skill])
+
+        llm = _ToolCaptureLLM("web_search", {"query": "x"}, "done")
+        engine = ReActEngine(
+            _make_deps_with_llm(llm),
+            tool_registry=registry,
+            skill_registry=skill_registry,
+        )
+        response = await engine.run("web search something", _make_context())
+
+        tool_names = [t.get("function", {}).get("name") for t in llm.captured_tool_defs]
+        assert "web_search" in tool_names
+        assert "test_tool" not in tool_names
+        assert "escalate" not in tool_names
+        assert response.tier_used == InteractionTier.REACT_FUNCTION_CALLING
+
+    @pytest.mark.asyncio
+    async def test_skill_injects_system_prompt(self) -> None:
+        """选中 skill 后，system prompt 包含其专业化指令。"""
+        llm = _CapturingLLM()
+        skill = Skill(
+            name="test_skill",
+            description="Test skill prompt injection",
+            system_prompt="你是测试专家，只能回答测试相关问题。",
+            allowed_tools=[],
+            triggers=["测试"],
+        )
+        engine = ReActEngine(
+            _make_deps_with_llm(llm),
+            skill_registry=SkillRegistry([skill]),
+        )
+        await engine.run("这是一个测试", _make_context())
+        assert llm.captured_system is not None
+        assert "你是测试专家" in llm.captured_system
+
+    @pytest.mark.asyncio
+    async def test_no_skill_registry_keeps_all_visible_tools(self) -> None:
+        """未配置 skill_registry 时，所有当前 phase 可见工具都暴露给 LLM。"""
+        registry = ToolRegistry()
+        registry.register(TestTool())
+        registry.register(_TierATestTool())
+
+        llm = _ToolCaptureLLM("test_tool", {"query": "x"}, "done")
+        engine = ReActEngine(
+            _make_deps_with_llm(llm),
+            tool_registry=registry,
+        )
+        await engine.run("any", _make_context())
+
+        tool_names = [t.get("function", {}).get("name") for t in llm.captured_tool_defs]
+        assert "test_tool" in tool_names
+        assert "web_search" in tool_names
+
+    def test_skill_registry_selects_by_priority_on_tie(self) -> None:
+        """同分 skill 按 priority 选择高优先级。"""
+        low = Skill(name="low", description="", triggers=["测试"], priority=1)
+        high = Skill(name="high", description="", triggers=["测试"], priority=10)
+        registry = SkillRegistry([low, high])
+        selected = registry.select_skill("测试")
+        assert selected is not None
+        assert selected.name == "high"
+
+    @pytest.mark.asyncio
+    async def test_skill_whitelist_blocks_non_allowed_tool_in_tier3(self) -> None:
+        """Tier-3 fallback 也遵守 skill allowed_tools 白名单。"""
+        deps = CognitiveDependencies()
+        registry = ToolRegistry()
+        registry.register(_TierATestTool())
+        registry.register(_TierBTestTool())
+
+        skill = Skill(
+            name="no_escalate",
+            description="Can use web_search but not escalate",
+            allowed_tools=["web_search"],
+            triggers=["参数"],
+        )
+        engine = ReActEngine(
+            deps,
+            tool_registry=registry,
+            skill_registry=SkillRegistry([skill]),
+        )
+        # "调整" 命中 escalate 关键词，"search" 命中 web_search；
+        # skill 只允许 web_search，因此 escalate 被拦截，web_search 胜出。
+        response = await engine.run("帮我调整 search 参数", _make_context())
+        assert "escalate" not in response.tools_used
+        assert "web_search" in response.tools_used

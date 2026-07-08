@@ -1,137 +1,112 @@
-"""Label Studio MCP Client — 封装 4 个标注业务工具调用。
+"""Label Studio MCP Client — 对接标注平台 MCP Server v2.0。
 
-对外提供类型安全的方法，内部通过 MCPClient 调用 Label Studio MCP server
-暴露的 tools。MCP server 负责对接 Label Studio REST API。
+对外提供类型安全的方法，内部通过 MCPClient 调用标注平台 MCP server
+暴露的 10 个 tools。MCP server 负责对接 Label Studio REST API。
 
-工具映射:
-  - create_annotation_task → Label Studio 建 project + 上传图片
-  - push_prediction        → IQA 检测结果作为预标注推送
-  - fetch_annotations      → 拉取人工标注结果
-  - export_dataset         → 导出标注数据集
+工具映射（v2.0）:
+  - list_datasets  → 分页列出数据集
+  - get_dataset    → 查看数据集详情 + 版本信息
+  - create_job     → 创建标注作业（需 versionId）
+  - list_jobs      → 列出作业及进度
+  - get_job        → 查看作业详情
+  - list_tasks     → 列出子任务
+  - create_task    → 创建标注子任务
+  - trigger_ai     → 触发 AI 自动标注（v2.0: 按 taskId 粒度）
+  - upload_images  → 上传图片到版本（v2.0 NEW）
+  - assign_task    → 分配标注员
 
-配置:
-  环境变量（传给 MCP server 子进程）:
-    LABEL_STUDIO_URL       — Label Studio 地址（如 http://localhost:8080）
-    LABEL_STUDIO_API_KEY   — API token
-    LABEL_STUDIO_PROJECT_ID— 默认 project（可选）
+配置（环境变量）:
+  LABEL_STUDIO_MCP_URL      — MCP server URL（默认 http://172.16.11.11:8079/api/mcp）
+  LABEL_STUDIO_MCP_TOKEN    — JWT Token（可选，不传则匿名）
+  LABEL_STUDIO_MCP_USERNAME — 用户名（自动登录用，与 PASSWORD 配合）
+  LABEL_STUDIO_MCP_PASSWORD — 密码（自动登录用，与 USERNAME 配合）
+  LABEL_STUDIO_MCP_TIMEOUT  — HTTP 超时秒数（默认 60）
 
 使用:
     client = LabelStudioMCPClient.from_env()
     async with client:
-        task = await client.create_annotation_task(image_path="/tmp/test.jpg", title="焊缝1")
-        await client.push_prediction(task_id=task["id"], predictions=[...])
-        annotations = await client.fetch_annotations(task_ids=[task["id"]])
-        dataset = await client.export_dataset(project_id=task["project_id"], format="JSON")
+        ds = await client.get_dataset("01ABC...")
+        job = await client.create_job(version_id=ds["latestVersionId"], name="焊缝质检")
+        task = await client.create_task(job_id=job["id"])
 """
+
 from __future__ import annotations
 
 import logging
-import os
-from dataclasses import dataclass, field
+import re
 from typing import Any
 
-from executionplane.mcp.client import HTTPMCPClient, MCPClient, MCPError, StdioMCPClient
+from shared.labelstudio.auth import login_labelstudio
+from shared.labelstudio.config import LabelStudioConfig
+from shared.mcp.client import HTTPMCPClient, MCPClient, MCPError
 
 logger = logging.getLogger(__name__)
 
 
-# ── 数据结构 ──
+# ── 工具方法 ──
 
-@dataclass
-class LabelStudioConfig:
-    """Label Studio MCP server 连接配置。"""
-    # MCP 传输方式: "stdio" 或 "http"
-    transport: str = "stdio"
-    # stdio 模式: MCP server 启动命令
-    server_command: str = "python"
-    server_args: list[str] = field(default_factory=lambda: ["-m", "label_studio_mcp_server"])
-    # http 模式: MCP server URL
-    server_url: str = "http://localhost:9000/mcp"
-    # Label Studio 连接（作为 env 传给 MCP server）
-    label_studio_url: str = "http://localhost:8080"
-    label_studio_api_key: str = ""
-    label_studio_project_id: str = ""
-    # HTTP 超时
-    timeout: float = 60.0
+def _extract_id(text: str, pattern: str) -> str | None:
+    """从文本中提取 ID（jobId/taskId 等）。"""
+    m = re.search(pattern, text)
+    return m.group(1) if m else None
 
-    @classmethod
-    def from_env(cls) -> "LabelStudioConfig":
-        """从环境变量加载配置。
 
-        环境变量:
-          LABEL_STUDIO_MCP_TRANSPORT — "stdio" | "http"（默认 stdio）
-          LABEL_STUDIO_MCP_COMMAND   — stdio 模式命令（默认 python）
-          LABEL_STUDIO_MCP_ARGS      — stdio 模式参数（空格分隔）
-          LABEL_STUDIO_MCP_URL       — http 模式 URL
-          LABEL_STUDIO_URL           — Label Studio 地址
-          LABEL_STUDIO_API_KEY       — API token
-          LABEL_STUDIO_PROJECT_ID    — 默认 project
-          LABEL_STUDIO_MCP_TIMEOUT   — 超时秒数
-        """
-        transport = os.environ.get("LABEL_STUDIO_MCP_TRANSPORT", "stdio").strip().lower()
-        command = os.environ.get("LABEL_STUDIO_MCP_COMMAND", "python")
-        args_str = os.environ.get("LABEL_STUDIO_MCP_ARGS", "-m label_studio_mcp_server")
-        server_url = os.environ.get("LABEL_STUDIO_MCP_URL", "http://localhost:9000/mcp")
-        ls_url = os.environ.get("LABEL_STUDIO_URL", "http://localhost:8080")
-        ls_key = os.environ.get("LABEL_STUDIO_API_KEY", "")
-        ls_project = os.environ.get("LABEL_STUDIO_PROJECT_ID", "")
-        timeout_str = os.environ.get("LABEL_STUDIO_MCP_TIMEOUT", "60")
+def _parse_tool_response(result: Any) -> dict[str, Any]:
+    """统一解析 MCP tool 返回值（JSON 或纯文本）。
 
-        return cls(
-            transport=transport,
-            server_command=command,
-            server_args=args_str.split(),
-            server_url=server_url,
-            label_studio_url=ls_url,
-            label_studio_api_key=ls_key,
-            label_studio_project_id=ls_project,
-            timeout=float(timeout_str),
-        )
-
-    def to_env(self) -> dict[str, str]:
-        """转成环境变量 dict（传给 stdio 子进程）。"""
-        env: dict[str, str] = {
-            "LABEL_STUDIO_URL": self.label_studio_url,
-            "LABEL_STUDIO_API_KEY": self.label_studio_api_key,
-        }
-        if self.label_studio_project_id:
-            env["LABEL_STUDIO_PROJECT_ID"] = self.label_studio_project_id
-        return env
+    若 server 返回 JSON dict 则透传；若返回纯文本（如 "作业创建成功，jobId: xxx"），
+    则从文本中提取 ID 放入 {"raw": ..., "id": ...}。
+    """
+    if hasattr(result, "parsed_content"):
+        parsed = result.parsed_content
+        if isinstance(parsed, dict):
+            return parsed
+        text = result.text_content
+    elif isinstance(result, dict):
+        return result
+    else:
+        text = str(result)
+    resp: dict[str, Any] = {"raw": text}
+    extracted = _extract_id(text, r"(?:jobId|taskId):\s*([A-Za-z0-9]+)")
+    if extracted:
+        resp["id"] = extracted
+    return resp
 
 
 # ── Label Studio MCP Client ──
 
 class LabelStudioMCPClient:
-    """Label Studio MCP client — 封装 4 个标注业务工具。
+    """标注平台 MCP client v2.0 — 封装 9 个标注业务工具。
 
-    内部持有 MCPClient（stdio 或 http），对外暴露类型安全的方法。
+    内部持有 HTTPMCPClient（Streamable HTTP），对外暴露类型安全的方法。
     生命周期由 async context manager 管理。
     """
 
-    # MCP server 暴露的工具名（约定）
-    TOOL_CREATE_TASK = "create_annotation_task"
-    TOOL_PUSH_PREDICTION = "push_prediction"
-    TOOL_FETCH_ANNOTATIONS = "fetch_annotations"
-    TOOL_EXPORT_DATASET = "export_dataset"
+    # v2.0 工具名
+    TOOL_LIST_DATASETS = "list_datasets"
+    TOOL_GET_DATASET = "get_dataset"
+    TOOL_CREATE_JOB = "create_job"
+    TOOL_LIST_JOBS = "list_jobs"
+    TOOL_GET_JOB = "get_job"
+    TOOL_LIST_TASKS = "list_tasks"
+    TOOL_CREATE_TASK = "create_task"
+    TOOL_TRIGGER_AI = "trigger_ai"
+    TOOL_UPLOAD_IMAGES = "upload_images"
+    TOOL_ASSIGN_TASK = "assign_task"
 
-    def __init__(self, mcp_client: MCPClient) -> None:
+    def __init__(self, mcp_client: MCPClient, config: LabelStudioConfig | None = None) -> None:
         self._mcp = mcp_client
+        self._config = config
 
     @classmethod
     def from_config(cls, config: LabelStudioConfig) -> "LabelStudioMCPClient":
-        """从配置创建 client。"""
-        if config.transport == "http":
-            mcp = HTTPMCPClient(
-                url=config.server_url,
-                timeout=config.timeout,
-            )
-        else:
-            mcp = StdioMCPClient(
-                command=config.server_command,
-                args=config.server_args,
-                env=config.to_env(),
-            )
-        return cls(mcp)
+        """从配置创建 client（HTTP transport + JWT 认证）。"""
+        mcp = HTTPMCPClient(
+            url=config.server_url,
+            headers=config.get_headers() or None,
+            timeout=config.timeout,
+        )
+        return cls(mcp, config)
 
     @classmethod
     def from_env(cls) -> "LabelStudioMCPClient":
@@ -141,6 +116,10 @@ class LabelStudioMCPClient:
     # ── 生命周期 ──
 
     async def connect(self) -> None:
+        # 自动登录获取 JWT token
+        if self._config and self._config.mcp_username and self._config.mcp_password:
+            token = await login_labelstudio(self._config)
+            self._mcp._headers["Authorization"] = f"Bearer {token}"
         await self._mcp.connect()
         await self._mcp.initialize()
 
@@ -154,117 +133,160 @@ class LabelStudioMCPClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.disconnect()
 
-    # ── 4 个业务工具 ──
+    # ── 1. 数据集查询 ──
 
-    async def create_annotation_task(
-        self,
-        image_path: str,
-        title: str = "",
-        project_id: str | None = None,
-        label_config: str | None = None,
+    async def list_datasets(
+        self, page_num: int = 1, page_size: int = 10,
     ) -> dict[str, Any]:
-        """创建标注任务 — 在 Label Studio 建 project（可选）+ 上传图片。
-
-        Args:
-            image_path: 图片磁盘路径（L2 launch_workflow 已落盘的 image_path）
-            title: 任务标题（默认用文件名）
-            project_id: 已有 project ID（不传则新建 project）
-            label_config: Label Studio XML 标注配置（不传用默认焊缝缺陷模板）
+        """分页列出当前用户可见的数据集。
 
         Returns:
-            {"task_id": N, "project_id": N, "image_url": "..."}
+            {"datasets": [...], "total": N, "pageNum": 1, "pageSize": 10}
         """
-        args: dict[str, Any] = {"image_path": image_path}
-        if title:
-            args["title"] = title
-        if project_id:
-            args["project_id"] = project_id
-        if label_config:
-            args["label_config"] = label_config
-        result = await self._mcp.call_tool(self.TOOL_CREATE_TASK, args)
+        args = {"pageNum": page_num, "pageSize": page_size}
+        result = await self._mcp.call_tool(self.TOOL_LIST_DATASETS, args)
         parsed = result.parsed_content
-        if isinstance(parsed, dict):
-            return parsed
-        return {"raw": result.text_content, "task_id": None, "project_id": None}
+        return parsed if isinstance(parsed, dict) else {"raw": result.text_content}
 
-    async def push_prediction(
-        self,
-        task_id: int | str,
-        predictions: list[dict[str, Any]],
-        model_version: str = "weldevent-iqa-v1",
-    ) -> dict[str, Any]:
-        """推送预标注 — 把 IQA 的检测结果作为 prediction 推送到 Label Studio。
-
-        人工标注时能看到预标注结果，只需确认/修正，提升效率。
-
-        Args:
-            task_id: Label Studio task ID
-            predictions: 预测结果列表，格式兼容 Label Studio predictions API
-                         如 [{"result": [{"type": "rectanglelabels", "value": {...}}]}]
-            model_version: 模型版本标识
+    async def get_dataset(self, dataset_id: str) -> dict[str, Any]:
+        """获取数据集详情，含 latestVersionId（创建作业必需）。
 
         Returns:
-            {"prediction_id": N, "task_id": N}
+            {"id": "...", "name": "...", "latestVersionId": "...", ...}
+        """
+        args = {"datasetId": dataset_id}
+        result = await self._mcp.call_tool(self.TOOL_GET_DATASET, args)
+        parsed = result.parsed_content
+        return parsed if isinstance(parsed, dict) else {"raw": result.text_content}
+
+    # ── 2. 作业管理 ──
+
+    async def create_job(
+        self,
+        version_id: str,
+        name: str,
+        labels: list[str] | None = None,
+        annotation_type: str = "CLASSIFICATION",
+        platform: str = "LABEL_STUDIO",
+    ) -> dict[str, Any]:
+        """在指定数据集版本下创建标注作业。
+
+        Args:
+            version_id: 数据集版本 ID（从 get_dataset 的 latestVersionId 获取）
+            name: 作业名称（必填）
+            labels: 标签列表，如 ["气孔", "夹渣", "裂纹"]
+            annotation_type: 标注类型，默认 CLASSIFICATION
+            platform: 标注平台，默认 LABEL_STUDIO
+
+        Returns:
+            创建的作业信息，含 id
+        """
+        args: dict[str, Any] = {"versionId": version_id, "name": name}
+        if labels:
+            args["labels"] = labels
+        if annotation_type:
+            args["annotationType"] = annotation_type
+        if platform:
+            args["platform"] = platform
+        result = await self._mcp.call_tool(self.TOOL_CREATE_JOB, args)
+        return _parse_tool_response(result)
+
+    async def list_jobs(
+        self, dataset_id: str, page_num: int = 1, page_size: int = 50,
+    ) -> dict[str, Any]:
+        """列出某个数据集下的标注作业。
+
+        Returns:
+            {"jobs": [...], "total": N}
+        """
+        args = {"datasetId": dataset_id, "pageNum": page_num, "pageSize": page_size}
+        result = await self._mcp.call_tool(self.TOOL_LIST_JOBS, args)
+        parsed = result.parsed_content
+        return parsed if isinstance(parsed, dict) else {"raw": result.text_content}
+
+    async def get_job(self, job_id: str) -> dict[str, Any]:
+        """查看作业详情及完成进度。
+
+        Returns:
+            {"id": "...", "name": "...", "status": "...", "totalCount": N, "completedCount": N, ...}
+        """
+        args = {"jobId": job_id}
+        result = await self._mcp.call_tool(self.TOOL_GET_JOB, args)
+        parsed = result.parsed_content
+        return parsed if isinstance(parsed, dict) else {"raw": result.text_content}
+
+    # ── 3. 子任务管理 ──
+
+    async def list_tasks(
+        self, job_id: str, page_num: int = 1, page_size: int = 50,
+    ) -> dict[str, Any]:
+        """列出某个作业下的标注子任务。
+
+        Returns:
+            {"tasks": [...], "total": N}
+        """
+        args = {"jobId": job_id, "pageNum": page_num, "pageSize": page_size}
+        result = await self._mcp.call_tool(self.TOOL_LIST_TASKS, args)
+        parsed = result.parsed_content
+        return parsed if isinstance(parsed, dict) else {"raw": result.text_content}
+
+    async def create_task(self, job_id: str) -> dict[str, Any]:
+        """为某个作业创建标注子任务。
+
+        Returns:
+            创建的任务信息，含 id
+        """
+        args = {"jobId": job_id}
+        result = await self._mcp.call_tool(self.TOOL_CREATE_TASK, args)
+        return _parse_tool_response(result)
+
+    # ── 4. AI 标注 ──
+
+    async def trigger_ai(self, task_id: str) -> dict[str, Any]:
+        """触发指定标注任务的 AI 自动标注（v2.0: 按任务粒度触发）。
+
+        Returns:
+            触发确认
+        """
+        args = {"taskId": task_id}
+        result = await self._mcp.call_tool(self.TOOL_TRIGGER_AI, args)
+        return _parse_tool_response(result)
+
+    # ── 4.5 图片上传 ──
+
+    async def upload_images(
+        self, version_id: str, images: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        """上传图片到指定数据集版本（v2.0 NEW）。
+
+        Args:
+            version_id: 数据集版本 ID
+            images: 图片列表，每项 {"filename": "img001.jpg", "data": "base64..."}
+
+        Returns:
+            上传结果
+        """
+        args = {"versionId": version_id, "images": images}
+        result = await self._mcp.call_tool(self.TOOL_UPLOAD_IMAGES, args)
+        return _parse_tool_response(result)
+
+    # ── 5. 分配 ──
+
+    async def assign_task(
+        self, task_id: str, assignee_id: str, assignee_name: str,
+    ) -> dict[str, Any]:
+        """将子任务分配给指定标注员。
+
+        Returns:
+            分配确认
         """
         args = {
-            "task_id": task_id,
-            "predictions": predictions,
-            "model_version": model_version,
+            "taskId": task_id,
+            "assigneeId": assignee_id,
+            "assigneeName": assignee_name,
         }
-        result = await self._mcp.call_tool(self.TOOL_PUSH_PREDICTION, args)
-        parsed = result.parsed_content
-        if isinstance(parsed, dict):
-            return parsed
-        return {"raw": result.text_content, "prediction_id": None}
-
-    async def fetch_annotations(
-        self,
-        task_ids: list[int | str] | None = None,
-        project_id: str | None = None,
-        status: str = "completed",
-    ) -> dict[str, Any]:
-        """拉取人工标注结果。
-
-        Args:
-            task_ids: 指定 task ID 列表（不传则拉整个 project）
-            project_id: project ID（task_ids 不传时必填）
-            status: 过滤状态 — "completed"=已完成, "all"=全部
-
-        Returns:
-            {"annotations": [{"task_id": N, "result": [...], "created_at": "..."}]}
-        """
-        args: dict[str, Any] = {"status": status}
-        if task_ids:
-            args["task_ids"] = task_ids
-        if project_id:
-            args["project_id"] = project_id
-        result = await self._mcp.call_tool(self.TOOL_FETCH_ANNOTATIONS, args)
-        parsed = result.parsed_content
-        if isinstance(parsed, dict):
-            return parsed
-        return {"raw": result.text_content, "annotations": []}
-
-    async def export_dataset(
-        self,
-        project_id: str,
-        export_format: str = "JSON",
-    ) -> dict[str, Any]:
-        """导出标注数据集。
-
-        Args:
-            project_id: project ID
-            export_format: 导出格式 — "JSON" | "JSON_MIN" | "COCO" | "CSV"
-
-        Returns:
-            {"download_url": "...", "format": "...", "task_count": N}
-            （download_url 可用于下载完整数据集）
-        """
-        args = {"project_id": project_id, "format": export_format}
-        result = await self._mcp.call_tool(self.TOOL_EXPORT_DATASET, args)
-        parsed = result.parsed_content
-        if isinstance(parsed, dict):
-            return parsed
-        return {"raw": result.text_content, "download_url": None}
+        result = await self._mcp.call_tool(self.TOOL_ASSIGN_TASK, args)
+        return _parse_tool_response(result)
 
     # ── 工具发现 ──
 
@@ -278,8 +300,11 @@ class LabelStudioMCPClient:
         try:
             await self._mcp.list_tools()
             return True
-        except (MCPError, Exception) as e:
-            logger.warning("Label Studio MCP health check failed: %s: %s", type(e).__name__, e)
+        except Exception as e:
+            logger.warning(
+                "Label Studio MCP health check failed: %s: %s",
+                type(e).__name__, e,
+            )
             return False
 
 

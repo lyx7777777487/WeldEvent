@@ -13,7 +13,7 @@ Source: boundary-pinning §6.2
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from cognitiveplane.shared.dto_workflow import WorkflowSpec
 from cognitiveplane.shared.types import CaseId
@@ -154,6 +154,20 @@ class EventConnector:
         """P2-R3-5: 转发 launcher.is_healthy()，探测 Temporal 连通性。"""
         return await self._launcher.is_healthy()
 
+    async def query_status(self, workflow_id: str) -> dict[str, Any]:
+        """查询 workflow 执行状态（转发到底层 Temporal port）。
+
+        Returns:
+            {
+                "status": str,          # "RUNNING" | "COMPLETED" | "FAILED"
+                "completed_nodes": list[str],
+                "failed_nodes": list[str],
+                "node_results": dict,    # node_id → {status, data, error}
+                "error": str | None,
+            }
+        """
+        return await self._launcher.query_status(workflow_id)
+
     async def send_human_gate_signal(
         self, workflow_id: str, node_id: str, approved: bool
     ) -> bool:
@@ -165,14 +179,31 @@ class EventConnector:
         Returns:
             True=成功, False=失败或不支持
         """
-        port = getattr(self._launcher, '_port', None)
-        if port is None or not hasattr(port, 'send_human_gate_signal'):
-            logger.warning(
-                "send_human_gate_signal: port does not support signals (workflow=%s)",
-                workflow_id,
-            )
-            return False
-        return await port.send_human_gate_signal(workflow_id, node_id, approved)
+        return await self._launcher.send_human_gate_signal(workflow_id, node_id, approved)
+
+    async def send_signal(
+        self, workflow_id: str, signal_name: str, args: Any = None
+    ) -> bool:
+        """P1-6: 发送通用 Temporal signal(pause/resume/cancel_by_user)。
+
+        LLM workflow_control 工具调此方法控制正在执行的 workflow。
+        signal_name 与 dag_runner_workflow.py 的 @workflow.signal 方法名对应:
+          - "pause"         → 暂停 workflow
+          - "resume"        → 恢复暂停的 workflow
+          - "cancel_by_user" → 用户取消 workflow
+
+        Returns:
+            True=成功, False=失败或不支持
+        """
+        return await self._launcher.send_signal(workflow_id, signal_name, args)
+
+    async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
+        """取消 Temporal workflow（转发到底层 Temporal port）。
+
+        Returns:
+            True=成功, False=失败或不支持
+        """
+        return await self._launcher.cancel_workflow(workflow_id, reason)
 
 
 __all__ = ["EventConnector"]

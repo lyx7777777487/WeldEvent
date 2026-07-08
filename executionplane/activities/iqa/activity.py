@@ -298,43 +298,65 @@ class IqaActivity(BaseActivity):
         results: list[RuleResult],
         weights: dict[str, float],
     ) -> float:
-        """计算综合置信度（加权）"""
-        
-        # 映射规则ID到权重键
+        """计算综合置信度（加权）。
+
+        P1-4 fix: 原逻辑 passed=False 但 value>=threshold 时 score=1.0,导致未通过规则
+        贡献满分,置信度虚高,有缺陷的图可能被 AUTO_PASS。这是工业质检安全风险。
+
+        正确语义:
+          - passed=True  → score=1.0(满分)
+          - passed=False → score 严格 < 1.0,反映"未达标"
+            * value>0 且 threshold>0: score = min(value/threshold, 1.0),但上限 0.9
+              (未通过永远不能接近满分;0.9 上限保证单项严重失败会显著拉低置信度)
+            * 范围类规则(exposure) passed=False 时 value 可能 > threshold(越上限),
+              此时 value/threshold > 1,clamp 到 0.9
+            * threshold=0 或 value=0: score=0.0(完全失败)
+
+        P3-7 fix: rule_weight_map 用精确子串匹配,避免 "FOC" 先于 "FOCUS" 匹配导致
+        "IQA-FOCUS" 错误命中 focus 权重(虽然结果相同但是死代码,改为单条 "FOCUS")。
+        用 rule_id 大写 + in 匹配,顺序无关。
+        """
+        # P3-7 fix: 单一映射,顺序无关(rule_id 大写匹配)
         rule_weight_map = {
             "RES": "resolution",
             "EXP": "exposure",
-            "FOC": "focus",
-            "FOCUS": "focus",
+            "FOCUS": "focus",   # 用 FOCUS 而非 FOC,避免歧义匹配
             "COMP": "completeness",
         }
-        
+
         total_weight = 0.0
         weighted_score = 0.0
-        
+
         for r in results:
-            # 找到权重键
+            # 找到权重键(大写匹配,取第一个命中的 prefix)
+            rule_id_upper = r.rule_id.upper()
             weight_key = None
             for key_prefix, wkey in rule_weight_map.items():
-                if key_prefix in r.rule_id:
+                if key_prefix in rule_id_upper:
                     weight_key = wkey
                     break
-            
+
             weight = weights.get(weight_key, 0.25) if weight_key else 0.25
-            
-            # 通过的规则贡献满分，未通过的按比例贡献
+
+            # P1-4 fix: passed=False 时 score 严格 < 1.0
             if r.passed:
                 score = 1.0
             else:
-                # 根据值与阈值的差距计算部分得分
+                # 未通过 — 按值与阈值的比例给部分分,但上限 0.9
                 if r.threshold > 0 and r.value > 0:
-                    score = min(r.value / r.threshold, 1.0) if r.value < r.threshold else 1.0
+                    ratio = r.value / r.threshold
+                    score = min(ratio, 0.9)  # 上限 0.9,未通过永不接近满分
+                    # 若 ratio >= 1(越界型失败如 exposure 超上限),给 0.9 上限
+                    # 若 ratio < 1(未达型失败如 resolution 不足),按比例给分
+                    if ratio < 1.0:
+                        # 进一步保守:未达型失败,比例分再乘 0.9,确保显著拉低
+                        score = ratio * 0.9
                 else:
                     score = 0.0
-            
+
             weighted_score += score * weight
             total_weight += weight
-        
+
         return weighted_score / total_weight if total_weight > 0 else 0.0
     
     def _determine_route(
@@ -415,14 +437,38 @@ class IqaActivity(BaseActivity):
         return findings, anomalies
     
     def _encode_image(self, image: NDArray[np.uint8]) -> bytes:
-        """编码图像为JPEG bytes"""
+        """编码图像为JPEG bytes。
+
+        P3-5 fix: 原代码 cv2 缺失时用 image.tobytes() 产生无效 JPEG 数据,
+        发给 MLLM 会得到乱码响应或 API 报错。改为 Pillow 后备,都不可用则抛错
+        (宁可在 L3 报 ERROR,不发无效数据污染 MLLM 判断)。
+        """
         try:
             import cv2
             _, buf = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
             return buf.tobytes()
         except ImportError:
-            # 无OpenCV时用numpy tobytes
-            return image.tobytes()
+            pass
+        # 后备:Pillow
+        try:
+            from PIL import Image
+            import io
+            # numpy (H,W,C) BGR → PIL 需要 RGB
+            if image.ndim == 3 and image.shape[2] == 3:
+                # 假设 cv2 风格 BGR,转 RGB
+                rgb = image[:, :, ::-1].copy()
+            else:
+                rgb = image
+            pil_img = Image.fromarray(rgb)
+            buf = io.BytesIO()
+            pil_img.save(buf, format="JPEG", quality=95)
+            return buf.getvalue()
+        except ImportError:
+            raise RuntimeError(
+                "Cannot encode image for MLLM: neither cv2 nor Pillow available. "
+                "Install one of them; refusing to send invalid raw bytes to MLLM "
+                "(would produce garbage results)."
+            )
     
     def _downgrade_route(
         self,
@@ -510,7 +556,7 @@ class IqaActivity(BaseActivity):
                     passed=r.passed,
                     detail=r.detail,
                 )
-            elif "FOC" in r.rule_id or "FOCUS" in r.rule_id:
+            elif r.rule_id.startswith("IQA-FOC"):
                 focus = FocusCheck(
                     laplacian_variance=r.value,
                     threshold=standard.focus_laplacian_min,

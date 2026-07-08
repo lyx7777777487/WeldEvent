@@ -120,6 +120,19 @@ class WeldMapClient(ABC):
             return result.value
         return None
 
+    async def read_image_preprocess(
+        self, workflow_id: WorkflowId
+    ) -> dict[str, Any] | None:
+        """读取 PPA 预处理结果（预处理后图片路径 + 应用策略）。
+
+        PPA 写入 image/preprocess 路径，供后续节点（HCA/Annotation 等）
+        获取 PPA 预处理输出。当前消费者待 Phase 5+ 实现。
+        """
+        result = await self.read_path(workflow_id, WeldMapPath("image/preprocess"))
+        if result.value is None:
+            return None
+        return result.value if isinstance(result.value, dict) else None
+
     # ------------------------------------------------------------------
     # 便捷方法 — PPA (Mask)
     # ------------------------------------------------------------------

@@ -38,6 +38,9 @@ class LLMResponse(BaseModel):
     content: str
     parsed_object: Any | None = None
     tool_calls: list[dict] | None = None
+    # thinking 模式（GLM-4.6 / DeepSeek-R1 / Qwen3 等）返回的推理内容。
+    # 多轮对话时必须回传给 API，否则触发 "reasoning_content must be passed back" 校验错误。
+    reasoning_content: str | None = None
 
     model_used: str = ""
     tokens_prompt: int = 0

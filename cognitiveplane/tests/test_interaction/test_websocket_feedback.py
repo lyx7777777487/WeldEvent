@@ -22,8 +22,8 @@ def app_with_mock_llm(monkeypatch):
         capability_module, "get_llm",
         lambda: MockLLMProvider(default_response="测试答复")
     )
-    # _bootstrap_llm 会探测真实 API, 直接跳过
-    monkeypatch.setattr("cognitiveplane.app._bootstrap_llm", lambda: True)
+    # bootstrap_llm 会探测真实 API, 直接跳过
+    monkeypatch.setattr("cognitiveplane.app.bootstrap_llm", lambda: True)
     app = create_app()
     return app
 
@@ -78,7 +78,7 @@ def test_websocket_interrupt_cancels_react(app_with_mock_llm, monkeypatch):
             return await super().complete(request)
 
     monkeypatch.setattr(capability_module, "get_llm", lambda: SlowLLM())
-    monkeypatch.setattr("cognitiveplane.app._bootstrap_llm", lambda: True)
+    monkeypatch.setattr("cognitiveplane.app.bootstrap_llm", lambda: True)
     app = create_app()
     client = TestClient(app)
 
@@ -115,7 +115,7 @@ def test_feedback_injected_into_next_react_system_prompt(app_with_mock_llm, monk
             return await super().complete(request)
 
     monkeypatch.setattr(capability_module, "get_llm", lambda: CapturingLLM(default_response="答复"))
-    monkeypatch.setattr("cognitiveplane.app._bootstrap_llm", lambda: True)
+    monkeypatch.setattr("cognitiveplane.app.bootstrap_llm", lambda: True)
     app = create_app()
     client = TestClient(app)
 

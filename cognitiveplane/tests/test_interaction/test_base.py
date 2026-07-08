@@ -38,7 +38,7 @@ class TestUserMessage:
             intent_label="cognitive.intervention",
             intent_confidence=0.85,
             extracted_entities={"from_image": 4},
-            session_id=SessionId(value=uuid4()),
+            session_id=SessionId(value=str(uuid4())),
             case_id=CaseId(value="CASE-001"),
         )
         assert msg.intent_label == "cognitive.intervention"
@@ -49,7 +49,7 @@ class TestModeResponse:
     def test_text_reply(self):
         resp = ModeResponse(
             mode_id="cognitive.knowledge_query",
-            session_id=SessionId(value=uuid4()),
+            session_id=SessionId(value=str(uuid4())),
             response_type=ResponseType.TEXT_REPLY,
             text_reply="Q345R 22mm 预热温度要求 ≥100°C",
         )
@@ -60,7 +60,7 @@ class TestModeResponse:
     def test_clarification_request(self):
         resp = ModeResponse(
             mode_id="cognitive.knowledge_query",
-            session_id=SessionId(value=uuid4()),
+            session_id=SessionId(value=str(uuid4())),
             response_type=ResponseType.CLARIFICATION_REQUEST,
             text_reply="您指的是哪种材料的预热温度？",
             follow_up_suggestions=["Q345R", "Q235B"],
@@ -95,7 +95,7 @@ class TestBaseSessionData:
     def test_create(self):
         session = BaseSessionData(
             mode_id="cognitive.knowledge_query",
-            session_id=SessionId(value=uuid4()),
+            session_id=SessionId(value=str(uuid4())),
             operator_id="zhangsan",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),

@@ -78,7 +78,6 @@ DEFAULT_RBAC: dict[str, frozenset[str]] = {
             "search_cases",
             "search_process",
             "design_workflow",
-            "adjust_parameter",
             "request_confirmation",
             "explain_decision",
             "archive_memory",

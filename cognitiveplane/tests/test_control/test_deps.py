@@ -121,7 +121,7 @@ def test_control_deps_mcp_registry_assignable():
     from cognitiveplane.adapters.mcp.tool_policy_classifier import (
         MCPToolPolicyClassifier,
     )
-    from cognitiveplane.control.mcp_registry import MCPRegistry
+    from cognitiveplane.control.registry.mcp_registry import MCPRegistry
 
     classifier = MCPToolPolicyClassifier(yaml_path=None)
     registry = MCPRegistry(classifier=classifier, event_log=None)

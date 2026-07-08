@@ -26,7 +26,7 @@ class TestActiveContext:
 
     def test_update_session(self):
         ctx = ActiveContext(operator_id="zhangsan")
-        sid = SessionId(value=uuid4())
+        sid = SessionId(value=str(uuid4()))
         ctx.update_session("knowledge_query", sid)
         assert ctx.active_session_type == "knowledge_query"
 

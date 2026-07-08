@@ -20,6 +20,7 @@ Phase 2 范围 (plan line 844): 草稿区自动记录 (事件触发即写). 不�
 
 from __future__ import annotations
 
+import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -27,6 +28,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 # ── Trigger events (plan §4.2.2 line 819-822) ──
@@ -130,7 +133,7 @@ class PolicyRatchet:
             except Exception:
                 # Ratchet write failure must never break ReAct.
                 # Caller already swallowed — but defense in depth: don't propagate.
-                pass
+                logger.debug("policy_ratchet operation failed", exc_info=True)
 
         return entry
 
@@ -152,7 +155,7 @@ class PolicyRatchet:
                 if self._path.exists():
                     self._path.unlink()
             except Exception:
-                pass
+                logger.debug("policy_ratchet operation failed", exc_info=True)
 
     # ── internal ──
 

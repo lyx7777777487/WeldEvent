@@ -285,10 +285,8 @@ class InMemoryGatewayAdapter(
     async def get_subscription_status(self) -> SubscriptionStatus:
         last_ts: datetime | None = None
         # Peek at the last event without removing it
-        if not self._event_queue.empty():
-            # We cannot easily peek at the last item in a Queue,
-            # so we leave last_event_timestamp as None for now.
-            pass
+        # We cannot easily peek at the last item in a Queue,
+        # so we leave last_event_timestamp as None for now.
         return SubscriptionStatus(
             active=self._subscribed,
             subscribed_paths=self._subscribed_paths,

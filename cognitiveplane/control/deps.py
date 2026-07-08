@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from cognitiveplane.shared.ports.collaboration import HumanReviewRequestRepository
     from cognitiveplane.shared.ports.learning import LearningEventRepository
     from cognitiveplane.control.ports import BrainDecisionRepository
-    from cognitiveplane.control.mcp_registry import MCPRegistry
+    from cognitiveplane.control.registry.mcp_registry import MCPRegistry
     from cognitiveplane.governance.escalation import EscalationTracker
     from cognitiveplane.bridge.event_connector import EventConnector
 

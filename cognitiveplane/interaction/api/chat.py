@@ -12,28 +12,18 @@ Plan §A.3:
   - 上传图统一生成 Thumbnail 注入消息层 (成本闸门)
   - 原图保留在 ImageStore (内存，阶段 3+ 切 MinIO)
 
+Endpoint handlers live in sibling modules (chat_handlers, stream_handlers,
+approval_handlers, workflow_handlers, session_handlers). This module owns
+the dependency-injection setup and thin ``@router`` registration wrappers.
+
 Source: 7-plane redesign spec §7 FastAPI + plan §2.3 + §A.3.
 """
 
-from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, Form, UploadFile, WebSocket
 from pydantic import BaseModel
-from typing import Any, Optional
-import json
-import logging
+from typing import Optional
 
 from cognitiveplane.control.deps import CognitiveDependencies
-
-logger = logging.getLogger("chat_api")
-# 确保 INFO 级别日志能输出到 stdout（uvicorn 默认只配自己的 logger）
-if not logger.handlers:
-    import sys
-    h = logging.StreamHandler(sys.stdout)
-    h.setLevel(logging.INFO)
-    h.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S"))
-    logger.addHandler(h)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False  # 避免重复输出
 
 
 class ChatRequest(BaseModel):
@@ -56,25 +46,39 @@ class ChatResponse(BaseModel):
     workflow_ids: list[str] = []
 
 
-def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
-    """Create FastAPI router for chat endpoints."""
-    from cognitiveplane.control.react import ReActEngine
+def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "SessionManager"]:
+    """Create FastAPI router for chat endpoints.
+
+    Returns:
+        (router, session_manager) — session_manager 由调用方在 app lifespan
+        中管理 TTL 清理 task 的启动/停止（C4 fix）。
+    """
+    from cognitiveplane.control.react import ReActEngine, ApprovalStore
     from cognitiveplane.control.hooks import SafetyHook, PolicyHook
+    from cognitiveplane.memory.compaction import ContextCompactor, CompactionStrategy
     from cognitiveplane.control.event_log import EventLog
+    from cognitiveplane.control.skills import build_welding_skill_registry
     from cognitiveplane.governance.tool_policy import ToolPolicy
+    from cognitiveplane.governance.guardrails import (
+        WeldingAfterToolHook,
+        WeldingOutputGuardrail,
+    )
+    from cognitiveplane.governance.evaluation import (
+        build_evaluator,
+    )
     from cognitiveplane.interaction.session import SessionManager
     from cognitiveplane.interaction.file_handler import FileHandler
     from cognitiveplane.interaction.image_store import ImageStore
     from cognitiveplane.interaction.api.image_session import ImageSessionRegistry
-    from cognitiveplane.shared.dto.context import ContextSnapshot
-    from cognitiveplane.shared.enums import EventType, NoveltyLevel
     from cognitiveplane.shared.types import CaseId
-    from datetime import datetime, timezone
 
     router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
     session_manager = SessionManager()
     tool_policy = ToolPolicy()
     hooks = [SafetyHook(), PolicyHook(tool_policy)]
+    # Phase 4 Guardrails: 三层护栏中的 after_tool + output 层
+    after_tool_hooks = [WeldingAfterToolHook()]
+    output_guardrail = WeldingOutputGuardrail()
     # plan §A.3 + §7 contract: ImageStore is session-scoped state, NOT a Provider.
     # Constructed here and passed explicitly to ReActEngine → ToolRegistry → AnalyzeImageTool.
     image_store = ImageStore()
@@ -82,9 +86,39 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     # plan §0.1 规则 1: 架构替 LLM 做的看不见的事 (worldview 注入) 必须记进 EventLog.
     # Phase 2 用 app 级共享 EventLog (case_id="app-shared"); Phase 3 AgentLoop 时改 per-session.
     event_log = EventLog(case_id=CaseId(value="app-shared"))
+    # Phase 5 Agent Skills: 注入焊接领域预置 skill 注册表
+    skill_registry = build_welding_skill_registry()
+    # 架构级 approval gate — 进程级共享 ApprovalStore，供 ReAct loop 与
+    # /chat/approve 端点共享 human-in-the-loop 状态
+    approval_store = ApprovalStore()
+    # Context Compaction — Anthropic Context Engineering 的 Compaction 技术。
+    # 默认 SELF_COMPACT_SLIDING：LLM 自己总结旧历史（保留架构决策/未解决 bug/
+    # 实现细节），保留最近 6 条原文。max_tokens=16000（DeepSeek 32K 的一半，
+    # 留输出空间）。当 history 低于阈值时 compact() 直接返回原样，无额外开销。
+    context_compactor = ContextCompactor(
+        llm_provider=deps.capability.llm_provider,
+        max_tokens=16000,
+        default_strategy=CompactionStrategy.SELF_COMPACT_SLIDING,
+    )
+    # boundary-pinning §3 长路径 Temporal 观察者接入点 —
+    # 把全局 WorkflowEventBus 单例注入 ReActEngine，让 _build_system_prompt
+    # 能读到 workflow 状态摘要注入到下一轮 system prompt。
+    from cognitiveplane.interaction.workflow_events import (
+        get_workflow_event_bus,
+    )
+    workflow_event_bus = get_workflow_event_bus()
     engine = ReActEngine(
         deps, hooks=hooks, image_store=image_store, event_log=event_log,
+        after_tool_hooks=after_tool_hooks,
+        output_guardrail=output_guardrail,
+        skill_registry=skill_registry,
+        approval_store=approval_store,
+        context_compactor=context_compactor,
+        workflow_event_bus=workflow_event_bus,
     )
+    # Phase 5 评估框架: LLM-as-a-Judge + Langfuse scoring
+    # 在线评估（异步，不阻塞聊天返回）
+    evaluator = build_evaluator(deps.capability.llm_provider, enabled=True)
     file_handler = FileHandler(llm_provider=deps.capability.llm_provider, image_store=image_store)
 
     # 暴露 tool_registry 给 app.py，用于挂载 MCP server（协议化工具层）
@@ -92,57 +126,54 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
     router.tool_registry = engine._tools
     router.engine = engine
     router.image_store = image_store
+    router.image_sessions = image_sessions
+
+    # MCPRegistry — 装配外部工业 MCP server（如 Label Studio 标注工具）
+    # 在 app.py lifespan 中调 register_server + register_all 完成 async 注册
+    from pathlib import Path as _Path
+    from cognitiveplane.adapters.mcp.tool_policy_classifier import (
+        MCPToolPolicyClassifier,
+    )
+    from cognitiveplane.control.registry.mcp_registry import MCPRegistry
+    _yaml_path = (
+        _Path(__file__).resolve().parent.parent.parent
+        / "governance" / "mcp_policy.yaml"
+    )
+    _mcp_classifier = MCPToolPolicyClassifier(yaml_path=_yaml_path)
+    router.mcp_registry = MCPRegistry(
+        classifier=_mcp_classifier, event_log=event_log
+    )
+
+    # ── 加载 handler 模块（lazy import 避免循环依赖） ──
+    from cognitiveplane.interaction.api.chat_handlers import (
+        handle_chat, handle_chat_with_files,
+    )
+    from cognitiveplane.interaction.api.stream_handlers import (
+        handle_chat_stream, handle_websocket_chat,
+    )
+    from cognitiveplane.interaction.api.approval_handlers import (
+        CancelRequest, ApproveRequest,
+        handle_cancel_workflow, handle_approve_tool,
+    )
+    from cognitiveplane.interaction.api.workflow_handlers import (
+        WorkflowEventRequest, QueryWorkflowStatusRequest,
+        handle_receive_workflow_event, handle_query_workflow_status,
+        handle_workflow_stream,
+    )
+    from cognitiveplane.interaction.api.session_handlers import (
+        handle_list_sessions, handle_export_session,
+    )
 
     # ── JSON 纯文本聊天 ──
 
     @router.post("/", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:
-        session = _get_or_create_session(session_manager, request.operator_id, request.session_id, request.case_id)
-        logger.info("[CHAT] session=%s user=%r case=%s",
-                    session.session_id.value, request.message, request.case_id)
-
-        context = ContextSnapshot(
-            case_id=CaseId(value=request.case_id or "unknown"),
-            event_type=EventType.WORKFLOW_ENTERED,
-            workflow_state={},
-            case_data={},
-            measurements=[],
-            memory_match_confidence=0.5,
-            knowledge_coverage=0.5,
-            event_novelty=NoveltyLevel.PARTIAL,
-            validation_critical_count=0,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        response = await engine.run(
-            user_input=request.message,
-            context=context,
-            session={
-                "session_id": str(session.session_id.value),
-                "history": session.messages,  # 传入历史对话，避免 LLM 失忆
-            },
-        )
-
-        # 追加本轮对话到 session.messages，供下一轮作为历史
-        session.messages.append({"role": "user", "content": request.message})
-        if response.text_reply:
-            session.messages.append({"role": "assistant", "content": response.text_reply})
-
-        logger.info("[CHAT] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
-                    session.session_id.value,
-                    response.tools_used,
-                    getattr(response, "workflow_ids", []),
-                    len(response.text_reply or ""),
-                    response.error)
-        logger.info("[CHAT] reply=\n%s", response.text_reply)
-
-        return ChatResponse(
-            reply=response.text_reply,
-            session_id=str(session.session_id.value),
-            tools_used=response.tools_used,
-            tier=response.tier_used.value,
-            error=response.error,
-            workflow_ids=getattr(response, "workflow_ids", []),
+        return await handle_chat(
+            request,
+            session_manager=session_manager,
+            engine=engine,
+            router=router,
+            evaluator=evaluator,
         )
 
     # ── multipart/form-data 文件上传聊天 ──
@@ -155,319 +186,108 @@ def create_chat_router(deps: CognitiveDependencies) -> APIRouter:
         session_id: Optional[str] = Form(None),
         files: list[UploadFile] = File(default=[]),
     ) -> ChatResponse:
-        """带文件上传的聊天接口 — 使用 multipart/form-data，支持大文件。
-
-        Plan §2.3 双轨:
-          - Thumbnail 进消息层 (LLM 直接看)
-          - image_id 给工具层 (LLM 调 analyze_image 拿原图)
-        """
-        session = _get_or_create_session(session_manager, operator_id, session_id, case_id)
-        logger.info("[UPLOAD] session=%s user=%r case=%s files=%d",
-                    session.session_id.value, message, case_id, len(files))
-
-        if not files:
-            # 没有文件，走普通聊天
-            context = ContextSnapshot(
-                case_id=CaseId(value=case_id or "unknown"),
-                event_type=EventType.WORKFLOW_ENTERED,
-                workflow_state={},
-                case_data={},
-                measurements=[],
-                memory_match_confidence=0.5,
-                knowledge_coverage=0.5,
-                event_novelty=NoveltyLevel.PARTIAL,
-                validation_critical_count=0,
-                timestamp=datetime.now(timezone.utc),
-            )
-            response = await engine.run(
-                user_input=message,
-                context=context,
-                session={
-                    "session_id": str(session.session_id.value),
-                    "history": session.messages,
-                },
-            )
-            session.messages.append({"role": "user", "content": message})
-            if response.text_reply:
-                session.messages.append({"role": "assistant", "content": response.text_reply})
-            logger.info("[UPLOAD] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
-                        session.session_id.value,
-                        response.tools_used,
-                        getattr(response, "workflow_ids", []),
-                        len(response.text_reply or ""),
-                        response.error)
-            logger.info("[UPLOAD] reply=\n%s", response.text_reply)
-            return ChatResponse(
-                reply=response.text_reply,
-                session_id=str(session.session_id.value),
-                tools_used=response.tools_used,
-                tier=response.tier_used.value,
-                error=response.error,
-                workflow_ids=getattr(response, "workflow_ids", []),
-            )
-
-        # 有文件：解析文件，构建多模态消息，走 ReAct 引擎
-        response = await _handle_file_upload_via_react(
-            message=message,
-            session=session,
-            files=files,
-            file_handler=file_handler,
+        return await handle_chat_with_files(
+            message, operator_id, case_id, session_id, files,
+            session_manager=session_manager,
             engine=engine,
+            router=router,
+            file_handler=file_handler,
             image_sessions=image_sessions,
+            evaluator=evaluator,
         )
-        session.messages.append({"role": "user", "content": message})
-        if response.reply:
-            session.messages.append({"role": "assistant", "content": response.reply})
-        logger.info("[UPLOAD] session=%s tools=%s wf_ids=%s reply_len=%d error=%s",
-                    session.session_id.value,
-                    response.tools_used,
-                    getattr(response, "workflow_ids", []),
-                    len(response.reply or ""),
-                    response.error)
-        logger.info("[UPLOAD] reply=\n%s", response.reply)
-        return response
 
     # ── 流式聊天 (SSE) ──
 
     @router.post("/stream")
     async def chat_stream(request: ChatRequest):
-        """流式聊天端点 — SSE (Server-Sent Events)。
-
-        返回 text/event-stream，逐事件推送：
-          - thinking:    ReAct 新迭代
-          - tool_call:   工具调用（含 rejected/retry 信息）
-          - tool_result: 工具返回
-          - token:       最终轮 LLM 流式 token（打字机效果）
-          - final:       流式结束（含完整 reply + tools_used + workflow_ids）
-          - error:       异常
-
-        前端用 fetch + ReadableStream 消费（EventSource 不支持 POST）。
-        与 /chat/ 的差异：最终回复逐 token 流式输出，工具调用实时推送，
-        用户能看到 LLM 思考过程，减少等待焦虑。
-        """
-        session = _get_or_create_session(session_manager, request.operator_id, request.session_id, request.case_id)
-        logger.info("[STREAM] session=%s user=%r case=%s",
-                    session.session_id.value, request.message, request.case_id)
-
-        context = ContextSnapshot(
-            case_id=CaseId(value=request.case_id or "unknown"),
-            event_type=EventType.WORKFLOW_ENTERED,
-            workflow_state={},
-            case_data={},
-            measurements=[],
-            memory_match_confidence=0.5,
-            knowledge_coverage=0.5,
-            event_novelty=NoveltyLevel.PARTIAL,
-            validation_critical_count=0,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        session_id_str = str(session.session_id.value)
-        user_msg = request.message
-
-        async def event_generator():
-            """SSE 事件生成器 — 桥接 engine.run_stream()。
-
-            流结束后在 finally 块追加对话到 session.messages，供下一轮作为历史。
-            客户端断开时 generator 被取消，finally 仍执行（只追加已收到的内容）。
-            """
-            final_reply = ""
-            tools_used_list: list[str] = []
-            workflow_ids_list: list[str] = []
-            try:
-                async for event in engine.run_stream(
-                    user_input=user_msg,
-                    context=context,
-                    session={
-                        "session_id": session_id_str,
-                        "history": session.messages,
-                    },
-                ):
-                    if event["event"] == "final":
-                        final_reply = event["data"].get("reply", "")
-                        tools_used_list = event["data"].get("tools_used", [])
-                        workflow_ids_list = event["data"].get("workflow_ids", [])
-                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            except Exception as e:
-                err_event = {"event": "error", "data": {"message": f"stream error: {e}"}}
-                yield f"data: {json.dumps(err_event, ensure_ascii=False)}\n\n"
-            finally:
-                # 流结束后追加对话到 session.messages，供下一轮作为历史
-                session.messages.append({"role": "user", "content": user_msg})
-                if final_reply:
-                    session.messages.append({"role": "assistant", "content": final_reply})
-                logger.info("[STREAM] session=%s tools=%s wf_ids=%s reply_len=%d",
-                            session_id_str, tools_used_list, workflow_ids_list, len(final_reply))
-
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲，确保 token 实时推送
-            },
+        return await handle_chat_stream(
+            request,
+            session_manager=session_manager,
+            engine=engine,
+            router=router,
+            evaluator=evaluator,
+            deps=deps,
+            hooks=hooks,
+            image_store=image_store,
+            event_log=event_log,
+            after_tool_hooks=after_tool_hooks,
+            output_guardrail=output_guardrail,
+            skill_registry=skill_registry,
+            approval_store=approval_store,
+            context_compactor=context_compactor,
         )
 
     # ── WebSocket ── (Phase 3 子项目 D: AgentLoop 双 task)
 
     @router.websocket("/ws")
     async def websocket_chat(websocket: WebSocket) -> None:
-        await websocket.accept()
-
-        from cognitiveplane.control.agent_loop import AgentLoop
-        from cognitiveplane.control.event_log import EventLog
-
-        event_log = EventLog(case_id=CaseId(value="app-shared"))
-
-        async def send_json(data: dict) -> None:
-            await websocket.send_json(data)
-
-        # 治理一致: /ws 路径必须与 HTTP /api/v1/chat 用同一套 hooks (SafetyHook + PolicyHook).
-        # 不能让同一工具调用因入口不同而绕过 ToolPolicy.
-        loop = AgentLoop(
+        await handle_websocket_chat(
+            websocket,
             deps=deps,
-            event_log=event_log,
-            send_json=send_json,
             hooks=hooks,
+            skill_registry=skill_registry,
+            image_store=image_store,
+            after_tool_hooks=after_tool_hooks,
+            output_guardrail=output_guardrail,
+            engine=engine,
+            session_manager=session_manager,
+            image_sessions=image_sessions,
+            router=router,
         )
-        await loop.start()
 
-        try:
-            while True:
-                data = await websocket.receive_json()
-                await loop.put_message(data)
-        except WebSocketDisconnect:
-            pass
-        finally:
-            await loop.stop()
+    # ── 取消 workflow ──
 
-    return router
+    @router.post("/cancel")
+    async def cancel_workflow(request: CancelRequest):
+        return await handle_cancel_workflow(request, deps=deps)
 
+    # ── Workflow 节点事件回传 ────────────────────────────────────────
+    # L2 worker 执行 Temporal workflow 时,在节点 start/end/error 时调此端点
+    # 推送事件到 L1。L1 收到后按 session_id 路由到 WorkflowEventBus,广播给
+    # 前端 SSE 订阅者。这是"过程逐步展示"功能的 L2→L1 入口。
 
-def _get_or_create_session(session_manager, operator_id, session_id, case_id):
-    """获取或创建会话（复用前端传的 session_id，保证历史对话累积）。"""
-    return session_manager.get_or_create_session(operator_id, session_id, case_id)
-
-
-async def _handle_file_upload_via_react(
-    message: str,
-    session,
-    files: list[UploadFile],
-    file_handler: "FileHandler",
-    engine: "ReActEngine",
-    image_sessions: "ImageSessionRegistry",
-) -> ChatResponse:
-    """处理 multipart 上传的文件 — 通过 ReAct 引擎分析。
-
-    Plan §2.3 双轨:
-      消息层 (LLM 直接看 thumbnail):
-        content = [
-          {"type": "text", "text": "<message> + [图片清单 + image_id 引用]"},
-          {"type": "image_url", "image_url": {"url": "<thumbnail_1>"}},
-          {"type": "image_url", "image_url": {"url": "<thumbnail_2>"}},
-          ...
-        ]
-
-      工具层 (LLM 调 analyze_image):
-        analyze_image(image_id="<uuid>") → 工具从 ImageStore 取原图送 vision_complete
-
-    文档: 文本附加到消息 text 部分。
-    """
-    from cognitiveplane.interaction.file_handler import UploadedFile
-    from cognitiveplane.shared.dto.context import ContextSnapshot
-    from cognitiveplane.shared.enums import EventType, NoveltyLevel
-    from cognitiveplane.shared.types import CaseId
-    from datetime import datetime, timezone
-
-    # 1. 将 UploadFile 转为 UploadedFile
-    uploaded_files: list[UploadedFile] = []
-    for f in files:
-        raw_bytes = await f.read()
-        uploaded_files.append(UploadedFile(
-            filename=f.filename or "unknown",
-            content_type=f.content_type or "application/octet-stream",
-            size=len(raw_bytes),
-            data=raw_bytes,
-        ))
-
-    # 2. 解析文件 (ImageStore 自动生成 thumbnail + 分配 image_id)
-    # plan §2.3: image_id 格式 PENDING:{session_id}:{index} — 需先取 session_id
-    session_id_str = str(session.session_id.value)
-    result = await file_handler.process_uploaded_files(
-        uploaded_files, message, session_id=session_id_str
-    )
-
-    # 3. 注册 image_ids 到 session — analyze_image 通过 image_id 取原图
-    image_ids = result.image_ids
-    image_sessions.register(session_id_str, image_ids)
-
-    # 4. 构建用户消息 (plan §2.3 双轨: 消息层 thumbnail + 工具层 image_id)
-    # ReActEngine 按主 LLM 能力降级 (plan line 3166):
-    #   - 多模态主 LLM: 完整 content_parts (text + image_url thumbnails)
-    #   - 文本主 LLM (DeepSeek): 引擎过滤 image_url, 只留 text + image_ref 引用
-    # 工具层始终走 analyze_image(image_ref=...) 拿原图送 vision_complete
-    text_parts = [message]
-    if image_ids:
-        id_list = ", ".join(image_ids)
-        text_parts.append(
-            f"\n\n[系统提示：用户上传了 {len(image_ids)} 张焊缝图片。"
-            f"图片 image_ref 清单（按上传顺序）：{id_list}。"
-            f"调用 analyze_image(image_ref=\"<ref>\", question=\"...\") 分析图片。"
-            f"工具会取原图送给视觉模型分析。]"
-            f"\n[重要] 当你调用 design_workflow 编排工作流时，必须把上述 image_ref 清单"
-            f"完整传入 image_refs 参数（数组形式，如 [\"{image_ids[0]}\"]），"
-            f"否则下游 L3 activity（如 IQA 图像质量评估）将无法获取图片导致执行失败。"
-            f"即使用户只说\"分析这张图\"，也要把 image_refs 传给 design_workflow。"
+    @router.post("/workflow/events")
+    async def receive_workflow_event(request: WorkflowEventRequest):
+        return await handle_receive_workflow_event(
+            request, workflow_event_bus=workflow_event_bus,
         )
-    if result.text_context.strip():
-        text_parts.append(f"\n\n[附带的文档内容：]\n{result.text_context[:4000]}")
-    if result.summary:
-        text_parts.append(f"\n\n[已处理文件: {result.summary}]")
 
-    text_payload = "".join(text_parts)
+    # ── Session 管理（调试用） ──
 
-    # plan §2.3 + §A.3: 消息层注入 thumbnail (多模态 content_parts)
-    # DeepSeek 主循环不接收 image_url — ReActEngine._adapt_user_input 会过滤
-    user_message: str | list[dict]
-    if result.thumbnails:
-        user_message = [{"type": "text", "text": text_payload}]
-        for thumb in result.thumbnails:
-            user_message.append({
-                "type": "image_url",
-                "image_url": {"url": thumb},
-            })
-    else:
-        user_message = text_payload
+    @router.get("/sessions")
+    async def list_sessions():
+        """列出所有 session（调试用，导出对话历史）."""
+        return await handle_list_sessions(session_manager=session_manager)
 
-    # 5. 构建 context 并走 ReAct 引擎
-    context = ContextSnapshot(
-        case_id=CaseId(value="file-upload"),
-        event_type=EventType.WORKFLOW_ENTERED,
-        workflow_state={},
-        case_data={"uploaded_files": result.summary, "image_ids": image_ids},
-        measurements=[],
-        memory_match_confidence=0.5,
-        knowledge_coverage=0.5,
-        event_novelty=NoveltyLevel.PARTIAL,
-        validation_critical_count=0,
-        timestamp=datetime.now(timezone.utc),
-    )
+    @router.get("/sessions/{session_id}/export")
+    async def export_session(session_id: str):
+        """导出单个 session 的完整对话历史（调试用）."""
+        return await handle_export_session(
+            session_id, session_manager=session_manager,
+        )
 
-    response = await engine.run(
-        user_input=user_message,
-        context=context,
-        session={
-            "session_id": session_id_str,
-            "history": session.messages,
-        },
-    )
+    # ── Workflow SSE 订阅 ──
 
-    return ChatResponse(
-        reply=response.text_reply,
-        session_id=session_id_str,
-        tools_used=response.tools_used,
-        tier=response.tier_used.value,
-        error=response.error,
-        workflow_ids=getattr(response, "workflow_ids", []),
-    )
+    @router.get("/workflow/stream/{session_id}")
+    async def workflow_stream(session_id: str):
+        return await handle_workflow_stream(
+            session_id, workflow_event_bus=workflow_event_bus,
+        )
+
+    # ── Workflow 状态查询 ──
+
+    @router.post("/workflow/status")
+    async def query_workflow_status(request: QueryWorkflowStatusRequest):
+        return await handle_query_workflow_status(
+            request, workflow_event_bus=workflow_event_bus,
+        )
+
+    # ── Human-in-the-loop 确认 ──
+
+    @router.post("/approve")
+    async def approve_tool(request: ApproveRequest):
+        return await handle_approve_tool(
+            request, approval_store=approval_store,
+        )
+
+    return router, session_manager

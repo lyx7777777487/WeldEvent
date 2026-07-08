@@ -18,13 +18,16 @@ Source: WeldEvent架构方案 §5.2 (Agent接口契约)
   - workflow_id 从 workflow_context.workflow_id 获取
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-# 直接从controlplane导入接口定义，保持一致性
-from controlplane.domain.activity import ActivityInput, ActivityOutput, ActivityStatus
+# L3 独立副本（端口/适配器隔离）— 不再从 controlplane import
+from .contracts import ActivityInput, ActivityOutput, ActivityStatus
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -128,25 +131,44 @@ class BaseActivity(ABC):
         """执行后钩子 — 可对输出做后处理。"""
         return output
     
-    async def on_error(self, error: Exception) -> ActivityOutput:
-        """错误处理钩子 — 返回ERROR状态的ActivityOutput。"""
-        return ActivityOutput(
-            status=ActivityStatus.ERROR,
-            error=f"{self.activity_name}: {type(error).__name__}: {error}",
-        )
+    # 注: 原 on_error 钩子已移除。
+    # 设计决策: 异常由 Temporal RetryPolicy 处理，activity 不再捕获异常。
+    #   - 瞬时故障（网络/服务不可用）: 异常透传到 Temporal，由 RetryPolicy 自动重试
+    #   - 业务错误（参数无效/数据不存在）: execute() 应返回 ActivityOutput(ERROR)
+    # 这样使 Temporal 的重试机制能正确区分瞬时故障与业务错误。
     
     # ------------------------------------------------------------------
     # 统一执行入口（框架调用此方法，不要覆写）
     # ------------------------------------------------------------------
     
     async def run(self, input: ActivityInput) -> ActivityOutput:
-        """统一的执行入口 — 包含生命周期管理和错误处理。"""
+        """统一执行入口 — 生命周期管理 + 异常透传。
+        
+        异常处理策略（与 Temporal RetryPolicy 配合）:
+          - 瞬时故障（网络/服务不可用）: 异常透传 → Temporal 自动重试
+          - 业务错误（参数无效/数据不存在）: execute() 返回 ActivityOutput(ERROR)
+          - 生命周期钩子异常: log warning 不中断主流程
+        """
+        await self._safe_on_start(input)
+        result = await self.execute(input)
+        return await self._safe_on_complete(result)
+    
+    async def _safe_on_start(self, input: ActivityInput) -> None:
+        """安全执行 on_start 钩子 — 异常仅 log warning 不中断主流程。"""
         try:
             await self.on_start(input)
-            result = await self.execute(input)
+        except Exception as e:
+            logger.warning("on_start hook failed for %s: %s: %s",
+                           self.activity_name, type(e).__name__, e)
+    
+    async def _safe_on_complete(self, result: ActivityOutput) -> ActivityOutput:
+        """安全执行 on_complete 钩子 — 异常仅 log warning，返回 execute 的原始结果。"""
+        try:
             return await self.on_complete(result)
         except Exception as e:
-            return await self.on_error(e)
+            logger.warning("on_complete hook failed for %s: %s: %s",
+                           self.activity_name, type(e).__name__, e)
+            return result
     
     # ------------------------------------------------------------------
     # 健康检查
@@ -164,7 +186,7 @@ class BaseActivity(ABC):
 
 
 # ---------------------------------------------------------------------------
-# 导出接口（保持与controlplane一致）
+# 导出接口（从 .contracts re-export，保持调用方向后兼容）
 # ---------------------------------------------------------------------------
 
 __all__ = [

@@ -1669,3 +1669,2438 @@ entries:
     image_ref: PENDING:sess_1782805853826:0
     question: 全面分析这张焊缝图像的质量，检测是否存在缺陷（气孔、夹渣、裂纹、未熔合、咬边等），评估图像质量和焊缝质量等级
   session_id: sess_1782805853826
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:42:01.438820+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:42:01.488587+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:42:01.561828+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:42:01.617958+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:42:01.666414+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:42:01.685752+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:43:48.970553+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:43:49.027317+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:43:49.077443+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:43:49.133625+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:43:49.183234+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:43:49.203655+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:45:45.210632+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:45:45.267909+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:45:45.319045+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:45:45.376532+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:45:45.427957+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:45:45.448568+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:48:49.550796+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:48:49.609791+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:48:49.666719+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:48:49.726136+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T09:48:49.779272+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T09:48:49.801277+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T10:03:15.259975+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T10:03:15.318479+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T10:03:15.373700+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T10:03:15.440264+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-06-30T10:03:15.495297+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-06-30T10:03:15.536537+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T10:32:48.681771+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:0
+    question: 请全面分析这张焊缝图片，包括：焊缝质量、是否存在缺陷（气孔、夹渣、裂纹、未熔合、咬边等）、整体质量等级、以及改进建议
+  session_id: sess_1782815536200
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T10:33:20.553763+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:0
+    question: 这张焊缝图片的整体情况如何？
+  session_id: sess_1782815536200
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T10:53:41.376477+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:1
+    question: 请详细分析这张焊缝图片，包括焊缝质量、缺陷、整体情况
+  session_id: sess_1782815536200
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T10:54:12.688421+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:1
+    question: 这张焊缝图片有什么缺陷？质量如何？
+  session_id: sess_1782815536200
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 30.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T10:54:46.008458+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:1
+    question: 请描述这张焊缝图像的内容，包括焊缝形态、是否有缺陷、整体质量如何
+  session_id: sess_1782815536200
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 60.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T11:23:46.409448+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782815536200:0
+    question: 请全面分析这张焊缝图像，包括焊缝质量、缺陷、整体状况等
+  session_id: sess_1782815536200
+- tool_name: launch_workflow
+  failure_pattern: 'Invalid JSON arguments: Extra data: line 1 column 854 (char 853).
+    Raw: {"workflow_spec": {"objective": "焊缝图像质量检测与缺陷分析", "requirements": ["图像质量评估",
+    "预处理校正", "缺陷识别", "几何测量", "风险评估"], "nodes": [{"node_id": "iqa_01", "type": "tool_task",
+    "capability": "defect_detection", "de'
+  suggested_rule: Consider pre-validating launch_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-06-30T11:46:49.821657+00:00'
+  arguments_preview:
+    raw: '{"workflow_spec": {"objective": "焊缝图像质量检测与缺陷分析", "requirements": ["图像质量评估",
+      "预处理校正", "缺陷识别", "几何测量", "风险评估"], "nodes": [{"node_id": "iqa_01", "type": "tool_task",
+      "capability": "defect_detection", "de'
+  session_id: test_session_1782819923
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 60.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T12:09:36.067647+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782821295134:1
+    question: 请全面分析这张焊缝图片：检测缺陷（气孔、夹渣、裂纹、未熔合、咬边等），评估焊缝质量等级，给出改进建议
+  session_id: sess_1782821295134
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 60.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T12:10:38.006536+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782821295134:1
+    question: 请全面分析这张焊缝图片：检测缺陷（气孔、夹渣、裂纹、未熔合、咬边等），评估焊缝质量等级，给出改进建议
+  session_id: sess_1782821295134
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-06-30T14:04:13.217429+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782827730191:1
+    question: 请详细分析焊缝质量，包括缺陷类型、位置、严重程度
+  session_id: sess_1782827730191
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-02T02:27:57.559619+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782959170890:0
+    question: 请全面分析这张焊缝图片，包括：焊缝质量、有无缺陷、图像质量等
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T02:31:48.273756+00:00'
+  arguments_preview:
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    nodes: '[{"id": "iqa_1", "capability": "defect_detection", "depends_on": [], "description":
+      "图像质量评估：检查图片是否可用...(truncated)'
+    reason: 用户要求对焊缝图片进行标注，需要先做IQA确保图像质量可用，然后通过Label Studio创建标注任务上传图片。
+  session_id: sess_1782959170890
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:11:56.567021+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:11:56.639524+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:11:56.711367+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T04:11:56.792982+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T04:11:56.871830+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:11:56.901557+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:14:56.659815+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: Tool adjust_parameter requires a reason'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:14:56.736367+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:14:56.810098+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T04:14:56.890085+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T04:14:56.970881+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T04:14:57.001308+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T06:48:43.388323+00:00'
+  arguments_preview:
+    parameter_name: current
+    proposed_value: 200A
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T06:48:43.463199+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T06:48:43.531896+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: adjust_parameter
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating adjust_parameter required fields before
+    LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T06:48:43.564855+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:08:35.313635+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:08:35.385315+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:08:35.454363+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:08:35.547278+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:08:35.616543+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:08:35.647022+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:09:17.005496+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:09:17.104456+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:09:17.174657+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:09:17.252599+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:09:17.324766+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:09:17.355799+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:10:42.113170+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:10:42.199456+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:10:42.270814+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:10:42.348294+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-02T07:10:42.423187+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-02T07:10:42.454269+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-02T09:44:28.945401+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782959170890:0
+    question: 请分析这张花卉图片的整体质量：分辨率、曝光、对焦、完整性，以及图中紫色花朵的分布情况，是否适合做标注
+    session_id: sess_1782959170890
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:44:35.198669+00:00'
+  arguments_preview:
+    workflow_name: 花卉图片质检-预处理-标注工作流
+    workflow_description: 对花卉图片进行质量检测、图像预处理优化，最后在Label Studio上创建标注任务，标出图中所有紫色花朵
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "description": "图像质量检测：检查分辨率...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''reason'' is a required property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:44:37.961633+00:00'
+  arguments_preview:
+    workflow_name: 花卉图片质检-预处理-标注工作流
+    workflow_description: 对花卉图片进行质量检测、图像预处理优化，最后在Label Studio上创建标注任务，标出图中所有紫色花朵
+    objective: 从图像质量检测开始，经过预处理优化，最终在Label Studio平台上创建标注任务，对图片中的紫色花朵进行标注
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "description": "图像质量检测：检查分辨率...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[2]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:44:40.944372+00:00'
+  arguments_preview:
+    workflow_name: 花卉图片质检-预处理-标注工作流
+    workflow_description: 对花卉图片进行质量检测、图像预处理优化，最后在Label Studio上创建标注任务，标出图中所有紫色花朵
+    objective: 从图像质量检测开始，经过预处理优化，最终在Label Studio平台上创建标注任务，对图片中的紫色花朵进行标注
+    reason: 用户提供了一张花卉图片，希望完成从质量检测到预处理再到标注的完整流程，最终标注出图中所有紫色花朵
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "description": "图像质量检测：检查分辨率...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:57:44.651176+00:00'
+  arguments_preview:
+    name: 花卉图像质量评估与标注工作流
+    description: 对花卉图片进行质量检测 → 图像预处理 → 在Label Studio中创建标注任务找出紫色花朵
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": null,
+      "input_data": {"question":...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''reason'' is a required property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:57:47.697625+00:00'
+  arguments_preview:
+    name: 花卉图像质量评估与标注工作流
+    objective: 对花卉图片进行质量检测、图像预处理，并在Label Studio中创建标注任务找出紫色花朵区域
+    description: 对花卉图片进行质量检测 → 图像预处理 → 在Label Studio中创建标注任务找出紫色花朵
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": null,
+      "input_data": {"question":...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[2]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T09:57:50.994311+00:00'
+  arguments_preview:
+    name: 花卉图像质量评估与标注工作流
+    objective: 对花卉图片进行质量检测、图像预处理，并在Label Studio中创建标注任务找出紫色花朵区域
+    description: 对花卉图片进行质量检测 → 图像预处理 → 在Label Studio中创建标注任务找出紫色花朵
+    reason: 用户要求针对花卉图片设计一个包含质量检测、预处理和标注（找出紫色花朵）的方案，需要编排IQA、PPA、Annotation三个能力节点
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": null,
+      "input_data": {"question":...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:01:02.632558+00:00'
+  arguments_preview:
+    case_id: CASE_FLOWER_001
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "input_data": {"image_ref":
+      "PENDING:sess_1782...(truncated)'
+    workflow_name: 花卉图像质检标注工作流
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[2]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:01:05.873338+00:00'
+  arguments_preview:
+    objective: 对花卉图像依次进行质量评估(IQA)、图像预处理(PPA)，最后通过Label Studio标注紫色花朵区域
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "input_data": {"image_ref":
+      "PENDING:sess_1782...(truncated)'
+    workflow_name: 花卉图像质检标注工作流
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:01:09.445743+00:00'
+  arguments_preview:
+    objective: 对花卉图像依次进行质量评估(IQA)、图像预处理(PPA)，最后通过Label Studio标注紫色花朵区域
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    nodes: '[{"node_id": "iqa_node", "capability": "defect_detection", "input_data":
+      {"image_ref": "PENDING:sess...(truncated)'
+    workflow_name: 花卉图像质检标注工作流
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:03:34.136316+00:00'
+  arguments_preview:
+    nodes: '[{"id": "get_job_info", "capability": "annotation", "depends_on": [],
+      "input_data": {"action": "get_...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    workflow_name: 查询标注作业详情
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[0]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:03:35.973451+00:00'
+  arguments_preview:
+    nodes: '[{"id": "get_job_info", "capability": "annotation", "depends_on": [],
+      "input_data": {"action": "get_...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    workflow_name: 查询标注作业详情
+    objective: 查询标注作业job-10042的详细信息
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:03:37.611940+00:00'
+  arguments_preview:
+    nodes: '[{"node_id": "get_job_info", "capability": "annotation", "depends_on":
+      [], "input_data": {"action": ...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    workflow_name: 查询标注作业详情
+    objective: 查询标注作业job-10042的详细信息
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:10:05.810385+00:00'
+  arguments_preview:
+    nodes: '[{"id": "node1", "capability": "annotation", "depends_on": [], "input_data":
+      {"action": "list_datase...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    title: 列出数据集
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[0]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:10:07.303543+00:00'
+  arguments_preview:
+    nodes: '[{"id": "node1", "capability": "annotation", "depends_on": [], "input_data":
+      {"action": "list_datase...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    title: 列出Label Studio数据集
+    objective: 查询Label Studio中的所有可用数据集
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:10:08.727361+00:00'
+  arguments_preview:
+    nodes: '[{"node_id": "node1", "capability": "annotation", "depends_on": [], "input_data":
+      {"action": "list_d...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    title: 列出Label Studio数据集
+    objective: 查询Label Studio中的所有可用数据集
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at (root): ''objective'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:12:41.245775+00:00'
+  arguments_preview:
+    nodes: '[{"id": "node1", "capability": "annotation", "input_data": {"action":
+      "list_datasets"}, "depends_on"...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    description: 测试标注工具MCP操作：list_datasets → list_jobs → get_job → list_tasks
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'Schema validation failed at $.nodes[3]: ''node_id'' is a required
+    property'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:12:43.853754+00:00'
+  arguments_preview:
+    objective: 测试标注工具的多个MCP操作，依次执行list_datasets列数据集、list_jobs列作业、get_job查看作业详情、list_tasks列出子任务
+    nodes: '[{"id": "node1", "capability": "annotation", "input_data": {"action":
+      "list_datasets"}, "depends_on"...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    description: 测试标注工具MCP操作：list_datasets → list_jobs → get_job → list_tasks
+  session_id: sess_1782959170890
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-02T10:12:47.299373+00:00'
+  arguments_preview:
+    objective: 测试标注工具的多个MCP操作：列出数据集、列出作业、查看作业详情、列出子任务
+    nodes: '[{"node_id": "list_ds", "capability": "annotation", "input_data": {"action":
+      "list_datasets"}, "depe...(truncated)'
+    image_refs:
+    - PENDING:sess_1782959170890:0
+    description: 测试标注工具MCP操作：list_datasets → list_jobs → get_job → list_tasks
+  session_id: sess_1782959170890
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-03T02:15:53.751102+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782987937151:0
+    question: 分析这张焊缝图像的整体质量，包括是否存在缺陷、焊缝成型情况、质量等级等
+    session_id: sess_1782987937151
+  session_id: sess_1782987937151
+- tool_name: design_workflow
+  failure_pattern: design_workflow 缺少必填字段 'objective'。请提供 objective 参数，用一句话描述质检目标（如
+    '检测这张焊缝图的质量缺陷'）。
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T02:18:53.240609+00:00'
+  arguments_preview:
+    title: 焊缝质量综合检测方案
+    description: 对焊缝图像进行质量评估、缺陷识别、几何测量和风险评估的全流程检测方案
+    image_refs:
+    - PENDING:sess_1782987937151:0
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "input_data": {"question": "...(truncated)'
+    on_failure: escalate
+  session_id: sess_1782987937151
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T02:18:57.166012+00:00'
+  arguments_preview:
+    nodes: '[{"depends_on": [], "id": "iqa_node", "capability": "defect_detection",
+      "input_data": {"question": "...(truncated)'
+    objective: 检测这张焊缝图片的质量缺陷，识别气孔等缺陷类型及位置，测量几何尺寸，评估风险等级
+    title: 焊缝质量综合检测方案
+    description: 对焊缝图像进行质量评估、缺陷识别、几何测量和风险评估的全流程检测方案
+    image_refs:
+    - PENDING:sess_1782987937151:0
+    on_failure: escalate
+  session_id: sess_1782987937151
+- tool_name: design_workflow
+  failure_pattern: design_workflow 缺少必填字段 'objective'。请提供 objective 参数，用一句话描述质检目标（如
+    '检测这张焊缝图的质量缺陷'）。
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T02:35:37.035788+00:00'
+  arguments_preview:
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "label": "图像质量评估 (IQA)", "in...(truncated)'
+    image_refs:
+    - PENDING:sess_1783045944648:0
+    workflow_name: IQA-PPA-标注工作流
+  session_id: sess_1783045944648
+- tool_name: design_workflow
+  failure_pattern: 'PolicyHook DENY: Tool design_workflow requires a reason'
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T02:35:39.901580+00:00'
+  arguments_preview:
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "label": "图像质量评估 (IQA)", "in...(truncated)'
+    image_refs:
+    - PENDING:sess_1783045944648:0
+    workflow_name: IQA-PPA-标注工作流
+    objective: 对焊缝图像进行质量检测、图像预处理后创建Label Studio标注作业，标记气孔、未熔合、咬边等缺陷
+  session_id: sess_1783045944648
+- tool_name: launch_workflow
+  failure_pattern: launch_workflow 缺少必填字段 'reason'。请在调用时提供 reason 参数。
+  suggested_rule: Consider pre-validating launch_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T02:35:53.313187+00:00'
+  arguments_preview:
+    workflow_id: wf-6a7096df
+  session_id: sess_1783045944648
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:24:15.969604+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:24:16.056371+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:24:16.138814+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T03:24:16.230622+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T03:24:16.326201+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:24:16.362558+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:44:28.314259+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:44:28.400943+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:44:28.486255+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T03:44:28.580533+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T03:44:28.677932+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:44:28.715376+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: design_workflow
+  failure_pattern: design_workflow 缺少必填字段 'objective'。请提供 objective 参数，用一句话描述质检目标（如
+    '检测这张焊缝图的质量缺陷'）。
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T03:56:05.211716+00:00'
+  arguments_preview:
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "input_data": {"question": "...(truncated)'
+    image_refs:
+    - PENDING:sess_1783050741584:0
+  session_id: sess_1783050741584
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T05:26:34.095164+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T05:26:34.184406+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T05:26:34.273026+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T05:26:34.371421+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T05:26:34.473805+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T05:26:34.512351+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-03T05:33:17.638574+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1783056641729:0
+    question: 分析焊缝图像质量，检测是否存在缺陷
+    session_id: sess_1783056641729
+  session_id: sess_1783056641729
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-03T05:34:50.035606+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1783056641729:0
+    question: 焊缝质量评估，检查曝光、对焦、完整性等基础质量指标
+    session_id: sess_1783056641729
+  session_id: sess_1783056641729
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:41.634608+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:41.725993+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:41.816127+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:34:41.914787+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:34:42.016529+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:42.055623+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:50.926251+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:51.027747+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:51.119063+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:34:51.216438+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:34:51.307317+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:34:51.347236+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:42:07.032248+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:42:07.125902+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:42:07.217799+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:42:07.319481+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T06:42:07.423957+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T06:42:07.464505+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-03T07:33:17.086678+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1783063684791:0
+    question: 请全面分析这张焊缝图像的质量、缺陷情况、清晰度、曝光等
+    session_id: sess_1783063684791
+  session_id: sess_1783063684791
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:39:40.937342+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:39:41.038056+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:39:41.135567+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:39:41.254762+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:39:41.352855+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:39:41.395640+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:02.473758+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:02.573321+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:02.673536+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:40:02.796034+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:40:02.895234+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:02.938561+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:15.204084+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:15.313033+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:15.412589+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:40:15.518573+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:40:15.619628+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:40:15.664585+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:47:04.416741+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:47:04.526397+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:47:04.648137+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:47:04.758325+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T08:47:04.861214+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T08:47:04.905423+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:00:31.138274+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:00:31.246364+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:00:31.351465+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:00:31.475812+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:00:31.579463+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:00:31.624375+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:05:17.492008+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:05:17.601625+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:05:17.706960+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:05:17.835280+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:05:17.940697+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:05:17.986691+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: design_workflow
+  failure_pattern: design_workflow 缺少必填字段 'objective'。请提供 objective 参数，用一句话描述质检目标（如
+    '检测这张焊缝图的质量缺陷'）。
+  suggested_rule: Consider pre-validating design_workflow required fields before LLM
+    call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:07:35.239626+00:00'
+  arguments_preview:
+    nodes: '[{"id": "iqa_node", "capability": "defect_detection", "depends_on": [],
+      "input_data": {"image_refs":...(truncated)'
+    image_refs:
+    - PENDING:sess_1783069275640:0
+  session_id: sess_1783069275640
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:38:49.257986+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:38:49.365235+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:38:49.470926+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:38:49.600030+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-03T09:38:49.706338+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-03T09:38:49.752134+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-05T08:57:06.971180+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-05T08:57:07.080631+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-05T08:57:07.186710+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-05T08:57:07.312048+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-05T08:57:07.418868+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-05T08:57:07.464827+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:52:39.981710+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:52:40.096390+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:52:40.210180+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:52:40.419631+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:53:59.384001+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:53:59.497624+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:53:59.611589+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T05:53:59.747447+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T05:53:59.860317+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T05:53:59.909032+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-06T05:59:52.850967+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782987937151:1
+    question: 请全面分析这张焊缝图像：焊缝质量、缺陷情况、表面状态、质量等级
+    session_id: sess_1782987937151
+  session_id: sess_1782987937151
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-06T06:01:25.256377+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782987937151:1
+    question: 请分析这张焊缝图像：焊缝质量、缺陷情况、表面状态
+    session_id: sess_1782987937151
+  session_id: sess_1782987937151
+- tool_name: analyze_image
+  failure_pattern: Tool execution exceeded 90.0s
+  suggested_rule: Consider adding async timeout hint to analyze_image description
+    or splitting work
+  trigger_event: timeout
+  ts: '2026-07-06T06:04:40.477461+00:00'
+  arguments_preview:
+    image_ref: PENDING:sess_1782987937151:1
+    question: 请检测所有焊缝缺陷，评估质量等级，依据GB/T3323标准判定是否合格
+    session_id: sess_1782987937151
+  session_id: sess_1782987937151
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T06:24:35.873991+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T06:24:35.989499+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T06:24:36.104899+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T06:24:36.241593+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T06:24:36.356203+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T06:24:36.406326+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:06:48.646462+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:06:48.763956+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:06:48.882605+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T07:06:49.031178+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T07:06:49.147475+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:06:49.205834+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:17:21.874624+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:17:22.017255+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:17:22.135709+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T07:17:22.272547+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-06T07:17:22.390722+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-06T07:17:22.441391+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:17:21.659226+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:17:21.781867+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:17:21.914901+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:17:22.040785+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:17:22.160556+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:17:22.212550+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:18:41.042391+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:18:41.184004+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:18:41.303503+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:18:41.430719+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:18:41.550492+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:18:41.602652+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:45:43.584866+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:45:43.706010+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:45:43.825285+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:45:43.950427+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:45:44.069337+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:45:44.120833+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:56:26.799209+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:56:26.921155+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:56:27.041265+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:56:27.167389+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T04:56:27.287493+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T04:56:27.339512+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T05:49:44.219506+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: Tool escalate requires a reason'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T05:49:44.347490+00:00'
+  arguments_preview:
+    target: human_review
+    summary: 需要人工介入
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'PolicyHook DENY: first-deny'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T05:49:44.471943+00:00'
+  arguments_preview:
+    reason: test
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T05:49:44.614919+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: web_search
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider tightening web_search parameter schema or adding examples
+  trigger_event: schema_fail
+  ts: '2026-07-08T05:49:44.739293+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default
+- tool_name: escalate
+  failure_pattern: 'Invalid JSON arguments: Expecting property name enclosed in double
+    quotes: line 1 column 2 (char 1). Raw: {not valid json'
+  suggested_rule: Consider pre-validating escalate required fields before LLM call
+  trigger_event: reask_reject
+  ts: '2026-07-08T05:49:44.792871+00:00'
+  arguments_preview:
+    raw: '{not valid json'
+  session_id: default

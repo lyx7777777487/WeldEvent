@@ -16,6 +16,7 @@ from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.tools import BrainTool, ToolResult
 
 if TYPE_CHECKING:
+    from cognitiveplane.control.react import ApprovalStore
     from cognitiveplane.interaction.image_store import ImageStore
 
 
@@ -31,6 +32,7 @@ class ToolRegistry:
         deps: CognitiveDependencies | None = None,
         image_store: "ImageStore | None" = None,
         current_phase: int = 3,
+        approval_store: "ApprovalStore | None" = None,
     ) -> None:
         """Construct registry. If deps given, auto-register tools from deps.
 
@@ -41,9 +43,13 @@ class ToolRegistry:
             BrainTool.phase > current_phase 时仍注册 (execute() 可显式调用) 但
             get_llm_tool_definitions() 不暴露 — LLM 看不到也调不到. 默认 3 = 当前
             Phase 3 (2026-06-26 从 2 上调). 推进到 Phase 4+ 时调高即可隐藏未就绪工具.
+        approval_store: 架构级 approval gate 共享存储。传入后 RequestConfirmationTool
+            会用它阻塞等待用户在弹窗里的选项响应。None 时退化为非阻塞模式
+            （LLM 拿不到用户的选择）。
         """
         self._tools: dict[str, BrainTool] = {}
         self._current_phase = current_phase
+        self._approval_store = approval_store
         if deps is not None:
             self._register_tools(deps, image_store)
 
@@ -75,6 +81,7 @@ class ToolRegistry:
         from cognitiveplane.control.tools.archive_memory import ArchiveMemoryTool
         from cognitiveplane.control.tools.web_search import WebSearchTool
         from cognitiveplane.control.tools.analyze_image import AnalyzeImageTool
+        from cognitiveplane.control.tools.upload_image_to_dataset import UploadImageToDatasetTool
 
         # Knowledge tools
         if deps.knowledge.standards_query is not None:
@@ -92,6 +99,15 @@ class ToolRegistry:
                 image_store,
             ))
 
+        # L1 包装工具 — image_ref → Label Studio 数据集上传。
+        # 解决 LLM 有 image_ref 但 MCP upload_images 需要 base64 的断层。
+        # tool_registry 引用延迟注入 (MCP upload_images 注册后才能调)。
+        if image_store is not None:
+            self.register(UploadImageToDatasetTool(
+                image_store=image_store,
+                tool_registry=self,
+            ))
+
         # Gateway tools
         if deps.gateway.read is not None:
             self.register(ReadWeldMapTool(deps.gateway.read))
@@ -107,12 +123,16 @@ class ToolRegistry:
         # image_refs（PENDING:session_id:index）→ 磁盘 image_path，供 L3 IQA/PPA 读取
         if deps.bridge.event_connector is not None:
             self.register(LaunchWorkflowTool(deps, image_store=image_store))
+            # P1-6: 工作流控制工具 — query/pause/resume/cancel 正在执行的 workflow
+            # 让 LLM 能通过自然语言介入工作流执行过程
+            from cognitiveplane.control.tools.workflow_control import WorkflowControlTool
+            self.register(WorkflowControlTool(deps))
 
         # Human interaction tools
         if deps.gateway.write is not None:
-            self.register(RequestConfirmationTool(deps.gateway.write))
+            self.register(RequestConfirmationTool(deps.gateway.write, approval_store=self._approval_store))
         else:
-            self.register(RequestConfirmationTool())
+            self.register(RequestConfirmationTool(approval_store=self._approval_store))
         if deps.governance.validation is not None and deps.gateway.write is not None:
             self.register(EscalateTool(deps.governance.validation, deps.gateway.write))
 
@@ -136,27 +156,40 @@ class ToolRegistry:
         # 场景按需 opt-in (见 boundary-pinning spec §BrainToolRegistry profile).
         # 工具类本身保留, 测试可直接构造 ManagePlanTool() 验证功能.
 
-    def get_llm_tool_definitions(self) -> list[dict]:
+    def get_llm_tool_definitions(
+        self, allowed_tools: list[str] | None = None
+    ) -> list[dict]:
         """Return tool definitions in LLM Function Calling format.
 
         Boundary-pinning 2026-06-25: 过滤 phase > current_phase 的工具 — 它们仍
         在注册表里 (execute() 可显式调用), 但不出现在 LLM 工具表里, 防止未就绪
         工具被 LLM 误调用.
+
+        Phase 5 Agent Skills: 传入 allowed_tools 可进一步按 skill 白名单过滤。
         """
-        return [
+        allowed = set(allowed_tools) if allowed_tools is not None else None
+        defs = [
             tool.to_function_definition()
             for tool in self._tools.values()
             if self.is_llm_visible(tool.name)
+            and (allowed is None or tool.name in allowed)
         ]
+        return defs
 
     def is_llm_visible(self, tool_name: str) -> bool:
         """Whether a tool is visible/callable from the Brain LLM at this phase."""
         tool = self._tools.get(tool_name)
         return tool is not None and getattr(tool, "phase", 1) <= self._current_phase
 
-    def list_llm_tools(self) -> list[str]:
+    def list_llm_tools(self, allowed_tools: list[str] | None = None) -> list[str]:
         """List tools visible to the Brain LLM at this phase."""
-        return [name for name in self._tools if self.is_llm_visible(name)]
+        allowed = set(allowed_tools) if allowed_tools is not None else None
+        return [
+            name
+            for name in self._tools
+            if self.is_llm_visible(name)
+            and (allowed is None or name in allowed)
+        ]
 
     def validate_arguments(self, tool_name: str, arguments: dict) -> tuple[bool, str | None]:
         """Plan §3.5 原则 5: validate arguments against tool's JSON Schema before execution.

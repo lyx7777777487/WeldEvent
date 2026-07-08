@@ -3,6 +3,8 @@
 用于开发和测试环境。生产环境应替换为基于 OpenCV 的实现。
 """
 
+import asyncio
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -103,45 +105,34 @@ class NumpyCVRuleChecker(CVRuleChecker):
             ),
         )
 
+    # ------------------------------------------------------------------
+    # 综合规则
+    # ------------------------------------------------------------------
+
     async def run_all_rules(
-        self, image: NDArray[np.uint8], confidence_threshold: float = 0.85
+        self, image: NDArray[np.uint8],
+        confidence_threshold: float = 0.85,
     ) -> RuleEngineOutput:
-        """执行全部规则并计算综合置信度。"""
-        results = [
-            await self.check_resolution(image),
-            await self.check_exposure(image),
-            await self.check_focus(image),
-            await self.check_completeness(image),
-        ]
-        
-        # 综合置信度: 通过规则数 / 总规则数（可加权）
-        n_passed = sum(1 for r in results if r.passed)
-        n_total = len(results)
-        confidence = n_passed / n_total if n_total > 0 else 0.0
-        
-        # ERROR 级别违规直接拉低置信度
-        error_penalty = sum(0.25 for r in results 
-                          if not r.passed and r.severity == RuleSeverity.ERROR)
-        confidence = max(0.0, confidence - error_penalty)
-        
-        # 路由决策
-        if confidence >= confidence_threshold:
+        """执行全部规则并返回综合结果。"""
+        results = list(await asyncio.gather(
+            self.check_resolution(image),
+            self.check_exposure(image),
+            self.check_focus(image),
+            self.check_completeness(image),
+        ))
+        all_passed = all(r.passed for r in results)
+        avg_confidence = float(np.mean([
+            getattr(r, 'confidence', 1.0) for r in results
+        ]))
+        if avg_confidence >= confidence_threshold and all_passed:
             route = "AUTO_PASS"
-        elif confidence >= 0.5:
+        elif all_passed:
             route = "SUGGEST_REVIEW"
-        elif confidence >= 0.25:
-            route = "MANDATORY_REVIEW"
         else:
-            route = "REJECT"
-        
-        # 有 ERROR 级别违规时至少 REVIEW
-        if any(not r.passed and r.severity == RuleSeverity.ERROR for r in results):
-            if route == "AUTO_PASS":
-                route = "SUGGEST_REVIEW"
-        
+            route = "MANDATORY_REVIEW"
         return RuleEngineOutput(
             results=results,
-            overall_confidence=round(confidence, 4),
+            overall_confidence=avg_confidence,
             route_decision=route,
         )
 

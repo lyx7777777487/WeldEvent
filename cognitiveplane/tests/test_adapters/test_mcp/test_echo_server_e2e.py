@@ -41,9 +41,9 @@ from cognitiveplane.control.deps import (
 )
 from cognitiveplane.control.event_log import EventLog
 from cognitiveplane.control.hooks import SafetyHook
-from cognitiveplane.control.mcp_registry import MCPRegistry
+from cognitiveplane.control.registry.mcp_registry import MCPRegistry
 from cognitiveplane.control.react import ReActEngine
-from cognitiveplane.control.tool_registry import ToolRegistry
+from cognitiveplane.control.registry.tool_registry import ToolRegistry
 from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
 from cognitiveplane.shared.types import CaseId

@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -18,6 +19,8 @@ from .models import (
     WeldMapSnapshot,
 )
 from .watcher import StateWatcher
+
+logger = logging.getLogger(__name__)
 
 
 class InMemoryStateWatcher(StateWatcher):
@@ -123,6 +126,8 @@ class InMemoryWeldMapClient(WeldMapClient):
             self._set_path_value(snapshot, str(path), value)
             snapshot.version += 1
             snapshot.updated_at = datetime.now(timezone.utc)
+            # 锁内捕获 version，避免并发写入导致返回值不一致
+            new_version = snapshot.version
 
             event = WeldMapEvent(
                 event_type=f"{path.replace('/', '_')}_updated",
@@ -133,15 +138,18 @@ class InMemoryWeldMapClient(WeldMapClient):
             )
             snapshot.events.append(event.model_dump())
 
+            # 在锁内构造 WriteResult，使用捕获的 version 避免竞态
+            write_result = WriteResult(
+                success=True,
+                path=str(path),
+                version=new_version,
+                conflict=False,
+            )
+
         # 通知订阅者在锁外执行（避免回调内调 write_path 死锁）
         await self._watcher.notify_write(workflow_id, path, value)
 
-        return WriteResult(
-            success=True,
-            path=str(path),
-            version=snapshot.version,
-            conflict=False,
-        )
+        return write_result
 
     async def append_event(self, workflow_id: WorkflowId, event: WeldMapEvent) -> None:
         async with self._lock:
@@ -174,7 +182,7 @@ class InMemoryWeldMapClient(WeldMapClient):
         # 支持更多路径
         path_mapping = {
             "image/quality": snapshot.image_quality,
-            "image/preprocess": snapshot.image_quality,  # 暂时映射到image_quality（后续可扩展）
+            "image/preprocess": snapshot.image_preprocess,
             "mask": snapshot.mask,
             "annotations": snapshot.annotations,
             "validation": snapshot.validation,
@@ -198,8 +206,7 @@ class InMemoryWeldMapClient(WeldMapClient):
         if path == "image/quality" and isinstance(value, ImageQualityReport):
             snapshot.image_quality = value
         elif path == "image/preprocess":
-            # 预处理结果存储在events中（后续可扩展Snapshot模型）
-            pass  # 通过events自动记录
+            snapshot.image_preprocess = value
         elif path == "mask" and isinstance(value, MaskData):
             snapshot.mask = value
         elif path == "annotations" and isinstance(value, AnnotationsData):
@@ -210,4 +217,4 @@ class InMemoryWeldMapClient(WeldMapClient):
             snapshot.decision = value
         else:
             # 其他路径写入到events中
-            pass  # 通过events自动记录
+            logger.debug("WeldMap unknown path written: %s", path)  # 通过events自动记录

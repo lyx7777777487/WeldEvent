@@ -256,7 +256,7 @@ class TestIdentityTypes:
         _roundtrip(KnowledgeId, obj)
 
     def test_session_id(self):
-        obj = SessionId(value=UUID4)
+        obj = SessionId(value=str(UUID4))
         _roundtrip(SessionId, obj)
 
     def test_event_id(self):
@@ -1067,7 +1067,7 @@ class TestCollaborationDTOs:
 
     def test_conversation_session(self):
         obj = ConversationSession(
-            session_id=SessionId(value=UUID4),
+            session_id=SessionId(value=str(UUID4)),
             decision_id=DecisionId(value=UUID4),
             operator_id="OP-001",
             messages=[ConversationMessage(role="operator", content="Question", timestamp=NOW)],

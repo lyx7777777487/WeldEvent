@@ -22,7 +22,7 @@ from cognitiveplane.control.deps import (
     CognitiveDependencies,
 )
 from cognitiveplane.control.react import ReActEngine, InteractionTier
-from cognitiveplane.control.tool_registry import ToolRegistry
+from cognitiveplane.control.registry.tool_registry import ToolRegistry
 from cognitiveplane.control.tools import BrainTool, ToolResult
 from cognitiveplane.control.tools.launch_workflow import LaunchWorkflowTool
 from cognitiveplane.bridge.event_connector import EventConnector
@@ -125,23 +125,38 @@ class TestTemporalClientReconnect:
 
     @pytest.mark.asyncio
     async def test_reconnect_after_connection_failure(self):
-        """P2-fix: 第一次 submit 失败后，第二次 submit 应触发重新建连.
+        """P1-R3-2: 连接失败置 None 后，下次 submit 应重新建连并成功.
 
-        原测试只验证了"失败→置 None"，没验证"置 None 后下次 _ensure_client 重新建连"。
+        验证完整的断线重连链路：
+          1. 首次 _ensure_client 抛连接异常 → submit 返回 accepted=False
+          2. _maybe_invalidate_client 置 _client=None
+          3. 第二次 submit → _ensure_client 重新调用 → 建连成功
+          4. start_workflow 成功 → submit 返回 accepted=True
+
+        原测试用字符串 fake client（无 start_workflow），第二次 submit 实际
+        会抛 AttributeError，只验证了重试计数器自增，未验证重连后功能恢复。
         """
+        class _FakeHandle:
+            """Fake Temporal workflow handle with run_id."""
+            run_id = "run-reconnected-001"
+
+        class _FakeTemporalClient:
+            """Fake Temporal Client supporting start_workflow."""
+            async def start_workflow(self, *args, **kwargs):
+                return _FakeHandle()
+
         port = TemporalWorkflowLaunchPort(temporal_host="localhost:9999")
-        port._client = None
+        port._client = None  # 初始无连接
 
-        connect_call_count = 0
+        connect_attempts = 0
 
-        # 第一次 _ensure_client 失败，第二次成功
         async def _flaky_connect():
-            nonlocal connect_call_count
-            connect_call_count += 1
-            if connect_call_count == 1:
+            nonlocal connect_attempts
+            connect_attempts += 1
+            if connect_attempts == 1:
                 raise ConnectionRefusedError("first attempt fails")
-            # 第二次返回一个 fake client
-            port._client = "reconnected-fake-client"
+            # 第二次返回真实可用的 fake client
+            port._client = _FakeTemporalClient()
             return port._client
 
         port._ensure_client = _flaky_connect
@@ -152,21 +167,20 @@ class TestTemporalClientReconnect:
             nodes=[WorkflowNode(node_id="n1", type="tool_task")],
         )
 
-        # 第一次 submit — 失败
+        # 第一次 submit — _ensure_client 抛 ConnectionRefusedError → accepted=False
         result1 = await port.submit(spec)
         assert result1.accepted is False
         assert result1.error == "Temporal service unavailable"
-        # P1-R3-2: 失败后 _client 应被置 None（触发重连）
         assert port._client is None, "失败后 _client 应为 None 触发重连"
-        assert connect_call_count == 1
+        assert connect_attempts == 1
 
-        # 第二次 submit — 应触发重新建连（_ensure_client 被重新调用）
-        # 由于 fake client 没有 start_workflow 方法，会抛 AttributeError
-        # 但重点是 connect_call_count 应为 2，证明重连被触发
+        # 第二次 submit — _ensure_client 重新调用 → 返回可用 fake client → accepted=True
         result2 = await port.submit(spec)
-        assert connect_call_count == 2, "第二次 submit 应触发重新建连"
-        # 第二次 _ensure_client 成功设置了 _client，但 start_workflow 会失败
-        # 因为 fake client 没有该方法 — 这证明了重连确实发生了
+        assert connect_attempts == 2, "第二次 submit 应触发重新建连"
+        assert result2.accepted is True, "重连后 submit 应成功"
+        assert result2.run_id == "run-reconnected-001"
+        assert result2.adapter == "temporal"
+        assert port._client is not None, "重连成功后 _client 应保持有效"
 
 
 # ---------------------------------------------------------------------------
@@ -390,7 +404,11 @@ class TestReActEngineConcurrency:
 
 
 class _AcceptingPort(WorkflowLaunchPort):
-    """Port that always accepts, for testing launch limit."""
+    """Port that always accepts, for testing launch limit.
+
+    实现 query_status 返回 COMPLETED，让 LaunchWorkflowTool._poll_workflow
+    第一轮就检测到完成并 break（避免 60s 轮询超时拖慢测试套件）。
+    """
 
     async def submit(self, spec: WorkflowSpec) -> WorkflowLaunchResult:
         return WorkflowLaunchResult(
@@ -399,6 +417,15 @@ class _AcceptingPort(WorkflowLaunchPort):
             accepted=True,
             adapter="fake",
         )
+
+    async def query_status(self, workflow_id: str) -> dict:
+        return {
+            "status": "COMPLETED",
+            "completed_nodes": [],
+            "failed_nodes": [],
+            "node_results": {},
+            "error": None,
+        }
 
 
 def _make_launch_spec() -> WorkflowSpec:
@@ -434,7 +461,7 @@ class TestLaunchWorkflowRateLimit:
         )
 
         assert result.error is None
-        assert result.output["status"] == "launched"
+        assert result.output["status"] == "COMPLETED"
         assert tool._launch_count == 1
 
     @pytest.mark.asyncio
@@ -446,7 +473,7 @@ class TestLaunchWorkflowRateLimit:
         deps = CognitiveDependencies(bridge=BridgeDeps(event_connector=connector))
         tool = LaunchWorkflowTool(deps)
         # 预设已启动过该 workflow_id
-        tool._launched_ids.add("wf-launch-test")
+        tool._launched_ids["wf-launch-test"] = None
 
         result = await tool.execute(
             workflow_spec=_make_launch_spec().model_dump(),
@@ -457,8 +484,8 @@ class TestLaunchWorkflowRateLimit:
         assert "already launched" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_launch_blocks_at_total_limit(self):
-        """P2-8: 达到全局上限 _MAX_TOTAL_LAUNCHES 后拒绝."""
+    async def test_launch_evicts_oldest_at_total_limit(self):
+        """P3-2: 达到全局上限时 LRU 淘汰最老条目，新 launch 仍成功."""
         port = _AcceptingPort()
         launcher = WorkflowLauncher(port=port)
         connector = EventConnector(launcher=launcher)
@@ -466,15 +493,18 @@ class TestLaunchWorkflowRateLimit:
         tool = LaunchWorkflowTool(deps)
         # 预设到全局上限
         for i in range(tool._MAX_TOTAL_LAUNCHES):
-            tool._launched_ids.add(f"wf-existing-{i}")
+            tool._launched_ids[f"wf-existing-{i}"] = None
 
         result = await tool.execute(
-            workflow_spec=_make_launch_spec().model_dump(),  # wf-launch-test 不在 set 中
+            workflow_spec=_make_launch_spec().model_dump(),  # wf-launch-test 不在 OrderedDict 中
             reason="test",
         )
 
-        assert result.error is not None
-        assert "limit" in result.error.lower()
+        # P3-2: LRU eviction — 新 launch 成功，最老的 wf-existing-0 被淘汰
+        assert result.error is None
+        assert result.output["status"] == "COMPLETED"
+        assert "wf-existing-0" not in tool._launched_ids
+        assert "wf-launch-test" in tool._launched_ids
 
     @pytest.mark.asyncio
     async def test_launch_count_increments_only_on_success(self):

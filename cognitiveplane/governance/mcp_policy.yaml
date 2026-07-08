@@ -1,16 +1,60 @@
 # governance/mcp_policy.yaml
 # Phase 3 第三层人工 override 配置。
 # 优先级最高 — 覆盖 annotations 判定和前缀启发式。
-# Phase 3 起步为空，按需添加 override。
 #
 # 格式:
 #   <tool_name>:
-#     auto_approve: <bool>
-#     tier: "A" | "B"
-#     require_reason: <bool>
+#     auto_approve: <bool>   # 是否自动批准（无需架构拦截）
+#     tier: "A" | "B"         # A=可重试，B=精确执行
+#     require_reason: <bool> # 是否要求 LLM 提供 reason 参数
 #
-# 示例 (Phase 3 不启用，注释样例):
-# echo_tool:
-#   auto_approve: true
-#   tier: "A"
-#   require_reason: false
+# Label Studio 标注工具（10 个）— 2026-07-03 暴露给 L1 Brain LLM
+# 设计:
+#   - 查询类（list_/get_）→ Tier-A，auto_approve=true，LLM 可直接调用
+#   - 写入类（create_/upload_/trigger_/assign_）→ Tier-B，auto_approve=false
+#     架构层在 react.py APPROVAL_REQUIRED_TOOLS 拦截，需用户前端确认
+
+# ── 查询类（Tier-A，LLM 可直接调用）──
+list_datasets:
+  auto_approve: true
+  tier: "A"
+  require_reason: false
+get_dataset:
+  auto_approve: true
+  tier: "A"
+  require_reason: false
+list_jobs:
+  auto_approve: true
+  tier: "A"
+  require_reason: false
+get_job:
+  auto_approve: true
+  tier: "A"
+  require_reason: false
+list_tasks:
+  auto_approve: true
+  tier: "A"
+  require_reason: false
+
+# ── 写入类（Tier-B，走 approval gate 架构拦截）──
+# require_reason=false: 架构层已要求用户确认，不需 LLM 额外提供 reason
+create_job:
+  auto_approve: false
+  tier: "B"
+  require_reason: false
+create_task:
+  auto_approve: false
+  tier: "B"
+  require_reason: false
+trigger_ai:
+  auto_approve: false
+  tier: "B"
+  require_reason: false
+upload_images:
+  auto_approve: false
+  tier: "B"
+  require_reason: false
+assign_task:
+  auto_approve: false
+  tier: "B"
+  require_reason: false

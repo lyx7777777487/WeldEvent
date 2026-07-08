@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """端到端测试：L1 chat/upload → LLM design_workflow(image_refs) → launch_workflow
 → Temporal RunWorkflowSpec → L3 IqaActivity（真实 CV 规则 + 预处理）。
 
@@ -8,6 +7,12 @@
   3. LLM 调 launch_workflow，bridge 把 spec 提交到 Temporal
   4. Temporal RunWorkflowSpec 调 execute_node
   5. execute_node 调 L3 ActivityPool → IqaActivity 真实执行（不是 preprocessing_error）
+
+P2-2 fix: 从脚本式改造为 pytest。
+  - 默认 skip（需 WELDEVENT_RUN_E2E=1 显式启用），避免在普通测试运行时因缺环境而失败。
+  - sys.exit(1) → pytest.fail()；print [PASS]/[FAIL] → assert。
+  - 环境缺失（无 L1 服务 / 无 Temporal / 无测试图片）→ pytest.skip。
+  - 逻辑错误（LLM 未调 launch / IQA 未真实执行）→ pytest.fail。
 """
 from __future__ import annotations
 
@@ -15,10 +20,9 @@ import asyncio
 import json
 import os
 import re
-import sys
 from pathlib import Path
 
-import httpx
+import pytest
 
 # 测试图片
 IMAGE_PATH = Path("/tmp/test_weld.jpg")
@@ -26,21 +30,54 @@ L1_BASE = "http://127.0.0.1:8000"
 TEMPORAL_HOST = "localhost:7233"
 WORKER_LOG = "/tmp/worker.log"
 
+# 默认 skip：需 WELDEVENT_RUN_E2E=1 显式启用（需完整 L1+Temporal+worker 环境）
+_RUN_E2E = os.environ.get("WELDEVENT_RUN_E2E", "").strip() in ("1", "true", "True")
+_SKIP_REASON = (
+    "set WELDEVENT_RUN_E2E=1 to run this end-to-end test "
+    "(requires L1 service on :8000, Temporal on :7233, /tmp/test_weld.jpg)"
+)
+pytestmark = pytest.mark.skipif(not _RUN_E2E, reason=_SKIP_REASON)
+
 
 def banner(msg: str) -> None:
     print(f"\n{'=' * 70}\n{msg}\n{'=' * 70}")
 
 
-def step(n: int, msg: str) -> None:
+def step(n: int | str, msg: str) -> None:
     print(f"\n[Step {n}] {msg}")
+
+
+async def _check_l1_reachable() -> bool:
+    """探测 L1 服务是否可达（/api/v1/health）。"""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=3.0, trust_env=False) as client:
+            resp = await client.get(f"{L1_BASE}/api/v1/health")
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
+async def _check_temporal_reachable() -> bool:
+    """探测 Temporal 是否可达。"""
+    try:
+        from temporalio.client import Client
+        await asyncio.wait_for(
+            Client.connect(TEMPORAL_HOST, namespace="default"),
+            timeout=3.0,
+        )
+        return True
+    except Exception:
+        return False
 
 
 async def upload_design_and_launch() -> dict:
     """Step 1+2+3: 单轮上传 + design + launch（ReAct 多轮工具调用）"""
     step(1, "上传图片 + 让 LLM 设计并启动工作流（单轮多工具调用）")
 
+    import httpx
     if not IMAGE_PATH.exists():
-        raise FileNotFoundError(f"测试图片不存在: {IMAGE_PATH}")
+        pytest.skip(f"测试图片不存在: {IMAGE_PATH}")
 
     with open(IMAGE_PATH, "rb") as f:
         files = [("files", ("test_weld.jpg", f.read(), "image/jpeg"))]
@@ -63,9 +100,7 @@ async def upload_design_and_launch() -> dict:
             files=files,
         )
     print(f"  HTTP status: {resp.status_code}")
-    if resp.status_code != 200:
-        print(f"  ERROR response: {resp.text[:500]}")
-        sys.exit(1)
+    assert resp.status_code == 200, f"upload 返回非 200: {resp.status_code}, body={resp.text[:500]}"
 
     data = resp.json()
     print(f"  session_id: {data.get('session_id')}")
@@ -103,7 +138,7 @@ async def query_temporal_workflow(workflow_id: str) -> dict:
     # 先等 workflow 完成（最多 30 秒）
     print(f"  等待 workflow 完成（最多 30 秒）...")
     try:
-        result = await asyncio.wait_for(handle.result(), timeout=30.0)
+        await asyncio.wait_for(handle.result(), timeout=30.0)
         print(f"  workflow 已完成")
     except asyncio.TimeoutError:
         print(f"  WARN: workflow 30 秒内未完成，尝试 query 当前状态")
@@ -146,15 +181,21 @@ def print_worker_log_tail() -> None:
         print(f"  (worker log 不存在: {WORKER_LOG})")
 
 
-async def main() -> None:
+@pytest.mark.asyncio
+async def test_l1_l2_l3_end_to_end_flow() -> None:
+    """端到端：L1 upload → LLM design+launch → Temporal → L3 IQA 真实执行."""
     banner("L1 -> LLM -> L2 Temporal -> L3 IQA 端到端测试")
+
+    # 环境探测 — 任一不可达则 skip（非逻辑错误）
+    if not await _check_l1_reachable():
+        pytest.skip(f"L1 service not reachable at {L1_BASE}")
+    if not await _check_temporal_reachable():
+        pytest.skip(f"Temporal not reachable at {TEMPORAL_HOST}")
 
     # Step 1+2+3: 单轮上传 + 设计 + 启动
     resp = await upload_design_and_launch()
     session_id = resp.get("session_id")
-    if not session_id:
-        print("X 没有 session_id，退出")
-        sys.exit(1)
+    assert session_id, "响应缺少 session_id"
 
     tools_used = resp.get("tools_used", [])
     has_design = "design_workflow" in tools_used
@@ -162,20 +203,17 @@ async def main() -> None:
     print(f"\n  design_workflow called: {has_design}")
     print(f"  launch_workflow called: {has_launch}")
 
-    if not has_launch:
-        print(f"\nWARN: LLM 没有调用 launch_workflow（tools_used={tools_used}）")
-        print("  可能 LLM 想等用户确认。继续尝试查询 workflow_id（如果 LLM 在回复里提到了）")
+    assert has_design, f"LLM 未调用 design_workflow (tools_used={tools_used})"
+    assert has_launch, f"LLM 未调用 launch_workflow (tools_used={tools_used})"
 
     # Step 4: 提取 workflow_id
     workflow_id = find_workflow_id_in_reply(resp.get("reply", ""))
-
     step(4, "提取 workflow_id")
-    if workflow_id is None:
-        print(f"  X 未能从 LLM 回复中提取 workflow_id")
-        print(f"  reply (前 800): {resp.get('reply', '')[:800]}")
-        print(f"  tools_used: {tools_used}")
-        print_worker_log_tail()
-        sys.exit(1)
+    assert workflow_id, (
+        f"未能从 LLM 回复中提取 workflow_id\n"
+        f"reply (前 800): {resp.get('reply', '')[:800]}\n"
+        f"tools_used: {tools_used}"
+    )
     print(f"  OK workflow_id: {workflow_id}")
 
     # Step 5+6: 查询 Temporal workflow
@@ -212,6 +250,7 @@ async def main() -> None:
                 data = json.loads(data)
             except Exception:
                 data = {}
+        # P2-2 fix: 明确断言 route_decision 存在且无 preprocessing_error
         if "route_decision" in data and "preprocessing_error" not in data:
             iqa_success = True
             iqa_detail = f"route={data['route_decision']} confidence={data.get('confidence')}"
@@ -224,11 +263,9 @@ async def main() -> None:
     print(f"  tools_used: {tools_used}")
     print(f"  IQA 真实执行: {'OK ' + iqa_detail if iqa_success else 'FAIL'}")
 
-    if iqa_success:
-        print(f"\n  [PASS] 端到端链路打通: L1 upload → LLM design+launch → Temporal → L3 IQA")
-    else:
-        print(f"\n  [FAIL] IQA 未真实执行成功，检查上方 node_results / worker log")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    assert iqa_success, (
+        f"IQA 未真实执行成功 — 端到端链路未打通\n"
+        f"completed_nodes={completed} failed_nodes={failed}\n"
+        f"node_results={json.dumps(nrs, ensure_ascii=False, default=str)[:1000]}"
+    )
+    print(f"\n  [PASS] 端到端链路打通: L1 upload → LLM design+launch → Temporal → L3 IQA")

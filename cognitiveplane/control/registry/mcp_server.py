@@ -28,7 +28,7 @@ from mcp.server.fastmcp.tools import Tool
 from mcp.server.fastmcp.utilities.func_metadata import func_metadata
 
 if TYPE_CHECKING:
-    from cognitiveplane.control.tool_registry import ToolRegistry
+    from cognitiveplane.control.registry.tool_registry import ToolRegistry
 
 logger = logging.getLogger("mcp_server")
 if not logger.handlers:

@@ -151,6 +151,10 @@ class ImageStore:
     def exists(self, image_id: str) -> bool:
         return image_id in self._store
 
+    def keys(self) -> list[str]:
+        """返回所有 image_id(P3-3 fix: 提供 public API,避免上层访问 _store 私有属性)。"""
+        return list(self._store.keys())
+
     def __len__(self) -> int:
         return len(self._store)
 

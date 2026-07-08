@@ -8,6 +8,11 @@ workflow_spec)。
 pyproject，不跨模块 import，保持解耦。字段定义保持一致，Phase 4+ 再考虑
 抽到 shared 包。
 
+⚠️ Single Source of Truth (P0-1 fix):
+    enum 值与默认值必须与 cognitiveplane/shared/dto_workflow.py **逐字一致**。
+    修改任一文件时必须同步修改另一文件。`_SSOT_CHECKSUM` 是字段一致性自检锚点,
+    启动时由测试断言相等(见 test_canonical_port_surface)。
+
 Source: boundary-pinning §5 + cognitiveplane/shared/dto_workflow.py
 """
 
@@ -21,6 +26,18 @@ from uuid import uuid4
 NodeType = Literal["brain_task", "tool_task", "human_task", "wait_task"]
 OnFailure = Literal["abort", "continue", "escalate", "retry"]
 CallerType = Literal["brain_direct", "activity", "system"]
+
+# OnFailure 默认值常量 — 必须与 cognitiveplane/shared/dto_workflow.py 的
+# ON_FAILURE_DEFAULT 保持相同字符串值。
+ON_FAILURE_DEFAULT: OnFailure = "escalate"
+
+# SSOT 一致性锚点:测试断言此 tuple 与 cognitiveplane 侧一致
+_SSOT_CHECKSUM = {
+    "node_type": ("brain_task", "tool_task", "human_task", "wait_task"),
+    "on_failure": ("abort", "continue", "escalate", "retry"),
+    "caller_type": ("brain_direct", "activity", "system"),
+    "on_failure_default": "escalate",
+}
 
 
 @dataclass(frozen=True)
@@ -49,7 +66,7 @@ class WorkflowNode:
     depends_on: list[str] = field(default_factory=list)
     input: dict[str, Any] = field(default_factory=dict)
     condition: str | None = None
-    on_failure: OnFailure = "escalate"
+    on_failure: OnFailure = ON_FAILURE_DEFAULT
     caller_context: CallerContext = field(default_factory=CallerContext)
 
 
@@ -81,7 +98,7 @@ def workflow_spec_from_dict(data: dict[str, Any]) -> WorkflowSpec:
             depends_on=list(n.get("depends_on", [])),
             input=dict(n.get("input", {})),
             condition=n.get("condition"),
-            on_failure=n.get("on_failure", "escalate"),
+            on_failure=n.get("on_failure", ON_FAILURE_DEFAULT),
             caller_context=CallerContext(
                 caller_type=n.get("caller_context", {}).get("caller_type", "brain_direct"),
                 case_id=n.get("caller_context", {}).get("case_id"),

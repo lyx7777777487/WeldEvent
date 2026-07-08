@@ -17,8 +17,8 @@ from cognitiveplane.adapters.mcp.tool_policy_classifier import (
     MCPToolPolicyClassifier,
 )
 from cognitiveplane.control.event_log import EventLog
-from cognitiveplane.control.mcp_registry import MCPRegistry
-from cognitiveplane.control.tool_registry import ToolRegistry
+from cognitiveplane.control.registry.mcp_registry import MCPRegistry
+from cognitiveplane.control.registry.tool_registry import ToolRegistry
 from cognitiveplane.shared.types import CaseId
 
 

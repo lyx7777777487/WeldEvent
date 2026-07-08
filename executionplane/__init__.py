@@ -8,7 +8,7 @@
 子模块结构:
   - activities/iqa: 图像质量评估子模块
   - activities/ppa: 图像预处理子模块
-  - activities/mea: 缺陷检测子模块（待实现）
+  - activities/mea: 缺陷检测子模块（计划中，未实现）
   - ...
 
 使用方式:

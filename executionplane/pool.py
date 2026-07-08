@@ -18,9 +18,10 @@ Source: boundary-pinning §1.3/§1.4/§6.2
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
-from controlplane.domain.activity import ActivityInput, ActivityOutput, ActivityStatus
+from .activities.base import ActivityInput, ActivityOutput, ActivityStatus
 
 from .activities.annotation.activity import AnnotationActivity
 from .activities.base import BaseActivity
@@ -165,6 +166,8 @@ class ActivityPool:
             return None
 
         # 构造 L3 ActivityInput
+        # P5 fix: 传递 dependency_results，让下游 activity 可回退读取上游结果
+        # （WeldMap InMemory 实现重启即丢，或生产 Redis 瞬时不可用时降级）
         workflow_id = node_input.get("workflow_id", "")
         activity_input = ActivityInput(
             control_point_id=node_input.get("node_id", ""),
@@ -173,6 +176,7 @@ class ActivityPool:
                 "case_id": (node_input.get("caller_context") or {}).get("case_id", ""),
                 "node_id": node_input.get("node_id", ""),
                 "session_id": (node_input.get("caller_context") or {}).get("session_id", ""),
+                "dependency_results": node_input.get("dependency_results", {}),
             },
             params=node_input.get("input", {}),
         )
@@ -202,7 +206,6 @@ def create_default_pool(
     pool.register_ppa()
 
     # Annotation Activity：默认注册，但可通过环境变量关闭
-    import os
     annotation_enabled = os.environ.get("ANNOTATION_ACTIVITY_ENABLED", "1").strip()
     if annotation_enabled not in ("0", "false", "False", "no", "NO"):
         pool.register_annotation()

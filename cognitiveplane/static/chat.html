@@ -3,59 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Volcano Cognitive Plane</title>
+<title>WeldEvent · 焊接质检认知平面</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;550;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/mona-sans/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fontsource-variable/jetbrains-mono/index.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  /* 深空黑底 — Linear 风格的克制 */
   --bg-root: #0a0a0f;
-  --bg-sidebar: #0f0f17;
-  --bg-main: #0c0c12;
-  --bg-hover: #181824;
+  --bg-rail: #08080c;
+  --bg-panel: #0d0d14;
+  --bg-elevated: #13131c;
+  --bg-hover: #161620;
   --bg-active: #1f1f2e;
-  --bg-bubble: #161620;
-  --bg-input: #12121a;
-  --bg-card: #13131d;
-  --bg-glass: rgba(20, 20, 30, 0.7);
+  --bg-bubble-user: #18181f;
+  --bg-input: #0f0f17;
+  --bg-card: #13131c;
+  --bg-glass: rgba(15, 15, 23, 0.88);
 
-  --border: #252535;
-  --border-subtle: #1a1a26;
-  --border-glow: rgba(139, 92, 246, 0.3);
+  /* 边框 — 极简 */
+  --border: #1f1f2e;
+  --border-subtle: #16161f;
+  --border-strong: #2a2a3c;
+  --border-glow: rgba(245, 158, 11, 0.32);
 
-  --text-primary: #f0f0f8;
-  --text-secondary: #9898b0;
-  --text-muted: #5e5e78;
+  /* 文字 */
+  --text-primary: #f5f5fa;
+  --text-secondary: #a0a0b8;
+  --text-muted: #5a5a72;
+  --text-faint: #3a3a4d;
 
-  --accent: #8b5cf6;
-  --accent-2: #06b6d4;
-  --accent-soft: rgba(139, 92, 246, 0.08);
-  --accent-hover: rgba(139, 92, 246, 0.16);
-  --accent-glow: rgba(139, 92, 246, 0.4);
+  /* 琥珀 accent — 焊接火花色，工业场景专属 */
+  --accent: #f59e0b;
+  --accent-2: #fbbf24;
+  --accent-soft: rgba(245, 158, 11, 0.08);
+  --accent-hover: rgba(245, 158, 11, 0.16);
+  --accent-glow: rgba(245, 158, 11, 0.32);
 
+  /* 状态色 — 与琥珀系协调 */
   --green: #10b981;
   --green-soft: rgba(16, 185, 129, 0.10);
-  --green-glow: rgba(16, 185, 129, 0.3);
-  --amber: #f59e0b;
-  --amber-soft: rgba(245, 158, 11, 0.10);
-  --amber-glow: rgba(245, 158, 11, 0.3);
+  --green-glow: rgba(16, 185, 129, 0.28);
+  --amber: #eab308;
+  --amber-soft: rgba(234, 179, 8, 0.10);
+  --amber-glow: rgba(234, 179, 8, 0.28);
   --red: #ef4444;
   --red-soft: rgba(239, 68, 68, 0.10);
-  --red-glow: rgba(239, 68, 68, 0.3);
+  --red-glow: rgba(239, 68, 68, 0.28);
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.10);
 
-  --radius-lg: 20px;
-  --radius-md: 14px;
-  --radius-sm: 10px;
-  --radius-xs: 8px;
+  --radius-xl: 20px;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
-  --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 24px rgba(245, 158, 11, 0.18);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-sans: 'Mona Sans Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
 }
 
 html, body {
@@ -66,860 +87,1247 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-  font-size: 15px;
+  font-size: 14.5px;
+  font-weight: 450;
+  font-variant-numeric: 'tabular-nums';
+  letter-spacing: -0.005em;
+  text-rendering: optimizeLegibility;
 }
 
 body::before {
   content: '';
   position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: 
-    radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.02) 0%, transparent 70%);
+  inset: 0;
+  background: var(--bg-root);
   pointer-events: none;
   z-index: 0;
-  animation: bgShift 20s ease-in-out infinite;
 }
 
-@keyframes bgShift {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(-2%, 1%) rotate(1deg); }
-  66% { transform: translate(1%, -1%) rotate(-0.5deg); }
-}
-
-.app { 
-  display: flex; 
-  height: 100vh; 
+/* ══════════════════════════════════════════════
+   Layout — 极简三栏：rail(56px) + main + exec(按需)
+   ══════════════════════════════════════════════ */
+.app {
+  display: flex;
+  height: 100vh;
   position: relative;
   z-index: 1;
 }
 
+/* ── 左侧极窄 rail ── */
 .sidebar {
-  width: 280px; min-width: 280px;
-  background: var(--bg-sidebar);
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg-rail);
   border-right: 1px solid var(--border-subtle);
-  display: flex; flex-direction: column;
-  transition: transform .35s cubic-bezier(.4,0,.2,1);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-slow) var(--ease);
   z-index: 10;
   position: relative;
 }
 
-.sidebar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(to bottom, transparent, var(--border-glow), transparent);
-  opacity: 0.5;
+.sidebar-header {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* 窄屏遮罩 — 点击收起 sidebar */
-.sidebar-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.5);
-  z-index: 9;
-  opacity: 0;
-  transition: opacity .3s ease;
-}
-.sidebar-overlay.show { display: block; opacity: 1; }
-@media (min-width: 769px) { .sidebar-overlay { display: none !important; } }
-
-.sidebar-header { padding: 22px 18px 18px; }
 .brand {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 20px; padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
 }
+
 .brand-mark {
-  width: 34px; height: 34px; border-radius: 10px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #06b6d4 100%);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-  position: relative;
-  overflow: hidden;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #c2410c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a1a0a;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.32);
 }
-.brand-mark::before {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  animation: shimmer 3s ease-in-out infinite;
+
+.brand-name {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
-@keyframes shimmer {
-  0% { left: -100%; }
-  50%, 100% { left: 100%; }
-}
-.brand-name { 
-  font-size: 16px; font-weight: 600; letter-spacing: -.3px;
-  background: linear-gradient(135deg, #f0f0f8 0%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.brand-ver { 
-  font-size: 10px; font-weight: 600; color: var(--text-muted); 
-  margin-left: 6px; letter-spacing: .5px;
-  background: var(--bg-hover);
-  padding: 2px 6px;
-  border-radius: 4px;
-  -webkit-text-fill-color: var(--text-muted);
+
+.brand-ver {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
 }
 
 .btn-new-chat {
-  width: 100%; padding: 11px 16px;
-  background: linear-gradient(135deg, var(--accent-soft) 0%, transparent 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm); color: var(--text-secondary);
-  font-size: 13.5px; font-weight: 500; font-family: var(--font-sans);
-  cursor: pointer; display: flex; align-items: center; gap: 10px;
-  transition: all .2s cubic-bezier(.4,0,.2,1); 
-  letter-spacing: -.1px;
-  position: relative;
-  overflow: hidden;
+  width: 100%;
+  background: var(--accent-soft);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--accent);
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all var(--dur) var(--ease);
 }
-.btn-new-chat::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(135deg, var(--accent-hover), transparent);
-  opacity: 0;
-  transition: opacity .2s ease;
-}
-.btn-new-chat:hover { 
-  background: var(--bg-hover); 
-  color: var(--text-primary); 
-  border-color: var(--border-glow);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-glow);
-}
-.btn-new-chat:hover::before { opacity: 1; }
-.btn-new-chat svg { width: 16px; height: 16px; opacity: .8; position: relative; z-index: 1; }
-.btn-new-chat span { position: relative; z-index: 1; }
 
-.sidebar-list { flex: 1; overflow-y: auto; padding: 6px 10px 10px; }
-.session-date-label {
-  font-size: 11px; font-weight: 600; color: var(--text-muted);
-  padding: 16px 10px 8px; letter-spacing: .6px;
-  text-transform: uppercase;
+.btn-new-chat:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent);
 }
+
+.btn-new-chat svg { width: 14px; height: 14px; }
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 8px;
+}
+
+.session-date-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 12px 8px 6px;
+}
+
 .session-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: var(--radius-sm);
-  cursor: pointer; transition: all .15s cubic-bezier(.4,0,.2,1);
-  font-size: 13.5px; color: var(--text-secondary);
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
   margin-bottom: 2px;
 }
-.session-row:hover { 
-  background: var(--bg-hover); 
-  color: var(--text-primary);
-  transform: translateX(2px);
-}
-.session-row.active { 
-  background: linear-gradient(135deg, var(--accent-soft), transparent);
-  color: var(--text-primary);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-}
-.session-row.active::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 50%;
-  transform: translateY(-50%);
-  width: 3px; height: 20px;
-  background: linear-gradient(to bottom, var(--accent), var(--accent-2));
-  border-radius: 0 2px 2px 0;
-}
+
+.session-row:hover { background: var(--bg-hover); }
+.session-row.active { background: var(--bg-active); }
 .session-row .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--text-muted); flex-shrink: 0; 
-  transition: all .2s ease;
-  box-shadow: 0 0 0 2px transparent;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
 }
-.session-row.active .dot { 
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 8px var(--accent-glow);
+.session-row.active .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+.session-row .title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.session-row .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.session-row.active .title { color: var(--text-primary); }
 .session-row .btn-del {
-  opacity: 0; width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-  border: none; background: none; color: var(--text-muted);
-  cursor: pointer; border-radius: 6px; flex-shrink: 0; 
-  transition: all .15s ease;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  opacity: 0;
+  transition: all var(--dur) var(--ease);
 }
 .session-row:hover .btn-del { opacity: 1; }
-.session-row .btn-del:hover { 
-  color: var(--red); 
-  background: var(--red-soft);
-  transform: scale(1.1);
+.session-row .btn-del:hover { color: var(--red); background: var(--red-soft); }
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.sidebar-footer { padding: 16px 18px; border-top: 1px solid var(--border-subtle); }
-.status-line { 
-  display: flex; align-items: center; gap: 10px; 
-  font-size: 12px; color: var(--text-muted);
-  padding: 8px 10px;
-  background: var(--bg-hover);
-  border-radius: var(--radius-sm);
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
-.status-pulse { 
-  width: 8px; height: 8px; border-radius: 50%; 
-  flex-shrink: 0; background: var(--green);
-  position: relative;
-}
-.status-pulse::after {
-  content: '';
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%; height: 100%;
+
+.status-pulse {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: inherit;
-  animation: pulseRing 2s ease-out infinite;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-glow);
+  animation: pulse 2.4s ease-in-out infinite;
 }
-@keyframes pulseRing {
-  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-  100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+.status-pulse.off { background: var(--text-faint); box-shadow: none; animation: none; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
-.status-pulse.off { background: var(--red); }
-.status-pulse.off::after { animation: none; }
 
-.main-panel { 
-  flex: 1; display: flex; flex-direction: column; 
-  min-width: 0; background: var(--bg-main);
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+  z-index: 9;
+}
+.sidebar-overlay.show { opacity: 1; pointer-events: auto; }
+
+/* ── 主面板 ── */
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   position: relative;
-}
-
-.main-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-glow), transparent);
-  opacity: 0.3;
 }
 
 .top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 28px; border-bottom: 1px solid var(--border-subtle); 
-  min-height: 56px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: var(--bg-glass);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 52px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  flex-shrink: 0;
 }
-.top-left { display: flex; align-items: center; gap: 14px; }
+
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .btn-menu {
-  display: none; width: 36px; height: 36px;
-  border: none; background: none; color: var(--text-secondary);
-  cursor: pointer; border-radius: var(--radius-xs);
-  align-items: center; justify-content: center;
-  transition: all .15s ease;
-}
-.btn-menu:hover { background: var(--bg-hover); color: var(--text-primary); }
-.top-title { 
-  font-size: 15px; font-weight: 600; 
-  letter-spacing: -.2px;
-}
-.top-meta { display: flex; align-items: center; gap: 12px; }
-.pill {
-  font-size: 11px; font-weight: 600; padding: 5px 12px;
-  border-radius: 99px; font-family: var(--font-mono); 
-  letter-spacing: .3px;
-  text-transform: uppercase;
-  border: 1px solid transparent;
-  transition: all .2s ease;
-}
-.pill-fc { 
-  background: var(--accent-soft); color: var(--accent); 
-  border-color: rgba(139, 92, 246, 0.2);
-}
-.pill-so { 
-  background: var(--amber-soft); color: var(--amber);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-.pill-kw { 
-  background: var(--green-soft); color: var(--green);
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.msg-scroll { 
-  flex: 1; overflow-y: auto; 
-  scroll-behavior: smooth;
-  position: relative;
-}
-.msg-container { max-width: 820px; margin: 0 auto; padding: 36px 28px 28px; }
-
-.hero {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 72px 24px 48px; text-align: center;
-  animation: fadeUp .6s cubic-bezier(.4,0,.2,1);
-}
-@keyframes fadeUp { 
-  from { opacity: 0; transform: translateY(24px); } 
-  to { opacity: 1; transform: translateY(0); } 
-}
-.hero-logo {
-  width: 64px; height: 64px; border-radius: 18px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #06b6d4 100%);
-  display: flex; align-items: center; justify-content: center; 
-  margin-bottom: 28px;
-  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3),
-              0 0 60px rgba(139, 92, 246, 0.15);
-  position: relative;
-}
-.hero-logo::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #8b5cf6, #06b6d4, #8b5cf6);
-  z-index: -1;
-  animation: logoSpin 8s linear infinite;
-  opacity: 0.6;
-  filter: blur(8px);
-}
-@keyframes logoSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-.hero-logo svg { width: 30px; height: 30px; color: #fff; }
-.hero h1 { 
-  font-size: 28px; font-weight: 700; letter-spacing: -.6px; 
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, #f0f0f8 0%, #c4b5fd 50%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.hero p { 
-  color: var(--text-secondary); font-size: 15px; line-height: 1.7; 
-  max-width: 500px; margin-bottom: 44px; 
-  font-weight: 400;
-}
-
-.quick-grid { 
-  display: grid; grid-template-columns: repeat(2, 1fr); 
-  gap: 12px; width: 100%; max-width: 580px; 
-}
-.quick-card {
-  padding: 18px 20px; border: 1px solid var(--border);
-  border-radius: var(--radius-md); text-align: left; cursor: pointer;
-  transition: all .25s cubic-bezier(.4,0,.2,1); 
-  background: linear-gradient(145deg, var(--bg-card), var(--bg-input));
-  font-family: var(--font-sans); color: var(--text-primary);
-  position: relative;
-  overflow: hidden;
-}
-.quick-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-}
-.quick-card::after {
-  content: '';
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 0; height: 0;
-  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width .4s ease, height .4s ease;
-}
-.quick-card:hover { 
-  border-color: var(--border-glow); 
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
-}
-.quick-card:hover::after {
-  width: 300px; height: 300px;
-}
-.quick-card .label { 
-  font-size: 14px; font-weight: 600; margin-bottom: 5px; 
-  letter-spacing: -.1px;
-  position: relative; z-index: 1;
-}
-.quick-card .hint { 
-  font-size: 12.5px; color: var(--text-muted);
-  position: relative; z-index: 1;
-}
-
-.chat-msg {
-  margin-bottom: 32px; animation: msgIn .3s cubic-bezier(.4,0,.2,1);
-}
-@keyframes msgIn { 
-  from { opacity: 0; transform: translateY(12px); } 
-  to { opacity: 1; transform: translateY(0); } 
-}
-.chat-msg .role-tag {
-  font-size: 11px; font-weight: 600; color: var(--text-muted);
-  margin-bottom: 10px; text-transform: uppercase; letter-spacing: .8px;
-  display: flex; align-items: center; gap: 8px;
-}
-.chat-msg .role-tag::before {
-  content: '';
-  width: 16px; height: 2px;
-  background: linear-gradient(90deg, var(--accent), transparent);
-  border-radius: 1px;
-}
-.chat-msg .body { 
-  font-size: 15px; line-height: 1.78; color: var(--text-primary); 
-  font-weight: 400;
-}
-.chat-msg .body p { margin-bottom: 14px; }
-.chat-msg .body p:last-child { margin-bottom: 0; }
-.chat-msg .body h1, .chat-msg .body h2, .chat-msg .body h3 { 
-  font-weight: 600; letter-spacing: -.3px; margin: 24px 0 12px; 
-  color: var(--text-primary);
-}
-.chat-msg .body h1 { font-size: 22px; }
-.chat-msg .body h2 { font-size: 18px; }
-.chat-msg .body h3 { font-size: 16px; }
-.chat-msg .body ul, .chat-msg .body ol { margin: 12px 0; padding-left: 24px; }
-.chat-msg .body li { margin-bottom: 6px; }
-.chat-msg .body strong { font-weight: 600; color: #fff; }
-.chat-msg .body code {
-  font-family: var(--font-mono); font-size: .86em;
-  background: var(--bg-bubble); padding: 3px 8px;
-  border-radius: 6px; border: 1px solid var(--border); 
-  color: #c4b5fd; font-weight: 500;
-}
-.chat-msg .body pre {
-  background: linear-gradient(145deg, var(--bg-sidebar), var(--bg-card)); 
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 18px 22px; 
-  overflow-x: auto; margin: 16px 0;
-  position: relative;
-}
-.chat-msg .body pre::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2), transparent);
-  opacity: 0.5;
-}
-.chat-msg .body pre code { 
-  background: none; border: none; padding: 0; 
-  font-size: .85em; line-height: 1.7; color: var(--text-primary); 
-  font-weight: 400;
-}
-.chat-msg .body table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 16px 0; font-size: .92em; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
-.chat-msg .body th, .chat-msg .body td { padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--border-subtle); }
-.chat-msg .body th { 
-  background: var(--bg-sidebar); font-weight: 600; color: var(--accent); 
-  font-size: .82em; text-transform: uppercase; letter-spacing: .4px;
-}
-.chat-msg .body tr:last-child td { border-bottom: none; }
-.chat-msg .body tr:hover td { background: var(--bg-hover); }
-.chat-msg .body hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-.chat-msg .body blockquote { 
-  border-left: 3px solid var(--accent); 
-  padding: 4px 0 4px 18px; color: var(--text-secondary); 
-  margin: 16px 0;
-  background: var(--accent-soft);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.thumb-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-.thumb-strip img { 
-  width: 88px; height: 88px; border-radius: var(--radius-sm); 
-  object-fit: cover; border: 1px solid var(--border);
-  transition: all .2s ease;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
   cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: none;
 }
-.thumb-strip img:hover {
-  border-color: var(--border-glow);
-  transform: scale(1.05);
-  box-shadow: var(--shadow-md);
-}
+.btn-menu:hover { color: var(--text-primary); background: var(--bg-hover); }
 
-.tool-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.tool-chip {
-  font-size: 11px; font-weight: 500; padding: 5px 12px; border-radius: 99px;
-  font-family: var(--font-mono); background: var(--accent-soft);
-  color: #c4b5fd; border: 1px solid rgba(139,92,246,.2);
-  transition: all .15s ease;
-}
-.tool-chip:hover {
-  background: var(--accent-hover);
-  border-color: var(--border-glow);
-}
-
-/* 确认/取消工作流按钮 */
-.confirm-row { display: flex; gap: 10px; margin-top: 16px; }
-.btn-confirm, .btn-cancel {
-  font-family: var(--font-sans); font-size: 13px; font-weight: 500;
-  padding: 8px 18px; border-radius: var(--radius-xs); cursor: pointer;
-  border: 1px solid transparent; transition: all .15s ease;
-}
-.btn-confirm {
-  background: var(--green); color: #fff;
-  box-shadow: 0 0 12px var(--green-glow);
-}
-.btn-confirm:hover { background: #0ea271; transform: translateY(-1px); }
-.btn-cancel {
-  background: transparent; color: var(--text-secondary);
-  border-color: var(--border);
-}
-.btn-cancel:hover { background: var(--bg-hover); color: var(--text-primary); }
-
-.typing-row { display: flex; gap: 6px; padding: 8px 0; }
-.typing-row span {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent);
-  animation: dotBounce 1.4s ease-in-out infinite;
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-.typing-row span:nth-child(2) { animation-delay: .15s; }
-.typing-row span:nth-child(3) { animation-delay: .3s; }
-@keyframes dotBounce {
-  0%, 60%, 100% { opacity: .3; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-8px); }
-}
-
-.wf-panel {
-  border-top: 1px solid var(--border);
-  background: var(--bg-sidebar);
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height .4s cubic-bezier(.4,0,.2,1), padding .4s ease;
-  position: relative;
-}
-.wf-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-glow), var(--accent-2), transparent);
-}
-.wf-panel.open { max-height: 460px; }
-
-.wf-panel-inner { padding: 0 28px; }
-.wf-panel.open .wf-panel-inner { padding: 20px 28px; }
-
-.wf-header {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
-}
-.wf-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); letter-spacing: -.1px; }
-.wf-stats { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 500; }
-
-.wf-progress-bar {
-  height: 4px; background: var(--bg-hover); border-radius: 3px; margin-bottom: 16px; overflow: hidden;
-}
-.wf-progress-fill {
-  height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  border-radius: 3px; transition: width .5s cubic-bezier(.4,0,.2,1);
-  position: relative;
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-.wf-progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 40px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
-  animation: progressShine 1.5s ease-in-out infinite;
-}
-@keyframes progressShine {
-  0% { transform: translateX(-40px); opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateX(0); opacity: 0; }
-}
-
-.wf-card-strip {
-  display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px;
-  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-}
-
-.wf-card {
-  flex: 0 0 260px; scroll-snap-align: start;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  transition: all .25s cubic-bezier(.4,0,.2,1);
-  cursor: pointer;
-}
-.wf-card:hover { 
-  border-color: var(--border-glow); 
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-.wf-card.expanded { flex: 0 0 520px; }
-
-.wf-card-img {
-  width: 100%; height: 170px; background: var(--bg-hover);
-  display: flex; align-items: center; justify-content: center;
-  position: relative; overflow: hidden;
-}
-.wf-card-img img {
-  width: 100%; height: 100%; object-fit: cover;
-  transition: transform .3s ease;
-}
-.wf-card:hover .wf-card-img img {
-  transform: scale(1.05);
-}
-.wf-card-img .placeholder {
-  color: var(--text-muted); font-size: 13px;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-}
-
-.wf-card-status {
-  position: absolute; top: 10px; right: 10px;
-  font-size: 10px; font-weight: 600; padding: 4px 10px;
-  border-radius: 99px; letter-spacing: .4px;
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  text-transform: uppercase;
-}
-.wf-card-status.pending  { 
-  background: rgba(107,114,128,.5); color: #d1d5db; 
-  border: 1px solid rgba(107,114,128,.3);
-}
-.wf-card-status.running  { 
-  background: rgba(139,92,246,.5); color: #ddd6fe; 
-  animation: statusPulse 1.5s ease-in-out infinite;
-  border: 1px solid rgba(139,92,246,.3);
-}
-.wf-card-status.done     { 
-  background: rgba(16,185,129,.5); color: #d1fae5;
-  border: 1px solid rgba(16,185,129,.3);
-}
-.wf-card-status.error    { 
-  background: rgba(239,68,68,.5); color: #fee2e2;
-  border: 1px solid rgba(239,68,68,.3);
-}
-
-@keyframes statusPulse { 
-  0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(139,92,246,.4); } 
-  50% { opacity: .8; box-shadow: 0 0 0 6px rgba(139,92,246,0); } 
-}
-
-.wf-annot-layer {
-  position: absolute; inset: 0; pointer-events: none;
-}
-.wf-annot-box {
-  position: absolute;
-  border: 2px solid var(--accent);
-  border-radius: 3px;
-  background: rgba(139,92,246,.12);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-.wf-annot-label {
-  position: absolute; top: -20px; left: -2px;
-  font-size: 9px; font-weight: 600; color: #fff;
-  background: linear-gradient(135deg, var(--accent), #6366f1); 
-  padding: 2px 6px;
-  border-radius: 3px; white-space: nowrap;
-  font-family: var(--font-mono);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-.wf-card-info { padding: 12px 14px; }
-.wf-card-name {
-  font-size: 13px; font-weight: 600; margin-bottom: 6px;
-  letter-spacing: -.1px;
-}
-.wf-card-defects { font-size: 11.5px; color: var(--text-muted); }
-.wf-card-defect-item {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-right: 10px; margin-top: 4px;
+.top-title {
+  font-size: 13.5px;
   font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: -0.005em;
 }
-.wf-card-defect-item .sev {
-  width: 7px; height: 7px; border-radius: 50%;
-  box-shadow: 0 0 4px currentColor;
-}
-.wf-card-defect-item .sev.high { background: var(--red); color: var(--red-glow); }
-.wf-card-defect-item .sev.med  { background: var(--amber); color: var(--amber-glow); }
-.wf-card-defect-item .sev.low  { background: var(--green); color: var(--green-glow); }
 
-.wf-card-actions {
-  display: flex; gap: 8px; padding: 8px 14px 14px;
+.mode-selector {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
 }
-.wf-btn {
-  padding: 7px 14px; border-radius: var(--radius-xs);
-  border: 1px solid var(--border); background: transparent;
-  color: var(--text-secondary); font-size: 12px; font-weight: 500;
-  cursor: pointer; transition: all .15s ease;
+
+.mode-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--dur) var(--ease);
+}
+.mode-pill:hover { color: var(--text-secondary); }
+.mode-pill.active { background: var(--bg-active); color: var(--text-primary); }
+
+.top-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exec-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+}
+.exec-toggle-btn:hover { background: var(--accent-hover); }
+.exec-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.pill {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.pill-fc { background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(245, 158, 11, 0.2); }
+.pill-so { background: var(--blue-soft); color: var(--blue); border: 1px solid rgba(59, 130, 246, 0.2); }
+.pill-kw { background: var(--bg-hover); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── 消息区 ── */
+.msg-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  position: relative;
+}
+
+.msg-container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 24px 32px;
+}
+
+/* hero 空状态 — 极简 */
+.hero {
+  padding: 100px 16px 60px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent), #c2410c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1a0a;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
+
+.hero-logo svg { width: 28px; height: 28px; }
+
+.hero h1 {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  line-height: 1.1;
+}
+
+.hero p {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+.hero .quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 36px;
+  width: 100%;
+  max-width: 540px;
+}
+
+.quick-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--dur) var(--ease);
   font-family: var(--font-sans);
 }
-.wf-btn:hover { 
-  background: var(--bg-hover); border-color: var(--border-glow); 
-  color: var(--accent);
-}
-.wf-btn.feedback { 
-  border-color: rgba(139,92,246,.25); 
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.wf-btn.feedback:hover { 
-  background: var(--accent-hover); 
+.quick-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
   transform: translateY(-1px);
 }
+.quick-card .label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+.quick-card .hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
 
-.wf-feedback-form {
-  padding: 0 14px 12px; display: none; flex-direction: column; gap: 8px;
+/* 消息气泡 — Linear 风格的克制 */
+.chat-msg {
+  margin-bottom: 24px;
+  animation: msgIn var(--dur) var(--ease-out);
 }
-.wf-card.expanded .wf-feedback-form { display: flex; }
-.wf-feedback-form textarea {
-  width: 100%; background: var(--bg-hover); border: 1px solid var(--border);
-  border-radius: var(--radius-xs); padding: 10px 12px;
-  color: var(--text-primary); font-size: 12px; font-family: var(--font-sans);
-  resize: vertical; min-height: 56px;
-  transition: border-color .15s ease;
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.wf-feedback-form textarea:focus {
-  outline: none;
-  border-color: var(--border-glow);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-.wf-feedback-form textarea::placeholder { color: var(--text-muted); }
-.wf-feedback-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.wf-feedback-actions .wf-btn.send {
-  background: linear-gradient(135deg, var(--accent), #6366f1); 
-  border-color: var(--accent); color: #fff;
+
+.chat-msg .role-tag {
+  font-size: 11px;
   font-weight: 600;
-}
-.wf-feedback-actions .wf-btn.send:hover { 
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  box-shadow: var(--shadow-glow);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
 }
 
-.input-zone { padding: 0 28px 24px; }
-.input-shell { max-width: 820px; margin: 0 auto; }
+.chat-msg .body {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
 
-.preview-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.chat-msg .body p { margin-bottom: 12px; }
+.chat-msg .body p:last-child { margin-bottom: 0; }
+.chat-msg .body strong { color: var(--text-primary); font-weight: 600; }
+.chat-msg .body em { color: var(--text-secondary); font-style: italic; }
+.chat-msg .body code {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--accent);
+}
+.chat-msg .body pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.chat-msg .body pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.chat-msg .body h1, .chat-msg .body h2, .chat-msg .body h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 16px 0 8px;
+  letter-spacing: -0.01em;
+}
+.chat-msg .body h1 { font-size: 18px; }
+.chat-msg .body h2 { font-size: 16px; }
+.chat-msg .body h3 { font-size: 14.5px; }
+.chat-msg .body ul, .chat-msg .body ol { margin: 8px 0 12px 20px; }
+.chat-msg .body li { margin-bottom: 4px; }
+.chat-msg .body hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.chat-msg .body blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+.chat-msg .body table {
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+  width: 100%;
+}
+.chat-msg .body th, .chat-msg .body td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.chat-msg .body th {
+  background: var(--bg-elevated);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* 缩略图条 */
+.thumb-strip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.thumb-strip img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+/* 工具调用标签 */
+.tool-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.tool-chip {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+/* typing 指示器 */
+.typing-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+.typing-row span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingDot 1.4s ease-in-out infinite;
+}
+.typing-row span:nth-child(2) { animation-delay: 0.2s; }
+.typing-row span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingDot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* thinking 块 — Claude Code 风格的可折叠推理过程 */
+.thinking-block {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--text-faint);
+  border-radius: var(--radius-sm);
+  margin: 12px 0;
+  overflow: hidden;
+}
+.thinking-block .think-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  transition: background var(--dur) var(--ease);
+}
+.thinking-block .think-header:hover { background: var(--bg-hover); }
+.thinking-block .think-icon { width: 14px; height: 14px; opacity: 0.7; }
+.thinking-block .think-label { flex: 1; }
+.thinking-block .think-chev { font-size: 10px; transition: transform var(--dur) var(--ease); }
+.thinking-block.collapsed .think-chev { transform: rotate(-90deg); }
+.thinking-block.collapsed .think-body { display: none; }
+.thinking-block .think-body {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* approval-card — 工作流启动前确认 */
+.approval-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin: 12px 0;
+  animation: msgIn var(--dur) var(--ease-out);
+}
+.approval-card.resolved { opacity: 0.65; border-left-color: var(--text-faint); }
+.ap-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ap-icon { width: 16px; height: 16px; color: var(--accent); }
+.ap-title { font-size: 13px; font-weight: 500; color: var(--text-primary); flex: 1; }
+.ap-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.ap-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.ap-actions { display: flex; gap: 8px; }
+.ap-resolved-tag {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+/* 确认按钮组 */
+.confirm-row, .ap-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-confirm, .btn-approve {
+  background: var(--accent);
+  color: #1a1a0a;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--dur) var(--ease);
+}
+.btn-confirm:hover, .btn-approve:hover {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-cancel, .btn-reject {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--dur) var(--ease);
+}
+.btn-cancel:hover, .btn-reject:hover {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ══════════════════════════════════════════════
+   Workflow DAG Canvas — Coze/Dify 风格的工作流编排画板
+   ══════════════════════════════════════════════ */
+.wf-canvas {
+  position: relative;
+  height: 320px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  display: none;
+  flex-shrink: 0;
+}
+.wf-canvas.open { display: block; animation: canvasIn var(--dur) var(--ease-out); }
+@keyframes canvasIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wf-canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+.wf-canvas-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wf-canvas-title::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.wf-canvas-stats {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.wf-canvas-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  transition: all var(--dur) var(--ease);
+}
+.wf-canvas-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+.wf-canvas-body {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 41px);
+  overflow: auto;
+  background:
+    radial-gradient(circle at 1px 1px, var(--border-subtle) 1px, transparent 0) 0 0 / 20px 20px;
+}
+
+.wf-dag-svg {
+  display: block;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* DAG 节点样式 */
+.dag-node {
+  cursor: pointer;
+  transition: filter var(--dur) var(--ease);
+}
+.dag-node:hover { filter: brightness(1.15); }
+
+.dag-node-rect {
+  fill: var(--bg-elevated);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  rx: 10;
+  ry: 10;
+  transition: all var(--dur) var(--ease);
+}
+
+/* 节点状态色 — 边框 + 微光 */
+.dag-node.pending .dag-node-rect {
+  stroke: var(--border-strong);
+  fill: var(--bg-elevated);
+}
+.dag-node.running .dag-node-rect {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+  animation: nodePulse 1.8s ease-in-out infinite;
+}
+@keyframes nodePulse {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+  50% { filter: drop-shadow(0 0 14px var(--accent-glow)); }
+}
+.dag-node.done .dag-node-rect {
+  stroke: var(--green);
+  fill: var(--green-soft);
+}
+.dag-node.failed .dag-node-rect {
+  stroke: var(--red);
+  fill: var(--red-soft);
+}
+.dag-node.cancelled .dag-node-rect {
+  stroke: var(--text-faint);
+  fill: var(--bg-elevated);
+  opacity: 0.5;
+}
+
+.dag-node-capability {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dag-node-label {
+  fill: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+}
+
+.dag-node-status-icon {
+  font-size: 11px;
+}
+
+/* DAG 连线 */
+.dag-edge {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  transition: stroke var(--dur) var(--ease);
+}
+.dag-edge.active {
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+.dag-edge.done {
+  stroke: var(--green);
+}
+
+.dag-edge-arrow {
+  fill: var(--border-strong);
+  transition: fill var(--dur) var(--ease);
+}
+.dag-edge.active .dag-edge-arrow { fill: var(--accent); }
+.dag-edge.done .dag-edge-arrow { fill: var(--green); }
+
+/* DAG 节点详情 tooltip */
+.dag-tooltip {
+  position: absolute;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 280px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+}
+.dag-tooltip.show { opacity: 1; transform: translateY(0); }
+.dag-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.dag-tooltip-body {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ── 旧 wf-panel（保留兼容性，但默认不显示） ── */
+.wf-panel {
+  display: none;
+}
+
+/* ── 输入区 ── */
+.input-zone {
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.input-shell {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.preview-strip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
 .preview-item {
-  position: relative; width: 72px; height: 72px;
-  border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border);
-  transition: all .2s ease;
-}
-.preview-item:hover {
-  border-color: var(--border-glow);
-  transform: scale(1.05);
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
 }
 .preview-item img { width: 100%; height: 100%; object-fit: cover; }
 .preview-item .rm-btn {
-  position: absolute; top: 4px; right: 4px;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: none; background: rgba(0,0,0,.8); color: #fff;
-  font-size: 11px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .15s ease;
-  opacity: 0;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border: none;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.preview-item:hover .rm-btn { opacity: 1; }
-.preview-item .rm-btn:hover { background: var(--red); transform: scale(1.1); }
 
 .input-row {
-  display: flex; align-items: flex-end; gap: 10px;
-  background: var(--bg-input); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 10px 10px 10px 20px;
-  transition: all .25s cubic-bezier(.4,0,.2,1);
-  position: relative;
-  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 8px 8px 8px 12px;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.input-row:focus-within { 
-  border-color: var(--border-glow);
-  box-shadow: var(--shadow-md), 0 0 0 4px var(--accent-soft), var(--shadow-glow);
+.input-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.input-row textarea {
-  flex: 1; background: none; border: none; outline: none;
-  color: var(--text-primary); font-family: var(--font-sans);
-  font-size: 15px; line-height: 1.6; resize: none;
-  max-height: 180px; min-height: 28px; padding: 6px 0;
-  font-weight: 400;
-}
-.input-row textarea::placeholder { color: var(--text-muted); }
 
 .btn-attach {
-  width: 38px; height: 38px; border-radius: var(--radius-sm);
-  border: none; background: transparent; color: var(--text-muted);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all .15s ease;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  transition: color var(--dur) var(--ease);
 }
-.btn-attach:hover { 
-  color: var(--text-secondary); 
-  background: var(--bg-hover);
-  transform: scale(1.05);
+.btn-attach:hover { color: var(--text-primary); }
+
+#chatInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+  resize: none;
+  padding: 6px 0;
+  max-height: 180px;
 }
+#chatInput::placeholder { color: var(--text-faint); }
 
 .btn-fire {
-  width: 38px; height: 38px; border-radius: var(--radius-sm);
-  border: none; cursor: pointer; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--accent), #6366f1); 
-  color: #fff; transition: all .2s cubic-bezier(.4,0,.2,1);
-  box-shadow: 0 2px 8px rgba(139,92,246,.3);
-  position: relative;
-  overflow: hidden;
+  background: var(--accent);
+  color: #1a1a0a;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur) var(--ease);
+  flex-shrink: 0;
 }
-.btn-fire::before {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left .5s ease;
+.btn-fire:hover {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
-.btn-fire:hover { 
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(139,92,246,.4);
-}
-.btn-fire:hover::before { left: 100%; }
-.btn-fire:active { transform: scale(.96); }
-.btn-fire:disabled { 
-  opacity: .3; pointer-events: none;
+.btn-fire:disabled {
   background: var(--bg-hover);
+  color: var(--text-faint);
+  cursor: not-allowed;
+  transform: none;
   box-shadow: none;
 }
 
-.input-hint { 
-  text-align: center; font-size: 11.5px; color: var(--text-muted); 
-  margin-top: 10px; letter-spacing: .2px; font-weight: 400;
+.input-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  margin-top: 8px;
+  font-family: var(--font-mono);
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { 
-  background: linear-gradient(to bottom, var(--border), #2a2a3a); 
+/* ══════════════════════════════════════════════
+   Execution Panel — 右侧浮层（保留原 ID）
+   ══════════════════════════════════════════════ */
+.exec-panel {
+  position: fixed;
+  top: 52px;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform var(--dur-slow) var(--ease);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+.exec-panel.open { transform: translateX(0); }
+
+.exec-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.exec-agent-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.exec-agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.exec-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-exec-stop {
+  background: var(--red-soft);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--red);
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
-  transition: background .2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur) var(--ease);
 }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.btn-exec-stop:hover { background: rgba(239, 68, 68, 0.2); }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+.exec-panel-stats {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.btn-exec-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  transition: all var(--dur) var(--ease);
+}
+.btn-exec-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+.exec-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+.exec-workflow-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: none;
+}
+
+.exec-progress {
+  margin-bottom: 8px;
+}
+.exec-progress-bar {
+  height: 4px;
+  background: var(--bg-input);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.exec-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 2px;
+  transition: width var(--dur) var(--ease);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.exec-progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-bottom: 16px;
+}
+
+.exec-node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exec-node {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all var(--dur) var(--ease);
+}
+.exec-node.running {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.exec-node.done {
+  border-color: rgba(16, 185, 129, 0.2);
+}
+.exec-node.failed {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--red-soft);
+}
+
+.exec-node-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.exec-node-icon.pending { color: var(--text-faint); }
+.exec-node-icon.running { color: var(--accent); }
+.exec-node-icon.done { color: var(--green); }
+.exec-node-icon.failed { color: var(--red); }
+
+.exec-node-info { flex: 1; min-width: 0; }
+.exec-node-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.exec-node-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+.exec-node-detail {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+}
+
+.exec-summary {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.exec-summary-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.exec-summary-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
   }
-}
-
-@media (max-width: 768px) {
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); box-shadow: var(--shadow-lg); }
   .sidebar.open { transform: translateX(0); }
   .btn-menu { display: flex; }
-  .quick-grid { grid-template-columns: 1fr; }
-  .msg-container { padding: 24px 16px; }
-  .input-zone { padding: 0 16px 20px; }
-  .wf-card { flex: 0 0 220px; }
-  .wf-card.expanded { flex: 0 0 380px; }
-  .top-bar { padding: 12px 16px; }
-  .hero { padding: 48px 16px 36px; }
-  .hero h1 { font-size: 24px; }
+  .exec-panel { width: 100%; }
 }
+
+@media (max-width: 640px) {
+  .hero { padding: 60px 16px 40px; }
+  .hero h1 { font-size: 24px; }
+  .hero .quick-grid { grid-template-columns: 1fr; }
+  .msg-container { padding: 20px 16px; }
+  .input-zone { padding: 10px 12px 14px; }
+  .mode-selector { display: none; }
+  .top-meta .pill { display: none; }
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 </style>
 </head>
 <body>
@@ -929,7 +1337,7 @@ body::before {
     <div class="sidebar-header">
       <div class="brand">
         <div class="brand-mark">W</div>
-        <span class="brand-name">Volcano<span class="brand-ver">v0.2</span></span>
+        <span class="brand-name">WeldEvent<span class="brand-ver">v0.2</span></span>
       </div>
       <button class="btn-new-chat" onclick="newSession()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -955,7 +1363,16 @@ body::before {
         </button>
         <span class="top-title" id="chatTitle">新对话</span>
       </div>
+      <div class="mode-selector" id="modeSelector">
+        <button class="mode-pill active" data-mode="chat" onclick="switchMode('chat')">对话</button>
+        <button class="mode-pill" data-mode="batch" onclick="switchMode('batch')">批量</button>
+        <button class="mode-pill" data-mode="live" onclick="switchMode('live')">实时</button>
+      </div>
       <div class="top-meta">
+        <button class="exec-toggle-btn" id="execToggleBtn" onclick="openExecPanel()" style="display:none" title="打开执行监控面板">
+          <span class="exec-toggle-dot"></span>
+          <span id="execToggleLabel"></span>
+        </button>
         <span id="toolsCount" style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);font-weight:500"></span>
         <span class="pill pill-fc" id="tierBadge" style="display:none"></span>
       </div>
@@ -967,30 +1384,46 @@ body::before {
           <div class="hero-logo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5m-9.25-11.396c.251.023.501.05.75.082M19 14.5l-3.091-3.091a2.25 2.25 0 01-.659-1.591V3.186m0 0a24.3 24.3 0 00-4.5 0"/></svg>
           </div>
-          <h1>Volcano Cognitive Plane</h1>
-          <p>工业质检智能决策引擎 — 标准查询 · 案例检索 · 工艺参数 · 工作流设计 · 焊缝图像分析</p>
+          <h1>WeldEvent Cognitive Plane</h1>
+          <p>焊接质检智能决策引擎 · 标准查询 · 案例检索 · 工艺参数 · 工作流编排 · 焊缝图像分析</p>
           <div class="quick-grid">
             <button class="quick-card" onclick="sendQuick('查询NB/T47014标准中关于预热温度的规定')">
               <div class="label">查询焊接标准</div>
-              <div class="hint">NB/T47014 预热温度规定</div>
+              <div class="hint">NB/T 47014</div>
             </button>
             <button class="quick-card" onclick="sendQuick('查询GMAW焊接的工艺参数')">
               <div class="label">查询工艺参数</div>
-              <div class="hint">GMAW 焊接参数参考</div>
+              <div class="hint">GMAW 焊接</div>
             </button>
             <button class="quick-card" onclick="sendQuick('查找类似的夹渣缺陷处理案例')">
               <div class="label">检索历史案例</div>
-              <div class="hint">夹渣缺陷处理经验</div>
+              <div class="hint">夹渣缺陷</div>
             </button>
             <button class="quick-card" onclick="sendQuick('请设计一个完整的焊缝质检工作流')">
               <div class="label">设计工作流</div>
-              <div class="hint">焊缝质检全流程</div>
+              <div class="hint">IQA + PPA + 检测</div>
             </button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- 工作流 DAG 画板 — 工作流敲定时展开 -->
+    <div class="wf-canvas" id="wfCanvas">
+      <div class="wf-canvas-header">
+        <span class="wf-canvas-title">工作流编排</span>
+        <span class="wf-canvas-stats" id="wfCanvasStats"></span>
+        <button class="wf-canvas-close" onclick="closeWfCanvas()" title="收起画板">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="wf-canvas-body" id="wfCanvasBody">
+        <svg class="wf-dag-svg" id="wfDagSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="dag-tooltip" id="dagTooltip"></div>
+      </div>
+    </div>
+
+    <!-- 旧 wf-panel 容器（保留 ID 给原 JS 用，但默认隐藏） -->
     <div class="wf-panel" id="wfPanel">
       <div class="wf-panel-inner">
         <div class="wf-header">
@@ -1014,9 +1447,39 @@ body::before {
           <button class="btn-fire" id="sendBtn" onclick="sendMessage()">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
+          <button class="btn-fire btn-stop" id="stopBtn" onclick="stopChat()" style="display:none;background:var(--red,#e74c3c);color:#fff;" title="中断当前对话">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
         </div>
-        <div class="input-hint">支持图片/PDF/Word/Excel/CSV/ZIP 上传</div>
+        <div class="input-hint">支持图片 / PDF / Word / Excel / CSV / ZIP 上传</div>
       </div>
+    </div>
+  </div>
+
+  <div class="exec-panel" id="execPanel">
+    <div class="exec-panel-header">
+      <div class="exec-agent-badge">
+        <span class="exec-agent-dot"></span>
+        <span>Execution</span>
+      </div>
+      <div class="exec-panel-actions">
+        <button class="btn-exec-stop" id="execStopBtn" onclick="stopExecution()" title="停止执行">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+        </button>
+        <span class="exec-panel-stats" id="execPanelStats"></span>
+        <button class="btn-exec-close" onclick="closeExecPanel()" title="关闭面板">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="exec-panel-body">
+      <div class="exec-workflow-title" id="execWorkflowTitle"></div>
+      <div class="exec-progress">
+        <div class="exec-progress-bar"><div class="exec-progress-fill" id="execProgressFill" style="width:0%"></div></div>
+      </div>
+      <div class="exec-progress-text" id="execProgressText"></div>
+      <div class="exec-node-list" id="execNodeList"></div>
+      <div class="exec-summary" id="execSummary" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -1034,11 +1497,97 @@ let pendingFileList = [];
 let wfCards = [];
 let wfExpandedCard = null;
 
+// ── 执行监控面板状态 ──
+let execNodes = [];
+let execPanelOpen = false;
+let execRunCompleted = false;
+let execActiveWorkflowId = null;
+let activeAbortController = null;
+// ── AgentLoop WebSocket 连接 ──
+// 替代 HTTP /stream,启用 AgentLoop 的中断 + 反馈能力。
+// 全局一个连接,跨会话复用,session_id 在消息里带。
+let chatWs = null;
+let chatWsReady = false;
+// 当前流式消息的上下文 — onmessage 回调需要知道往哪条消息追加 token
+let activeStreamSession = null;
+let activeStreamMsg = null;
+// Promise 控制 — sendStreamMessage 阻塞到 final 事件到达
+let activeStreamPromise = null;
+let activeStreamResolve = null;
+let activeStreamReject = null;
+// P1-7: 工作流节点事件 EventSource — 长连接订阅 L2→L1 节点事件
+// 在 switchSession 时启动,switchSession 切走时关闭。监听 L2 emit 的
+// node_start/node_end/workflow_completed 等事件,实时更新 execPanel。
+let workflowEventSource = null;
+
+// ── Workflow DAG 状态 ──
+// 当 design_workflow 返回 nodes 列表后，记录节点和依赖关系到此处。
+// handleWorkflowEvent 收到 node_start/node_end 时同步更新 dagNodeStates。
+let dagNodes = [];        // [{node_id, capability, action, depends_on:[]}]
+let dagNodeStates = {};   // {node_id: 'pending'|'running'|'done'|'failed'|'cancelled'}
+let dagEdges = [];        // [{from: node_id, to: node_id}]
+let dagPositions = {};    // {node_id: {x, y}} — 自动布局缓存
+
+let currentMode = 'chat';
+
+// 工具名 → 用户可读的描述（tool_call 气泡用）
+const TOOL_LABELS = {
+  analyze_image: '正在分析图片...',
+  search_standards: '正在查询焊接标准...',
+  search_cases: '正在检索历史案例...',
+  read_weldmap: '正在读取案例信息...',
+  design_workflow: '正在编排质检工作流...',
+  launch_workflow: '正在启动工作流...',
+  request_confirmation: '等待用户确认...',
+  escalate: '正在请求人工介入...',
+  web_search: '正在搜索相关资料...',
+};
+function toolLabel(name) { return TOOL_LABELS[name] || `正在执行 ${name}...`; }
+
+// 工具结果 → 用户可读的摘要（tool_result 气泡用）
+function toolResultSummary(toolName, result, error) {
+  if (error) {
+    // 常见错误翻译
+    if (error.includes('image_ref not found')) return '图片已过期，请重新上传';
+    if (error.includes('timeout')) return '操作超时，请重试';
+    // 不截断 — LLM 和用户都需要看到完整错误信息才能正确判断原因
+    // (如 "version_id 缺失" vs "权限不足" vs "网络错误" 处理方式完全不同)
+    return `失败: ${error}`;
+  }
+  const out = result?.output || {};
+  switch (toolName) {
+    case 'analyze_image':
+      return '分析完成，见上方报告';
+    case 'search_standards':
+      return out.total_count ? `找到 ${out.total_count} 条相关标准` : '查询完成';
+    case 'search_cases':
+      return out.total_count ? `找到 ${out.total_count} 个类似案例` : '查询完成';
+    case 'read_weldmap':
+      return '案例信息已加载';
+    case 'design_workflow':
+      return out.workflow_id ? `方案已生成 (${out.node_count || '?'} 个节点)` : '方案已生成';
+    case 'launch_workflow':
+      if (out.status === 'COMPLETED') return '工作流执行完成';
+      if (out.status === 'RUNNING') return '工作流执行中...';
+      if (out.accepted) return '工作流已提交';
+      return `启动失败: ${out.error || '未知错误'}`;
+    case 'request_confirmation':
+      return '等待用户确认';
+    case 'escalate':
+      return '已通知人工处理';
+    case 'web_search':
+      return out.total_count ? `搜索到 ${out.total_count} 条结果` : '搜索完成';
+    default:
+      return '完成';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   checkHealth();
   renderSessions();
   if (sessions.length > 0) switchSession(sessions[0].id);
   document.getElementById('chatInput').focus();
+  connectNotificationWs();
 });
 
 async function checkHealth() {
@@ -1071,6 +1620,148 @@ function switchSession(id) {
   updateMeta(s);
   // 窄屏选中会话后自动收起 sidebar
   closeSidebar();
+  resetExecPanel();
+  closeWfCanvas();
+  // P1-7: 启动工作流节点事件 EventSource — 长连接订阅 L2→L1 节点事件
+  startWorkflowEventStream(id);
+}
+
+// P1-7: 订阅 L2→L1 工作流节点事件流(SSE)
+function startWorkflowEventStream(sessionId) {
+  if (workflowEventSource) {
+    workflowEventSource.close();
+    workflowEventSource = null;
+  }
+  if (!sessionId) return;
+  try {
+    const url = `${API_BASE}/chat/workflow/stream/${sessionId}`;
+    workflowEventSource = new EventSource(url);
+    workflowEventSource.onmessage = (ev) => {
+      try {
+        const evt = JSON.parse(ev.data);
+        handleWorkflowEvent(evt);
+      } catch (e) {}
+    };
+    workflowEventSource.onerror = (e) => {
+      console.debug('[workflow SSE] error (will auto-reconnect)', e);
+    };
+  } catch (e) {
+    console.warn('[workflow SSE] start failed:', e);
+  }
+}
+
+// P1-7: 处理 L2 推送的工作流节点事件 — 更新 execPanel + DAG 画板
+function handleWorkflowEvent(evt) {
+  if (!evt || !evt.event_type) return;
+  const wfId = evt.workflow_id;
+  const nodeId = evt.node_id;
+  const type = evt.event_type;
+
+  if (type === 'workflow_started') {
+    if (!execActiveWorkflowId) {
+      execActiveWorkflowId = wfId;
+      openExecPanel();
+      document.getElementById('execWorkflowTitle').textContent = `工作流 ${wfId}`;
+      document.getElementById('execWorkflowTitle').style.display = 'block';
+    }
+    return;
+  }
+
+  if (type === 'node_start' && nodeId) {
+    let node = execNodes.find(n => n.node_id === nodeId);
+    if (!node) {
+      execNodes.push({
+        node_id: nodeId,
+        label: nodeId,
+        status: 'running',
+        summary: '',
+        data: null,
+      });
+    } else if (node.status === 'pending') {
+      node.status = 'running';
+    }
+    dagNodeStates[nodeId] = 'running';
+    renderExecNodes();
+    updateExecProgress();
+    renderDagGraph();
+    openExecPanel();
+    return;
+  }
+
+  if (type === 'node_end' && nodeId) {
+    let node = execNodes.find(n => n.node_id === nodeId);
+    if (!node) {
+      node = { node_id: nodeId, label: nodeId, status: 'done', summary: '', data: null };
+      execNodes.push(node);
+    }
+    const status = (evt.node_status || '').toUpperCase();
+    if (status === 'OK' || status === 'MARGINAL') {
+      node.status = 'done';
+      dagNodeStates[nodeId] = 'done';
+    } else {
+      node.status = 'failed';
+      dagNodeStates[nodeId] = 'failed';
+    }
+    node.data = evt.node_data || {};
+    if (evt.error) node.data._error = evt.error;
+    node.summary = summarizeNodeData(node.data, status);
+    const nextPending = execNodes.find(n => n.status === 'pending');
+    if (nextPending) {
+      nextPending.status = 'running';
+      dagNodeStates[nextPending.node_id] = 'running';
+    }
+    renderExecNodes();
+    updateExecProgress();
+    renderDagGraph();
+    return;
+  }
+
+  if (type === 'workflow_completed' || type === 'workflow_failed') {
+    execRunCompleted = true;
+    if (type === 'workflow_failed' && evt.error) {
+      const summaryEl = document.getElementById('execSummary');
+      if (summaryEl) {
+        summaryEl.style.display = 'block';
+        summaryEl.innerHTML = `<div class="exec-summary-title" style="color:var(--red)">工作流失败</div><div class="exec-summary-text">${escHtml(evt.error)}</div>`;
+      }
+    }
+    updateExecProgress();
+    return;
+  }
+
+  if (type === 'workflow_paused') {
+    const statsEl = document.getElementById('execPanelStats');
+    if (statsEl) statsEl.textContent = '⏸ 已暂停';
+    return;
+  }
+  if (type === 'workflow_resumed') {
+    const statsEl = document.getElementById('execPanelStats');
+    if (statsEl) statsEl.textContent = '▶ 已恢复';
+    return;
+  }
+}
+
+function summarizeNodeData(data, status) {
+  if (!data || typeof data !== 'object') return '';
+  const parts = [];
+  if (data.defects !== undefined) parts.push(`缺陷:${data.defects}`);
+  if (data.score !== undefined) parts.push(`评分:${data.score}`);
+  if (data.confidence !== undefined) parts.push(`置信度:${data.confidence}`);
+  if (data.status) parts.push(`状态:${data.status}`);
+  if (data.mock) parts.push('⚠️MOCK');
+  if (data._error) parts.push(`错误:${String(data._error).slice(0, 60)}`);
+  if (parts.length === 0) {
+    const keys = Object.keys(data).filter(k =>
+      !['image_b64', 'image_path', 'raw_image'].includes(k)
+    ).slice(0, 3);
+    for (const k of keys) {
+      const v = data[k];
+      if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+        parts.push(`${k}:${v}`);
+      }
+    }
+  }
+  return parts.slice(0, 4).join(' · ');
 }
 
 function deleteSession(id, e) {
@@ -1116,11 +1807,60 @@ function renderMessages() {
 function makeHero() {
   const el = document.createElement('div');
   el.className = 'hero'; el.id = 'hero';
-  el.innerHTML = `<div class="hero-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5m-9.25-11.396c.251.023.501.05.75.082M19 14.5l-3.091-3.091a2.25 2.25 0 01-.659-1.591V3.186m0 0a24.3 24.3 0 00-4.5 0"/></svg></div><h1>Volcano Cognitive Plane</h1><p>工业质检智能决策引擎 — 标准查询 · 案例检索 · 工艺参数 · 工作流设计 · 焊缝图像分析</p><div class="quick-grid"><button class="quick-card" onclick="sendQuick('查询NB/T47014标准中关于预热温度的规定')"><div class="label">查询焊接标准</div><div class="hint">NB/T47014 预热温度规定</div></button><button class="quick-card" onclick="sendQuick('查询GMAW焊接的工艺参数')"><div class="label">查询工艺参数</div><div class="hint">GMAW 焊接参数参考</div></button><button class="quick-card" onclick="sendQuick('查找类似的夹渣缺陷处理案例')"><div class="label">检索历史案例</div><div class="hint">夹渣缺陷处理经验</div></button><button class="quick-card" onclick="sendQuick('请设计一个完整的焊缝质检工作流')"><div class="label">设计工作流</div><div class="hint">焊缝质检全流程</div></button></div>`;
+  el.innerHTML = `<div class="hero-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5m-9.25-11.396c.251.023.501.05.75.082M19 14.5l-3.091-3.091a2.25 2.25 0 01-.659-1.591V3.186m0 0a24.3 24.3 0 00-4.5 0"/></svg></div><h1>WeldEvent Cognitive Plane</h1><p>焊接质检智能决策引擎 · 标准查询 · 案例检索 · 工艺参数 · 工作流编排 · 焊缝图像分析</p><div class="quick-grid"><button class="quick-card" onclick="sendQuick('查询NB/T47014标准中关于预热温度的规定')"><div class="label">查询焊接标准</div><div class="hint">NB/T 47014</div></button><button class="quick-card" onclick="sendQuick('查询GMAW焊接的工艺参数')"><div class="label">查询工艺参数</div><div class="hint">GMAW 焊接</div></button><button class="quick-card" onclick="sendQuick('查找类似的夹渣缺陷处理案例')"><div class="label">检索历史案例</div><div class="hint">夹渣缺陷</div></button><button class="quick-card" onclick="sendQuick('请设计一个完整的焊缝质检工作流')"><div class="label">设计工作流</div><div class="hint">IQA + PPA + 检测</div></button></div>`;
   return el;
 }
 
 function msgHTML(m) {
+  if (m.is_progress) return m.prog_html || '';
+  if (m.is_thinking) {
+    const body = renderMarkdown(m.content || '');
+    const iter = m.iteration ? ` · 第 ${m.iteration} 轮推理` : '';
+    return `<div class="thinking-block">
+      <div class="think-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <svg class="think-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <span class="think-label">思考过程${iter}</span>
+        <span class="think-chev">▾</span>
+      </div>
+      <div class="think-body">${body}</div>
+    </div>`;
+  }
+  if (m.is_approval) {
+    const summary = renderMarkdown(m.summary || '');
+    const label = toolLabel(m.tool);
+    const resolved = m.resolved;
+    // 按 tool_name 动态生成按钮文案 — 避免所有工具都用"确认启动工作流"
+    const approvalTexts = {
+      launch_workflow:    { approve: '确认启动', reject: '取消', title: '确认启动工作流', resolvedOk: '✓ 已确认，工作流正在启动…' },
+      create_job:         { approve: '确认创建', reject: '取消', title: '确认创建标注作业', resolvedOk: '✓ 已确认，作业正在创建…' },
+      upload_images:      { approve: '确认上传', reject: '取消', title: '确认上传图片', resolvedOk: '✓ 已确认，图片正在上传…' },
+      create_task:        { approve: '确认创建', reject: '取消', title: '确认创建标注任务', resolvedOk: '✓ 已确认，任务正在创建…' },
+      trigger_ai:         { approve: '确认触发', reject: '取消', title: '确认触发AI预标注', resolvedOk: '✓ 已确认，AI预标注正在触发…' },
+      assign_task:        { approve: '确认分配', reject: '取消', title: '确认分配标注任务', resolvedOk: '✓ 已确认，任务正在分配…' },
+      request_confirmation: { approve: '确认', reject: '取消', title: '请确认', resolvedOk: '✓ 已确认' },
+      escalate:           { approve: '同意介入', reject: '拒绝', title: '确认人工介入', resolvedOk: '✓ 已同意人工介入' },
+    };
+    const tx = approvalTexts[m.tool] || { approve: '确认', reject: '取消', title: '请确认', resolvedOk: '✓ 已确认' };
+    const resolvedTag = resolved === 'approved'
+      ? `<div class="ap-resolved-tag" style="color: var(--green);">${tx.resolvedOk}</div>`
+      : resolved === 'rejected'
+      ? '<div class="ap-resolved-tag" style="color: var(--red);">✗ 已拒绝，已通知智能体调整方案</div>'
+      : '';
+    const actions = resolved ? '' : `
+      <div class="ap-actions">
+        <button class="btn-approve" onclick="approveTool('${escHtml(m.approval_id)}', 'approved')">${tx.approve}</button>
+        <button class="btn-reject" onclick="approveTool('${escHtml(m.approval_id)}', 'rejected')">${tx.reject}</button>
+      </div>`;
+    return `<div class="approval-card ${resolved ? 'resolved' : ''}">
+      <div class="ap-header">
+        <svg class="ap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span class="ap-title">${tx.title} · ${escHtml(label)}</span>
+        <span class="ap-badge">需确认</span>
+      </div>
+      <div class="ap-body">${summary || '<em>（无方案摘要）</em>'}</div>
+      ${actions}${resolvedTag}
+    </div>`;
+  }
   const isUser = m.role === 'user';
   const role = isUser ? '你' : 'Volcano';
   let imgs = '';
@@ -1132,19 +1872,9 @@ function msgHTML(m) {
     tools = '<div class="tool-row">' + m.tools_used.map(t => `<span class="tool-chip">${escHtml(t)}</span>`).join('') + '</div>';
   }
   const body = isUser ? escHtml(m.content) : renderMarkdown(m.content);
-  // 检测确认请求：tools_used 含 request_confirmation 或正文含确认关键词
-  let confirmBtns = '';
-  if (!isUser) {
-    const hasConfirmTool = (m.tools_used || []).includes('request_confirmation');
-    const hasConfirmText = /确认启动|请确认|等待确认|是否启动|确认后|请通过通知/.test(m.content || '');
-    if (hasConfirmTool || hasConfirmText) {
-      confirmBtns = '<div class="confirm-row"><button class="btn-confirm" onclick="confirmWorkflow()">确认启动工作流</button><button class="btn-cancel" onclick="cancelWorkflow()">取消</button></div>';
-    }
-  }
-  return `<div class="chat-msg"><div class="role-tag">${role}</div>${imgs}<div class="body">${body}</div>${tools}${confirmBtns}</div>`;
+  return `<div class="chat-msg"><div class="role-tag">${role}</div>${imgs}<div class="body">${body}</div>${tools}</div>`;
 }
 
-// 确认/取消工作流：自动发送消息触发 launch_workflow 或终止
 function confirmWorkflow() {
   const input = document.getElementById('chatInput');
   input.value = '确认启动工作流。请直接使用 launch_workflow 工具启动之前设计的工作流，无需再次确认。';
@@ -1156,6 +1886,33 @@ function cancelWorkflow() {
   sendMessage();
 }
 
+async function approveTool(approvalId, decision) {
+  try {
+    const r = await fetch(`${API_BASE}/chat/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approval_id: approvalId, decision: decision }),
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      console.warn('[approve] failed:', data.error);
+      return;
+    }
+    const s = sessions.find(x => x.id === currentSessionId);
+    if (!s) return;
+    for (let i = s.messages.length - 1; i >= 0; i--) {
+      const m = s.messages[i];
+      if (m.is_approval && m.approval_id === approvalId) {
+        m.resolved = decision;
+        break;
+      }
+    }
+    renderMessages();
+  } catch (err) {
+    console.error('[approve] error:', err);
+  }
+}
+
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -1163,28 +1920,20 @@ async function sendMessage() {
   if (!currentSessionId) newSession();
   const s = sessions.find(x => x.id === currentSessionId);
   if (!s) return;
-  console.log('[DEBUG sendMessage] pendingFileList=', pendingFileList.length, 'pendingImages=', pendingImages.length, 'text=', text);
 
   const fc = pendingFileList.length;
   s.messages.push({ role: 'user', content: text, images: pendingImages.length ? [...pendingImages] : undefined, fileCount: fc || undefined });
   if (s.messages.length === 1) { s.title = text.slice(0, 30) + (text.length > 30 ? '...' : ''); renderSessions(); }
 
-  const isWorkflow = fc >= 3 || /批量|工作流|标注.*图|处理.*图|分析.*图/ig.test(text);
-  if (isWorkflow && fc >= 2) {
-    startWorkflowSimulation(pendingFileList, pendingImages, s.id);
-  }
-
   input.value = ''; input.style.height = 'auto';
-  // 注意：pendingFileList 不能在这里清空！下面的 fetch 还要用它构造 FormData。
-  // 清空操作移到请求完成之后（finally 块）。
   document.getElementById('imagePreview').innerHTML = '';
   renderMessages(); showTyping();
   isLoading = true;
-  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('sendBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = '';
 
   try {
     if (fc > 0) {
-      // 文件上传 — 非流式（multipart/form-data，保持原路径）
       const fd = new FormData(); fd.append('message', text); fd.append('session_id', s.id);
       pendingFileList.forEach(f => fd.append('files', f));
       const r = await fetch(`${API_BASE}/chat/upload`, { method: 'POST', body: fd }); const data = await r.json();
@@ -1192,85 +1941,336 @@ async function sendMessage() {
       s.messages.push({ role: 'assistant', content: data.error ? `**错误**: ${data.error}` : (data.reply || '(空回复)'), tools_used: data.tools_used || [], tier: data.tier });
       updateMeta(s, data);
     } else {
-      // 纯文本 — 流式 SSE（打字机 token + 工具气泡 + 思考过程）
       await sendStreamMessage(text, s);
     }
   } catch (err) {
     hideTyping();
     s.messages.push({ role: 'assistant', content: `**连接失败**: ${err.message}`, tools_used: [] });
   } finally {
-    // 请求完成（成功或失败）后才清空待发送文件列表
     pendingImages = []; pendingFileList = [];
   }
   isLoading = false;
-  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('sendBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
   saveSessions(); renderMessages(); scrollDown();
   input.focus();
 }
 
-// ── 流式 SSE 消费（POST /chat/stream + fetch ReadableStream）──
-// EventSource 不支持 POST，所以用 fetch + reader 手动解析 SSE 格式（data: {json}\n\n）。
-// 渲染策略：
-//   - thinking: 忽略（typing 指示器已隐藏，assistant 空气泡已显示）
-//   - tool_call: 在 streaming assistant 气泡前插入工具调用气泡
-//   - tool_result: 更新对应工具气泡，显示结果摘要
-//   - token: 逐 token 追加到 streaming assistant 气泡（局部刷新 DOM，不全量重渲染）
-//   - final: 全量重渲染 + updateMeta
-//   - error: 显示错误
-async function sendStreamMessage(text, s) {
-  const r = await fetch(`${API_BASE}/chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text, session_id: s.id }),
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+// 中断当前对话 — 优先 AgentLoop interrupt,回退 HTTP abort
+function stopChat() {
+  // 优先 AgentLoop WebSocket 中断
+  if (sendInterrupt()) {
+    console.log('Interrupt sent via AgentLoop WebSocket');
+    // 标记当前流式消息结束 (AgentLoop 收到 interrupt 会 cancel react_task,
+    // 可能不会再推 final 事件,所以前端主动结束)
+    if (activeStreamMsg && activeStreamMsg.streaming) {
+      activeStreamMsg.streaming = false;
+      if (!activeStreamMsg.content) activeStreamMsg.content = '(已中断)';
+    }
+    isLoading = false;
+    document.getElementById('sendBtn').style.display = '';
+    document.getElementById('stopBtn').style.display = 'none';
+    hideTyping();
+    renderMessages();
+    // resolve Promise 让 sendStreamMessage 返回
+    const resolveFn = activeStreamResolve;
+    activeStreamSession = null;
+    activeStreamMsg = null;
+    activeStreamPromise = null;
+    activeStreamResolve = null;
+    activeStreamReject = null;
+    if (resolveFn) resolveFn();
+    return;
+  }
+  // 回退: HTTP /stream abort
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+  // 标记当前流式消息结束
+  const s = sessions.find(x => x.id === currentSessionId);
+  if (s) {
+    const streamingMsg = s.messages.findLast(m => m.streaming);
+    if (streamingMsg) {
+      streamingMsg.streaming = false;
+      if (!streamingMsg.content) streamingMsg.content = '(已中断)';
+    }
+  }
+  isLoading = false;
+  document.getElementById('sendBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+  hideTyping();
+  renderMessages();
+}
 
-  // 创建 streaming assistant 消息（content 逐 token 增长）
+async function sendStreamMessage(text, s) {
+  // AgentLoop WebSocket 路径 — 替代 HTTP /stream
+  // 首次调用时建立 WebSocket 连接,后续复用。
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
+    await connectChatWs();
+    if (!chatWsReady) {
+      // 连接失败,回退到 HTTP /stream
+      console.warn('Chat WebSocket connection failed, falling back to HTTP /stream');
+      return sendStreamMessageHttp(text, s);
+    }
+  }
+
   const assistantMsg = { role: 'assistant', content: '', tools_used: [], streaming: true };
   s.messages.push(assistantMsg);
   hideTyping();
-  renderMessages(); // 显示空气泡
+  renderMessages();
 
-  const reader = r.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    // SSE 事件以 \n\n 分隔
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop(); // 最后一段可能不完整，保留到下次
-    for (const part of parts) {
-      const line = part.split('\n').find(l => l.startsWith('data: '));
-      if (!line) continue;
-      let event;
-      try { event = JSON.parse(line.slice(6)); } catch { continue; }
-      handleStreamEvent(event, s, assistantMsg);
-    }
-  }
-  // 流结束兜底（final 事件未到达时）
-  if (assistantMsg.streaming) {
-    assistantMsg.streaming = false;
-    if (!assistantMsg.content) assistantMsg.content = '(空回复)';
+  // 记录当前流式上下文 — onmessage 回调用
+  activeStreamSession = s;
+  activeStreamMsg = assistantMsg;
+
+  // 创建 Promise — 在 handleChatWsMessage 收到 final/error 事件时 resolve
+  // 这样 sendStreamMessage 阻塞到 LLM 回复完成,sendMessage 的 finally 不会提前执行
+  activeStreamPromise = new Promise((resolve, reject) => {
+    activeStreamResolve = resolve;
+    activeStreamReject = reject;
+  });
+
+  // 发送 chat 消息到 AgentLoop
+  chatWs.send(JSON.stringify({
+    type: 'chat',
+    message: text,
+    session_id: s.id,
+  }));
+
+  // 阻塞等待 final 事件
+  await activeStreamPromise;
+}
+
+// HTTP /stream 回退路径 — WebSocket 连接失败时用
+async function sendStreamMessageHttp(text, s) {
+  const controller = new AbortController();
+  activeAbortController = controller;
+
+  try {
+    const r = await fetch(`${API_BASE}/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, session_id: s.id }),
+      signal: controller.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    const assistantMsg = { role: 'assistant', content: '', tools_used: [], streaming: true };
+    s.messages.push(assistantMsg);
+    hideTyping();
     renderMessages();
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for (const part of parts) {
+        const line = part.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        let event;
+        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+        handleStreamEvent(event, s, assistantMsg);
+      }
+    }
+    if (assistantMsg.streaming) {
+      assistantMsg.streaming = false;
+      if (!assistantMsg.content) assistantMsg.content = '(空回复)';
+      renderMessages();
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const assistantMsg = s.messages.findLast(m => m.streaming);
+      if (assistantMsg) {
+        assistantMsg.streaming = false;
+        if (!assistantMsg.content) assistantMsg.content = '(已停止)';
+      }
+      renderMessages();
+    } else {
+      throw err;
+    }
+  } finally {
+    activeAbortController = null;
   }
+}
+
+// ── AgentLoop WebSocket 连接管理 ──
+function connectChatWs() {
+  return new Promise((resolve) => {
+    if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+      chatWsReady = true;
+      resolve();
+      return;
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}${API_BASE}/chat/ws`;
+    chatWs = new WebSocket(wsUrl);
+
+    chatWs.onopen = () => {
+      console.log('Chat WebSocket (AgentLoop) connected');
+      chatWsReady = true;
+      resolve();
+    };
+
+    chatWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleChatWsMessage(msg);
+      } catch (e) {
+        console.error('Failed to parse chat WS message:', e);
+      }
+    };
+
+    chatWs.onclose = () => {
+      console.log('Chat WebSocket closed');
+      chatWsReady = false;
+      chatWs = null;
+      // 流式消息标记为结束
+      if (activeStreamMsg && activeStreamMsg.streaming) {
+        activeStreamMsg.streaming = false;
+        if (!activeStreamMsg.content) activeStreamMsg.content = '(连接已断开)';
+        renderMessages();
+        isLoading = false;
+        document.getElementById('sendBtn').disabled = false;
+        hideTyping();
+      }
+      activeStreamSession = null;
+      activeStreamMsg = null;
+      // 自动重连 (3秒后)
+      setTimeout(() => {
+        if (!chatWs) connectChatWs();
+      }, 3000);
+    };
+
+    chatWs.onerror = (error) => {
+      console.error('Chat WebSocket error:', error);
+      chatWsReady = false;
+      resolve(); // 连接失败也 resolve,让 sendStreamMessage 回退到 HTTP
+    };
+
+    // 连接超时 (3秒)
+    setTimeout(() => {
+      if (!chatWsReady) resolve();
+    }, 3000);
+  });
+}
+
+// 处理 AgentLoop 推送的消息
+function handleChatWsMessage(msg) {
+  // final 事件 (stream 模式: {event: "final", data: {...}}, 非 stream: {type: "final", ...})
+  // 优先判断 — 避免被 handleStreamEvent 分支拦截
+  if ((msg.type === 'final' || msg.event === 'final') && activeStreamMsg) {
+    if (msg.event === 'final') {
+      // stream 模式: 让 handleStreamEvent 处理 final 事件的 data (含 reply/tools_used)
+      handleStreamEvent(msg, activeStreamSession, activeStreamMsg);
+    } else {
+      // 非 stream 模式: 直接填充
+      if (msg.reply && !activeStreamMsg.content) activeStreamMsg.content = msg.reply;
+      if (msg.tools_used) activeStreamMsg.tools_used = msg.tools_used;
+      if (msg.tier) activeStreamMsg.tier = msg.tier;
+    }
+    activeStreamMsg.streaming = false;
+    if (!activeStreamMsg.content) activeStreamMsg.content = '(空回复)';
+    renderMessages();
+    isLoading = false;
+    document.getElementById('sendBtn').style.display = '';
+    document.getElementById('stopBtn').style.display = 'none';
+    activeStreamSession = null;
+    const resolveFn = activeStreamResolve;
+    activeStreamMsg = null;
+    activeStreamPromise = null;
+    activeStreamResolve = null;
+    activeStreamReject = null;
+    if (resolveFn) resolveFn();
+    return;
+  }
+  // 错误消息
+  if (msg.type === 'error') {
+    console.error('AgentLoop error:', msg.error);
+    if (activeStreamMsg) {
+      activeStreamMsg.streaming = false;
+      activeStreamMsg.content = `**错误**: ${msg.error || '未知错误'}`;
+      renderMessages();
+      isLoading = false;
+      document.getElementById('sendBtn').style.display = '';
+      document.getElementById('stopBtn').style.display = 'none';
+      hideTyping();
+    }
+    activeStreamSession = null;
+    const resolveFn = activeStreamResolve;
+    activeStreamMsg = null;
+    activeStreamPromise = null;
+    activeStreamResolve = null;
+    activeStreamReject = null;
+    if (resolveFn) resolveFn();
+    return;
+  }
+  // AgentLoop _run_react_stream 推送的事件: {event: "thinking"|"tool_call"|"token"|..., data: {...}}
+  // 与 HTTP /stream 的 SSE 事件格式完全一致,复用 handleStreamEvent。
+  if (msg.event && activeStreamSession && activeStreamMsg) {
+    handleStreamEvent(msg, activeStreamSession, activeStreamMsg);
+    return;
+  }
+  console.log('Chat WS message (unhandled):', msg);
+}
+
+// 通过 AgentLoop 发送中断 — 取消当前 ReAct run()
+function sendInterrupt() {
+  if (chatWs && chatWs.readyState === WebSocket.OPEN && activeStreamSession) {
+    chatWs.send(JSON.stringify({
+      type: 'interrupt',
+      session_id: activeStreamSession.id,
+      reason: '用户手动中断',
+    }));
+    return true;
+  }
+  return false;
+}
+
+// 通过 AgentLoop 发送反馈 — 纠正当前 ReAct 的工具调用
+function sendFeedback(correction, category = 'other') {
+  if (chatWs && chatWs.readyState === WebSocket.OPEN && activeStreamSession) {
+    chatWs.send(JSON.stringify({
+      type: 'feedback',
+      session_id: activeStreamSession.id,
+      correction: correction,
+      category: category,
+    }));
+    return true;
+  }
+  return false;
 }
 
 function handleStreamEvent(event, s, assistantMsg) {
   const type = event.event, d = event.data || {};
   if (type === 'thinking') {
-    // 思考中 — 可选：在 assistant 气泡显示 "思考中..." 闪烁
+    if (d.reasoning) {
+      const thinkMsg = {
+        role: 'assistant', is_thinking: true,
+        content: d.reasoning,
+        iteration: d.iteration || 0,
+      };
+      const idx = s.messages.indexOf(assistantMsg);
+      if (idx > 0) s.messages.splice(idx, 0, thinkMsg);
+      else s.messages.push(thinkMsg);
+      renderMessages();
+    }
     return;
   }
   if (type === 'tool_call') {
-    // 插入工具调用气泡（位于 streaming assistant 气泡之前）
-    const argStr = d.arguments ? JSON.stringify(d.arguments).slice(0, 100) : '';
-    const status = d.rejected ? '❌' : '🔧';
-    const reason = d.rejected ? ` (拒绝: ${d.reason || ''})` : '';
+    const status = d.rejected ? '🚫' : (d.approved ? '✅' : '⏳');
+    let suffix = '';
+    if (d.rejected) suffix = ` — ${d.reason || '已拒绝'}`;
+    else if (d.approved) suffix = d.feedback ? ` — 已确认${d.feedback ? '：' + d.feedback : ''}` : ' — 已确认';
+    const label = toolLabel(d.tool);
     const toolMsg = {
       role: 'assistant', is_tool: true, tool_name: d.tool,
-      content: `${status} **${d.tool}**(${argStr})${reason}`,
+      content: `${status} **${label}**${suffix}`,
     };
     const idx = s.messages.indexOf(assistantMsg);
     if (idx > 0) s.messages.splice(idx, 0, toolMsg);
@@ -1278,16 +2278,47 @@ function handleStreamEvent(event, s, assistantMsg) {
     renderMessages();
     return;
   }
+  if (type === 'compaction') {
+    const reduced = d.reduced || 0;
+    const pre = d.pre_tokens || 0;
+    const post = d.post_tokens || 0;
+    const tipMsg = {
+      role: 'assistant', is_tool: true, tool_name: 'compaction',
+      content: `🗜️ **上下文压缩** — 历史 token ${pre} → ${post}（减少 ${reduced}），已保留关键决策与未决问题`,
+    };
+    const idx = s.messages.indexOf(assistantMsg);
+    if (idx > 0) s.messages.splice(idx, 0, tipMsg);
+    else s.messages.push(tipMsg);
+    renderMessages();
+    return;
+  }
+  if (type === 'approval_request') {
+    const apMsg = {
+      role: 'assistant', is_approval: true,
+      approval_id: d.approval_id,
+      tool: d.tool,
+      summary: d.summary || '',
+      iteration: d.iteration || 0,
+      resolved: null,
+    };
+    const idx = s.messages.indexOf(assistantMsg);
+    if (idx > 0) s.messages.splice(idx, 0, apMsg);
+    else s.messages.push(apMsg);
+    renderMessages();
+    return;
+  }
   if (type === 'tool_result') {
-    // 更新最后匹配的工具气泡，显示结果摘要
+    // design_workflow 返回 nodes 列表 → 解析后初始化 DAG 画板
+    if (d.tool === 'design_workflow' && d.result?.output?.nodes) {
+      initWorkflowDag(d.result.output.nodes);
+    }
     for (let i = s.messages.length - 1; i >= 0; i--) {
       const m = s.messages[i];
       if (m.is_tool && m.tool_name === d.tool && !m.result_shown) {
         m.result_shown = true;
-        const r = d.result || {};
-        const summary = d.error ? `❌ ${d.error}` :
-                        (r.output ? `→ \`${JSON.stringify(r.output).slice(0, 120)}\`` : '→ 完成');
-        m.content += `\n${summary}`;
+        const summary = toolResultSummary(d.tool, d.result, d.error);
+        m.content = m.content.replace('⏳', d.error ? '❌' : '✅');
+        m.content += ` — ${summary}`;
         if (!assistantMsg.tools_used.includes(d.tool)) assistantMsg.tools_used.push(d.tool);
         renderMessages();
         break;
@@ -1295,9 +2326,23 @@ function handleStreamEvent(event, s, assistantMsg) {
     }
     return;
   }
+  if (type === 'workflow_progress') {
+    // 同时初始化 DAG 画板（若 nodes 字段存在）
+    if (d.status === 'started') {
+      execActiveWorkflowId = d.workflow_id;
+      initExecPanel(d.label || '', d.nodes || []);
+      if (d.nodes && d.nodes.length) initWorkflowDag(d.nodes);
+    } else if (d.status === 'completed' || d.status === 'failed') {
+      updateExecNode(d.node_id, d.status === 'failed' ? 'failed' : 'done', d.summary || '');
+      if (d.node_id) {
+        dagNodeStates[d.node_id] = (d.status === 'failed') ? 'failed' : 'done';
+        renderDagGraph();
+      }
+    }
+    return;
+  }
   if (type === 'token') {
     assistantMsg.content += d.content || '';
-    // 局部刷新最后一个 assistant 气泡的 body（不全量 renderMessages，避免卡顿）
     updateStreamingBubble(assistantMsg);
     return;
   }
@@ -1319,8 +2364,252 @@ function handleStreamEvent(event, s, assistantMsg) {
   }
 }
 
+// ══════════════════════════════════════════════
+// Execution Panel — 执行监控面板
+// ══════════════════════════════════════════════
+
+function openExecPanel() {
+  execPanelOpen = true;
+  const panel = document.getElementById('execPanel');
+  panel.classList.add('open');
+  document.getElementById('execToggleBtn').style.display = 'none';
+}
+
+function closeExecPanel() {
+  execPanelOpen = false;
+  const panel = document.getElementById('execPanel');
+  panel.classList.remove('open');
+  if (execActiveWorkflowId && !execRunCompleted) {
+    document.getElementById('execToggleBtn').style.display = 'flex';
+  }
+}
+
+function resetExecPanel() {
+  execNodes = [];
+  execPanelOpen = false;
+  execRunCompleted = false;
+  execActiveWorkflowId = null;
+  dagNodes = []; dagEdges = []; dagNodeStates = {}; dagPositions = {};
+  const panel = document.getElementById('execPanel');
+  panel.classList.remove('open');
+  document.getElementById('execToggleBtn').style.display = 'none';
+  document.getElementById('execToggleLabel').textContent = '';
+  document.getElementById('execWorkflowTitle').textContent = '';
+  document.getElementById('execWorkflowTitle').style.display = 'none';
+  document.getElementById('execProgressFill').style.width = '0%';
+  document.getElementById('execProgressText').textContent = '';
+  document.getElementById('execPanelStats').textContent = '';
+  document.getElementById('execNodeList').innerHTML = '';
+  document.getElementById('execSummary').style.display = 'none';
+}
+
+async function stopExecution() {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+  if (execActiveWorkflowId) {
+    try {
+      await fetch(`${API_BASE}/chat/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: execActiveWorkflowId }),
+      });
+    } catch (e) {
+      console.warn('Cancel workflow request failed:', e);
+    }
+  }
+  execNodes.forEach(n => {
+    if (n.status === 'running' || n.status === 'pending') {
+      n.status = 'cancelled';
+      if (dagNodeStates[n.node_id]) dagNodeStates[n.node_id] = 'cancelled';
+    }
+  });
+  execRunCompleted = true;
+  renderExecNodes();
+  updateExecProgress();
+  renderDagGraph();
+  showStopSummary();
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+  hideTyping();
+}
+
+function showStopSummary() {
+  const summaryEl = document.getElementById('execSummary');
+  const stopped = execNodes.filter(n => n.status === 'cancelled').length;
+  const done = execNodes.filter(n => n.status === 'done' || n.status === 'failed').length;
+  const html = `<div class="exec-summary-title">已停止</div><div class="exec-summary-text">
+    <span style="color:var(--amber)">执行已被用户中断</span><br>
+    已完成 ${done} 个节点，已取消 ${stopped} 个节点
+  </div>`;
+  summaryEl.innerHTML = html;
+  summaryEl.style.display = 'block';
+}
+
+// ══════════════════════════════════════════════
+// 模式切换
+// ══════════════════════════════════════════════
+function switchMode(mode) {
+  if (currentMode === mode) return;
+  currentMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.mode === mode);
+  });
+  const input = document.getElementById('chatInput');
+  const hint = document.querySelector('.input-hint');
+  const attachBtn = document.querySelector('.btn-attach');
+  switch (mode) {
+    case 'chat':
+      input.placeholder = '输入消息，Enter 发送，Shift+Enter 换行';
+      hint.textContent = '支持图片 / PDF / Word / Excel / CSV / ZIP 上传';
+      attachBtn.style.display = '';
+      input.style.display = '';
+      break;
+    case 'batch':
+      input.placeholder = '描述数据集处理需求，或直接上传 ZIP 文件';
+      hint.textContent = '上传 ZIP 数据集（含多张图片），系统将并行处理';
+      attachBtn.style.display = '';
+      input.style.display = '';
+      break;
+    case 'live':
+      input.placeholder = '流水线监听中... 可通过 webhook 推送图片';
+      hint.textContent = 'Webhook: POST /api/v1/live/{session_id}';
+      attachBtn.style.display = 'none';
+      input.style.display = '';
+      break;
+  }
+}
+
+function initExecPanel(title, nodeList) {
+  execNodes = nodeList.map(n => ({
+    node_id: n.node_id,
+    label: n.label || n.node_id,
+    status: 'pending',
+    summary: ''
+  }));
+  execRunCompleted = false;
+  const titleEl = document.getElementById('execWorkflowTitle');
+  if (title) {
+    titleEl.textContent = title;
+    titleEl.style.display = 'block';
+  } else {
+    titleEl.style.display = 'none';
+  }
+  if (execNodes.length > 0) {
+    execNodes[0].status = 'running';
+    dagNodeStates[execNodes[0].node_id] = 'running';
+  }
+  document.getElementById('execSummary').style.display = 'none';
+  renderExecNodes();
+  updateExecProgress();
+  openExecPanel();
+}
+
+function updateExecNode(nodeId, status, summary) {
+  const node = execNodes.find(n => n.node_id === nodeId);
+  if (!node) return;
+  node.status = status;
+  if (summary) node.summary = summary;
+  if (status === 'done' || status === 'failed') {
+    const nextPending = execNodes.find(n => n.status === 'pending');
+    if (nextPending) {
+      nextPending.status = 'running';
+      dagNodeStates[nextPending.node_id] = 'running';
+    }
+  }
+  renderExecNodes();
+  updateExecProgress();
+  renderDagGraph();
+}
+
+function renderExecNodes() {
+  const list = document.getElementById('execNodeList');
+  const icons = {
+    pending: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>',
+    running: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>',
+    done: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+    failed: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    cancelled: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+  };
+  list.innerHTML = execNodes.map((n, idx) => {
+    const cls = n.status;
+    const icon = icons[cls] || icons.pending;
+    const label = escHtml(n.label);
+    const summary = n.summary ? `<div class="exec-node-summary">${escHtml(n.summary)}</div>` : '';
+    const hasDetail = n.data && Object.keys(n.data).length > 0;
+    const clickable = hasDetail ? ` style="cursor:pointer" onclick="toggleNodeDetail(${idx})"` : '';
+    const detailIcon = hasDetail ? ' <span style="font-size:10px;opacity:.6">▾</span>' : '';
+    const detailHtml = hasDetail ? `<div class="exec-node-detail" id="nodeDetail${idx}" style="display:none">${escHtml(JSON.stringify(n.data, null, 2))}</div>` : '';
+    return `<div class="exec-node ${cls}"${clickable}>
+      <div class="exec-node-icon ${cls}">${icon}</div>
+      <div class="exec-node-info">
+        <div class="exec-node-label">${label}${detailIcon}</div>
+        ${summary}
+        ${detailHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleNodeDetail(idx) {
+  const el = document.getElementById(`nodeDetail${idx}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateExecProgress() {
+  const total = execNodes.length;
+  const done = execNodes.filter(n => n.status === 'done' || n.status === 'failed').length;
+  const running = execNodes.filter(n => n.status === 'running').length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('execProgressFill').style.width = pct + '%';
+  document.getElementById('execProgressText').textContent =
+    `${done}/${total} 完成` + (running > 0 ? ' · 1 执行中' : '');
+  document.getElementById('execPanelStats').textContent = `${done}/${total}`;
+  // 同步 DAG 画板顶部 stats
+  const dagStats = document.getElementById('wfCanvasStats');
+  if (dagStats) dagStats.textContent = `${done}/${total} · ${pct}%`;
+  const btn = document.getElementById('execToggleBtn');
+  if (execActiveWorkflowId && total > 0) {
+    document.getElementById('execToggleLabel').textContent = `执行中 ${done}/${total}`;
+    if (!execPanelOpen && !execRunCompleted) {
+      btn.style.display = 'flex';
+    }
+  }
+  const allDone = total > 0 && done >= total;
+  if (allDone && !execRunCompleted) {
+    execRunCompleted = true;
+    showExecSummary();
+    btn.style.display = 'none';
+  }
+}
+
+function showExecSummary() {
+  const summaryEl = document.getElementById('execSummary');
+  const failedNodes = execNodes.filter(n => n.status === 'failed');
+  const doneNodes = execNodes.filter(n => n.status === 'done');
+  let html = '<div class="exec-summary-title">执行结果</div><div class="exec-summary-text">';
+  if (failedNodes.length > 0) {
+    html += '<span style="color:var(--red)">失败节点:</span><br>';
+    failedNodes.forEach(n => {
+      html += `· ${escHtml(n.label)}: ${escHtml(n.summary || '未知错误')}<br>`;
+    });
+  }
+  if (doneNodes.length > 0) {
+    html += '<span style="color:var(--green)">成功节点:</span><br>';
+    doneNodes.forEach(n => {
+      html += `· ${escHtml(n.label)}${n.summary ? ': ' + escHtml(n.summary) : ''}<br>`;
+    });
+  }
+  if (failedNodes.length === 0 && doneNodes.length === execNodes.length) {
+    html += '<span style="color:var(--green)">全部节点执行成功</span>';
+  }
+  html += '</div>';
+  summaryEl.innerHTML = html;
+  summaryEl.style.display = 'block';
+}
+
 function updateStreamingBubble(msg) {
-  // 找到最后一个 .chat-msg，更新其 .body innerHTML（局部刷新，性能友好）
   const msgs = document.querySelectorAll('#msgContainer .chat-msg');
   if (!msgs.length) { renderMessages(); return; }
   const last = msgs[msgs.length - 1];
@@ -1393,13 +2682,8 @@ const MOCK_DEFECTS = [
   { type: '气孔', sev: 'med', desc: '密集气孔群，气孔率 3.5%' },
 ];
 
-function openWfPanel() {
-  document.getElementById('wfPanel').classList.add('open');
-}
-
-function closeWfPanel() {
-  document.getElementById('wfPanel').classList.remove('open');
-}
+function openWfPanel() { document.getElementById('wfPanel').classList.add('open'); }
+function closeWfPanel() { document.getElementById('wfPanel').classList.remove('open'); }
 
 function updateWfProgress() {
   const total = wfCards.length;
@@ -1422,25 +2706,16 @@ function submitFeedback(cardId) {
   const form = document.getElementById('fb-' + cardId);
   const text = form ? form.value.trim() : '';
   if (!text) return;
-
   const card = wfCards.find(c => c.id === cardId);
   if (!card) return;
-
   const s = sessions.find(x => x.id === currentSessionId);
   if (s) {
-    s.messages.push({
-      role: 'user',
-      content: `[反馈: ${card.name}] ${text}`,
-      feedbackTarget: cardId
-    });
+    s.messages.push({ role: 'user', content: `[反馈: ${card.name}] ${text}`, feedbackTarget: cardId });
     saveSessions();
   }
-
   form.value = '';
   const status = document.getElementById('fb-status-' + cardId);
   if (status) { status.textContent = '已提交'; status.style.color = 'var(--green)'; setTimeout(() => { status.textContent = ''; }, 2000); }
-
-  console.log('Feedback submitted:', { cardId, text, sessionId: currentSessionId });
 }
 
 function toggleCardExpand(cardId) {
@@ -1458,14 +2733,12 @@ function renderWfCards() {
 function wfCardHTML(c) {
   const expanded = wfExpandedCard === c.id;
   const cls = expanded ? ' expanded' : '';
-
   let imgContent;
   if (c.imageUrl) {
     imgContent = `<img src="${c.imageUrl}" alt="${escHtml(c.name)}">`;
   } else {
     imgContent = `<div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>${escHtml(c.name)}</span></div>`;
   }
-
   let annotLayer = '';
   if (c.annotations && c.annotations.length) {
     annotLayer = '<div class="wf-annot-layer">' + c.annotations.map(a => {
@@ -1473,7 +2746,6 @@ function wfCardHTML(c) {
       return `<div class="wf-annot-box" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;"><span class="wf-annot-label">${escHtml(a.label || '缺陷')} ${a.confidence ? Math.round(a.confidence*100)+'%' : ''}</span></div>`;
     }).join('') + '</div>';
   }
-
   let defectsHtml = '';
   if (c.defects && c.defects.length) {
     defectsHtml = c.defects.map(d => {
@@ -1483,9 +2755,7 @@ function wfCardHTML(c) {
   } else if (c.status === 'done') {
     defectsHtml = '<span style="color:var(--green);font-size:11.5px;font-weight:500">✓ 未检测到缺陷</span>';
   }
-
   const statusCN = { pending: '等待中', running: '分析中', done: '已完成', error: '异常' };
-
   return `<div class="wf-card${cls}" id="wf-card-${c.id}">
     <div class="wf-card-img" onclick="toggleCardExpand('${c.id}')">
       ${imgContent}
@@ -1526,13 +2796,11 @@ function startWorkflowSimulation(files, previews, sessionId) {
   wfExpandedCard = null;
   openWfPanel();
   renderWfCards();
-
   let idx = 0;
   function processNext() {
     if (idx >= wfCards.length) return;
     const card = wfCards[idx];
     updateWfCard(card.id, { status: 'running' });
-
     const delay = 600 + Math.random() * 1200;
     setTimeout(() => {
       const defectCount = Math.random() < 0.3 ? 0 : 1 + Math.floor(Math.random() * 3);
@@ -1568,7 +2836,6 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   const ov = document.getElementById('sidebarOverlay');
   sb.classList.toggle('open');
-  // 遮罩同步显示/隐藏（窄屏生效，桌面端 CSS 强制隐藏遮罩）
   if (sb.classList.contains('open')) { ov.classList.add('show'); }
   else { ov.classList.remove('show'); }
 }
@@ -1597,6 +2864,472 @@ function renderImagePreview() {
     return `<div class="preview-item" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-hover);font-size:10px;color:var(--text-muted);gap:2px;"><span style="font-size:22px">${icon}</span><span style="max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${escHtml(f.name)}</span><span style="font-size:10px">${sz}</span><button class="rm-btn" onclick="removeFile(${i})">&times;</button></div>`;
   }).join('');
 }
+
+// ══════════════════════════════════════════════
+// Workflow DAG 可视化 — Coze/Dify 风格的节点编排画板
+// ══════════════════════════════════════════════
+
+// 从 design_workflow 返回的 nodes 列表初始化 DAG
+// nodes 格式: [{node_id, capability, action, depends_on: [node_id, ...]}]
+function initWorkflowDag(nodes) {
+  if (!Array.isArray(nodes) || !nodes.length) return;
+  dagNodes = nodes.map(n => ({
+    node_id: n.node_id,
+    capability: n.capability || n.action || 'node',
+    action: n.action,
+    depends_on: Array.isArray(n.depends_on) ? n.depends_on : [],
+  }));
+  // 构建 edges（依赖关系：父 → 子）
+  dagEdges = [];
+  dagNodes.forEach(n => {
+    (n.depends_on || []).forEach(parent => {
+      dagEdges.push({ from: parent, to: n.node_id });
+    });
+  });
+  // 初始化状态（全部 pending，第一个节点 running）
+  dagNodeStates = {};
+  dagNodes.forEach((n, i) => {
+    dagNodeStates[n.node_id] = i === 0 ? 'running' : 'pending';
+  });
+  // 自动布局
+  dagPositions = computeDagLayout(dagNodes, dagEdges);
+  // 渲染
+  renderDagGraph();
+  openWfCanvas();
+}
+
+// 拓扑分层布局算法
+// 把 DAG 节点按依赖关系分层：根节点在第 0 层，依赖第 N-1 层节点的在第 N 层
+function computeDagLayout(nodes, edges) {
+  const positions = {};
+  if (!nodes.length) return positions;
+  // 构建邻接表
+  const inDegree = {}; // 入度
+  const adj = {};      // 邻接（父→子列表）
+  nodes.forEach(n => {
+    inDegree[n.node_id] = 0;
+    adj[n.node_id] = [];
+  });
+  edges.forEach(e => {
+    if (adj[e.from] && inDegree[e.to] !== undefined) {
+      adj[e.from].push(e.to);
+      inDegree[e.to]++;
+    }
+  });
+  // 拓扑分层（Kahn 算法变体 — 按层 BFS）
+  const layers = []; // [[node_id, ...], [node_id, ...], ...]
+  let remaining = new Set(nodes.map(n => n.node_id));
+  while (remaining.size > 0) {
+    // 找出当前所有入度为 0 的节点（在 remaining 中）
+    const layer = [];
+    for (const id of remaining) {
+      // 入度 = 还在 remaining 中的父节点数
+      const parents = edges.filter(e => e.to === id && remaining.has(e.from));
+      if (parents.length === 0) layer.push(id);
+    }
+    if (!layer.length) {
+      // 出现环 — 把剩余节点都塞进当前层避免死循环
+      layer.push(...remaining);
+    }
+    layers.push(layer);
+    layer.forEach(id => remaining.delete(id));
+  }
+  // 计算坐标 — 每层水平居中
+  const nodeWidth = 180;
+  const nodeHeight = 56;
+  const layerGap = 240;  // 水平间距（节点宽 + gap）
+  const nodeGap = 90;     // 垂直间距
+  const padding = 40;
+  // 计算每层最大高度，用于垂直居中
+  layers.forEach((layer, layerIdx) => {
+    const layerHeight = layer.length * (nodeHeight + nodeGap) - nodeGap;
+    layer.forEach((nodeId, nodeIdx) => {
+      positions[nodeId] = {
+        x: padding + layerIdx * layerGap,
+        y: padding + nodeIdx * (nodeHeight + nodeGap),
+      };
+    });
+  });
+  return positions;
+}
+
+// 渲染 DAG 到 SVG
+function renderDagGraph() {
+  const svg = document.getElementById('wfDagSvg');
+  if (!svg) return;
+  if (!dagNodes.length) { svg.innerHTML = ''; return; }
+  const nodeWidth = 180;
+  const nodeHeight = 56;
+  // 计算 SVG 画布尺寸
+  let maxX = 0, maxY = 0;
+  Object.values(dagPositions).forEach(p => {
+    if (p.x + nodeWidth > maxX) maxX = p.x + nodeWidth;
+    if (p.y + nodeHeight > maxY) maxY = p.y + nodeHeight;
+  });
+  const svgWidth = Math.max(maxX + 40, 600);
+  const svgHeight = Math.max(maxY + 40, 200);
+  svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  svg.setAttribute('width', svgWidth);
+  svg.setAttribute('height', svgHeight);
+
+  // 渲染连线（先画线后画节点，让节点压在线上）
+  let edgesHtml = '';
+  dagEdges.forEach(edge => {
+    const from = dagPositions[edge.from];
+    const to = dagPositions[edge.to];
+    if (!from || !to) return;
+    const x1 = from.x + nodeWidth;
+    const y1 = from.y + nodeHeight / 2;
+    const x2 = to.x;
+    const y2 = to.y + nodeHeight / 2;
+    // 贝塞尔曲线 — 水平方向控制点
+    const dx = (x2 - x1) / 2;
+    const path = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    const fromState = dagNodeStates[edge.from] || 'pending';
+    const toState = dagNodeStates[edge.to] || 'pending';
+    let edgeClass = 'dag-edge';
+    if (fromState === 'done') edgeClass += ' done';
+    else if (toState === 'running' || fromState === 'running') edgeClass += ' active';
+    // 箭头（终点小三角）
+    const arrowSize = 5;
+    const arrowPath = `M ${x2} ${y2} l ${-arrowSize} ${-arrowSize/2} l 0 ${arrowSize} z`;
+    edgesHtml += `<path class="${edgeClass}" d="${path}" />`;
+    edgesHtml += `<path class="${edgeClass} dag-edge-arrow" d="${arrowPath}" />`;
+  });
+
+  // 渲染节点
+  let nodesHtml = '';
+  dagNodes.forEach(n => {
+    const pos = dagPositions[n.node_id];
+    if (!pos) return;
+    const state = dagNodeStates[n.node_id] || 'pending';
+    const statusIcon = {
+      pending: '○',
+      running: '◐',
+      done: '✓',
+      failed: '✗',
+      cancelled: '⊘',
+    }[state] || '○';
+    const statusColor = {
+      pending: 'var(--text-muted)',
+      running: 'var(--accent)',
+      done: 'var(--green)',
+      failed: 'var(--red)',
+      cancelled: 'var(--text-faint)',
+    }[state] || 'var(--text-muted)';
+    // 节点显示 capability + node_id（截断）
+    const capLabel = (n.capability || 'node').slice(0, 14);
+    const nodeLabel = n.node_id.slice(0, 16);
+    nodesHtml += `<g class="dag-node ${state}" transform="translate(${pos.x}, ${pos.y})" data-node-id="${escHtml(n.node_id)}">
+      <rect class="dag-node-rect" width="${nodeWidth}" height="${nodeHeight}" rx="10" ry="10" />
+      <text class="dag-node-capability" x="14" y="20">${escHtml(capLabel)}</text>
+      <text class="dag-node-label" x="14" y="40">${escHtml(nodeLabel)}</text>
+      <text class="dag-node-status-icon" x="${nodeWidth - 20}" y="22" fill="${statusColor}" text-anchor="middle">${statusIcon}</text>
+    </g>`;
+  });
+
+  svg.innerHTML = edgesHtml + nodesHtml;
+
+  // 给每个节点绑定 hover tooltip
+  svg.querySelectorAll('.dag-node').forEach(g => {
+    const nodeId = g.dataset.nodeId;
+    const node = dagNodes.find(n => n.node_id === nodeId);
+    const state = dagNodeStates[nodeId] || 'pending';
+    const execNode = execNodes.find(n => n.node_id === nodeId);
+    g.addEventListener('mouseenter', (e) => {
+      const tooltip = document.getElementById('dagTooltip');
+      if (!tooltip || !node) return;
+      const summary = execNode?.summary || '（暂无执行摘要）';
+      tooltip.innerHTML = `<div class="dag-tooltip-title">${escHtml(nodeId)}</div><div class="dag-tooltip-body">capability: ${escHtml(node.capability)}<br>state: <span style="color:${statusColor}">${state}</span><br>${escHtml(summary)}</div>`;
+      tooltip.classList.add('show');
+    });
+    g.addEventListener('mousemove', (e) => {
+      const tooltip = document.getElementById('dagTooltip');
+      if (!tooltip) return;
+      const rect = document.getElementById('wfCanvasBody').getBoundingClientRect();
+      const x = e.clientX - rect.left + 12;
+      const y = e.clientY - rect.top + 12;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    });
+    g.addEventListener('mouseleave', () => {
+      const tooltip = document.getElementById('dagTooltip');
+      if (tooltip) tooltip.classList.remove('show');
+    });
+  });
+}
+
+function openWfCanvas() {
+  document.getElementById('wfCanvas').classList.add('open');
+}
+function closeWfCanvas() {
+  document.getElementById('wfCanvas').classList.remove('open');
+}
+
+// ── 实时通知和弹窗系统 ──
+let notificationWs = null;
+let activeNotifications = [];
+
+function connectNotificationWs() {
+  if (notificationWs) return;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}${API_BASE}/notifications/ws`;
+  notificationWs = new WebSocket(wsUrl);
+  notificationWs.onopen = () => {
+    console.log('Notification WebSocket connected');
+    updateConnectionStatus(true);
+  };
+  notificationWs.onmessage = (event) => {
+    try {
+      const notification = JSON.parse(event.data);
+      showNotificationPopup(notification);
+    } catch (e) {
+      console.error('Failed to parse notification:', e);
+    }
+  };
+  notificationWs.onclose = () => {
+    updateConnectionStatus(false);
+    notificationWs = null;
+    setTimeout(connectNotificationWs, 3000);
+  };
+  notificationWs.onerror = (error) => {
+    console.error('Notification WebSocket error:', error);
+  };
+}
+
+function updateConnectionStatus(connected) {
+  const dot = document.getElementById('statusDot');
+  if (connected) {
+    dot.style.boxShadow = '0 0 10px var(--green), 0 0 20px var(--green)';
+  } else {
+    dot.style.boxShadow = '';
+  }
+}
+
+function showNotificationPopup(notification) {
+  if (activeNotifications.find(n => n.notification_id === notification.notification_id)) return;
+  activeNotifications.push(notification);
+  const popup = document.createElement('div');
+  popup.className = 'notification-popup';
+  popup.id = `notif-${notification.notification_id}`;
+  const isConfirmation = notification.notification_type === 'confirmation_request';
+  const isEscalation = notification.notification_type === 'escalation';
+  const isWorkflowUpdate = notification.notification_type === 'workflow_update';
+  let icon = '⚠️';
+  let colorClass = 'warning';
+  if (isEscalation) { icon = '🚨'; colorClass = 'danger'; }
+  else if (isConfirmation) { icon = '❓'; colorClass = 'warning'; }
+  else if (isWorkflowUpdate) { icon = '📋'; colorClass = 'info'; }
+
+  const hasApprovalId = notification.payload && notification.payload.approval_id;
+  const payloadOptions = notification.payload?.options || [];
+  const isMultiOptionConfirm = isConfirmation && Array.isArray(payloadOptions) && payloadOptions.length >= 2;
+
+  let actionsHtml = '';
+  if (isMultiOptionConfirm && hasApprovalId) {
+    const buttonsHtml = payloadOptions.map((opt, idx) => {
+      const safeOpt = String(opt).replace(/'/g, "\\'");
+      const btnClass = idx === 0 ? 'notif-btn-approve' : (idx === payloadOptions.length - 1 ? 'notif-btn-reject' : 'notif-btn-ack');
+      return `<button class="notif-btn ${btnClass}" onclick="approveFromNotification('${notification.notification_id}', '${notification.payload.approval_id}', '${safeOpt}')">${escHtml(opt)}</button>`;
+    }).join('\n          ');
+    actionsHtml = `<div class="notification-actions notif-options-grid">${buttonsHtml}</div>`;
+  } else if (isConfirmation || isEscalation) {
+    const options = payloadOptions.length >= 2 ? payloadOptions : ['确认', '拒绝'];
+    if (hasApprovalId) {
+      actionsHtml = `<div class="notification-actions">
+          <button class="notif-btn notif-btn-approve" onclick="approveFromNotification('${notification.notification_id}', '${notification.payload.approval_id}', 'approved')">${escHtml(options[0] || '确认')}</button>
+          <button class="notif-btn notif-btn-reject" onclick="approveFromNotification('${notification.notification_id}', '${notification.payload.approval_id}', 'rejected')">${escHtml(options[1] || '拒绝')}</button>
+        </div>`;
+    } else {
+      actionsHtml = `<div class="notification-actions">
+          <button class="notif-btn notif-btn-approve" onclick="resolveNotification('${notification.notification_id}', 'approved')">${escHtml(options[0] || '确认')}</button>
+          <button class="notif-btn notif-btn-reject" onclick="resolveNotification('${notification.notification_id}', 'rejected')">${escHtml(options[1] || '拒绝')}</button>
+        </div>`;
+    }
+  } else {
+    actionsHtml = `<div class="notification-actions"><button class="notif-btn notif-btn-ack" onclick="acknowledgeNotification('${notification.notification_id}')">知道了</button></div>`;
+  }
+
+  popup.innerHTML = `
+    <div class="notification-icon ${colorClass}">${icon}</div>
+    <div class="notification-content">
+      <div class="notification-title">${escHtml(notification.title)}</div>
+      <div class="notification-message">${escHtml(notification.message)}</div>
+      ${actionsHtml}
+    </div>
+    <button class="notification-close" onclick="closeNotification('${notification.notification_id}')">&times;</button>
+  `;
+  popup.dataset.notificationId = notification.notification_id;
+  if (hasApprovalId) popup.dataset.approvalId = notification.payload.approval_id;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.classList.add('show'), 10);
+  if (notification.expires_at) {
+    const expiresAt = new Date(notification.expires_at);
+    const now = new Date();
+    const timeout = expiresAt.getTime() - now.getTime();
+    if (timeout > 0) setTimeout(() => closeNotification(notification.notification_id), timeout);
+  }
+}
+
+async function approveFromNotification(notificationId, approvalId, decision) {
+  try {
+    await fetch(`${API_BASE}/chat/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approval_id: approvalId, decision: decision, feedback: '' })
+    });
+  } catch (e) {
+    console.error('Failed to approve:', e);
+  }
+  closeNotification(notificationId);
+}
+
+async function acknowledgeNotification(notificationId) {
+  try {
+    await fetch(`${API_BASE}/notifications/${notificationId}/acknowledge`, { method: 'POST' });
+  } catch (e) {
+    console.error('Failed to acknowledge:', e);
+  }
+  closeNotification(notificationId);
+}
+
+async function resolveNotification(notificationId, decision) {
+  try {
+    await fetch(`${API_BASE}/notifications/${notificationId}/resolve?decision=${decision}`, { method: 'POST' });
+  } catch (e) {
+    console.error('Failed to resolve:', e);
+  }
+  closeNotification(notificationId);
+}
+
+function closeNotification(notificationId) {
+  const popup = document.getElementById(`notif-${notificationId}`);
+  if (popup) {
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 300);
+  }
+  activeNotifications = activeNotifications.filter(n => n.notification_id !== notificationId);
+}
 </script>
+
+<style>
+/* 通知弹窗样式 — 右上角浮层 */
+.notification-popup {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 420px;
+  width: calc(100% - 40px);
+  transform: translateX(120%) scale(0.96);
+  opacity: 0;
+  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.notification-popup.show {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+}
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.notification-icon.warning { background: var(--amber-soft); }
+.notification-icon.danger { background: var(--red-soft); }
+.notification-icon.info { background: var(--blue-soft); }
+.notification-content { flex: 1; min-width: 0; }
+.notification-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.notification-message {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.notification-actions {
+  display: flex;
+  gap: 6px;
+}
+.notif-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.notif-options-grid .notif-btn {
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif-btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  transition: all var(--dur-fast) var(--ease);
+  font-family: var(--font-sans);
+}
+.notif-btn:hover { background: var(--bg-active); color: var(--text-primary); }
+.notif-btn-approve {
+  background: var(--accent);
+  color: #1a1a0a;
+  border-color: transparent;
+}
+.notif-btn-approve:hover {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.notif-btn-reject { background: transparent; color: var(--text-secondary); }
+.notif-btn-reject:hover {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.notification-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--dur-fast) var(--ease);
+}
+.notification-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+@media (max-width: 640px) {
+  .notification-popup { top: 10px; right: 10px; left: 10px; width: auto; }
+}
+</style>
 </body>
 </html>

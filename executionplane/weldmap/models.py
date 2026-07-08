@@ -14,7 +14,7 @@ WeldMap 是 Agent 间唯一通信介质，采用层级路径结构:
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, NewType
 
 from pydantic import BaseModel, Field
 
@@ -23,19 +23,9 @@ from pydantic import BaseModel, Field
 # 基础类型
 # ---------------------------------------------------------------------------
 
-class WorkflowId(str):
-    """工作流唯一标识。"""
-    pass
-
-
-class WeldMapPath(str):
-    """WeldMap 内部路径，如 'image/quality/resolution'。"""
-    pass
-
-
-class Version(int):
-    """WeldMap 乐观锁版本号，每次写入自增。"""
-    pass
+WorkflowId = NewType("WorkflowId", str)  # 工作流唯一标识。
+WeldMapPath = NewType("WeldMapPath", str)  # WeldMap 内部路径，如 'image/quality/resolution'。
+Version = NewType("Version", int)  # WeldMap 乐观锁版本号，每次写入自增。
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +200,7 @@ class WeldMapSnapshot(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     image_quality: ImageQualityReport | None = None
+    image_preprocess: dict[str, Any] | None = None  # PPA 写入 weldmap:///{wf_id}/image/preprocess
     mask: MaskData | None = None
     annotations: AnnotationsData | None = None
     validation: ValidationData | None = None

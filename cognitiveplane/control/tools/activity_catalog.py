@@ -127,15 +127,24 @@ ACTIVITY_CATALOG: list[ActivityDescriptor] = [
         capability="annotation",
         name="标注任务 (Label Studio)",
         description=(
-            "通过 MCP 协议连接 Label Studio 标注平台，支持 4 个动作："
-            "create_task(创建标注任务上传图片) / push_prediction(推送预标注) / "
-            "fetch_annotations(拉取人工标注结果) / export_dataset(导出数据集)。"
-            "适用场景：用户说'标注'/'打标'/'Label Studio'/'导出训练数据'。"
+            "通过 MCP 协议连接 Label Studio 标注平台（v2.0），支持 11 个 action：\n"
+            "  复合 action（推荐）:\n"
+            "    auto_annotate — 一键完成全链路：自动 list_datasets → get_dataset → create_job → "
+            "upload_images(上传当前图片) → create_task → trigger_ai。适合'标注这张图'的场景。\n"
+            "  单一 action（10 个 MCP tool，细粒度控制）:\n"
+            "    list_datasets(列出数据集) / get_dataset(数据集详情) / "
+            "create_job(创建作业，version_id/dataset_id 均可自动解析) / "
+            "list_jobs(列出作业) / get_job(查看作业) / "
+            "list_tasks(列出子任务) / create_task(创建标注任务) / "
+            "trigger_ai(触发 AI 标注) / upload_images(上传图片) / "
+            "assign_task(分配标注员)。\n"
+            "input_data 中指定 action 字段选择执行哪个 action。"
+            "适用场景：用户说'标注'/'打标'/'Label Studio'。"
         ),
         implementation="real",
-        inputs=["action", "image_path", "task_id", "project_id"],
-        outputs=["task_id", "annotations", "download_url"],
-        depends_on_hint=["defect_detection"],
+        inputs=["action", "version_id|dataset_id", "job_id", "task_id", "images", "assignee_id", "name", "labels", "image_b64(auto_annotate)"],
+        outputs=["task_id", "annotations", "download_url", "datasets", "jobs", "latest_version_id", "steps(auto_annotate)"],
+        depends_on_hint=["defect_detection", "preprocess"],
         aliases=["label_studio", "annotate_label"],
     ),
     ActivityDescriptor(

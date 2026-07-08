@@ -60,11 +60,20 @@ class FeedbackSummary(BaseModel):
 
 import asyncio
 import logging
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.event_log import BrainEventType, EventLog
 from cognitiveplane.control.hooks import BeforeToolHook, SafetyHook
+from cognitiveplane.control.skills import SkillRegistry
+
+if TYPE_CHECKING:
+    from cognitiveplane.interaction.image_store import ImageStore
+    from cognitiveplane.governance.guardrails import (
+        AfterToolHook,
+        OutputGuardrail,
+    )
+    from cognitiveplane.control.registry.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +103,34 @@ class AgentLoop:
         event_log: EventLog,
         send_json: SendJsonFn,
         hooks: list[BeforeToolHook] | None = None,
+        skill_registry: SkillRegistry | None = None,
+        image_store: "ImageStore | None" = None,
+        after_tool_hooks: "list[AfterToolHook] | None" = None,
+        output_guardrail: "OutputGuardrail | None" = None,
+        stream_mode: bool = False,
+        tool_registry: "ToolRegistry | None" = None,
+        session_manager: Any = None,
+        image_sessions: Any = None,
+        router: Any = None,
     ) -> None:
         self._deps = deps
         self._event_log = event_log
         self._send_json = send_json
+        self._skill_registry = skill_registry
         self._hooks: list[BeforeToolHook] = hooks if hooks is not None else [SafetyHook()]
+        self._image_store = image_store
+        self._after_tool_hooks = after_tool_hooks
+        self._output_guardrail = output_guardrail
+        self._stream_mode = stream_mode
+        # 复用外部 ToolRegistry — 否则内部新建的 TR 不会有 Label Studio 标注工具
+        # (list_datasets/create_job 等), LLM 调用时报 "not available in current phase".
+        # app.py lifespan 只把标注工具注册到 chat_router.tool_registry.
+        self._tool_registry = tool_registry
+        # session 持久化 + 图片引用注入 — 与 HTTP /stream 路径保持一致。
+        # 不传则每轮临时 session,LLM 跨轮失忆(忘记已上传图片/上文)。
+        self._session_manager = session_manager
+        self._image_sessions = image_sessions
+        self._router = router
         self._incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self._feedback_queue: asyncio.Queue[FeedbackSummary] = asyncio.Queue(maxsize=10)
         self._receive_task: asyncio.Task | None = None
@@ -130,7 +162,7 @@ class AgentLoop:
                 try:
                     await task
                 except (asyncio.CancelledError, Exception):
-                    pass
+                    logger.debug("agent_loop cleanup error", exc_info=True)
         self._react_task = None
         self._receive_task = None
 
@@ -149,7 +181,7 @@ class AgentLoop:
                     logger.warning("AgentLoop dispatch error: %s", e)
                     await self._send_json({"type": "error", "error": f"dispatch: {e}"})
         except asyncio.CancelledError:
-            pass
+            logger.debug("agent_loop cleanup error", exc_info=True)
 
     async def _dispatch(self, message: dict[str, Any]) -> None:
         """根据 type 字段分发 chat/feedback/interrupt."""
@@ -167,10 +199,13 @@ class AgentLoop:
             })
 
     async def _handle_chat(self, message: dict[str, Any]) -> None:
-        """启动 react_task 跑 ReActEngine.run(). 同一时刻只有一个 react_task."""
+        """启动 react_task 跑 ReActEngine. 同一时刻只有一个 react_task."""
         if self._react_task is not None and not self._react_task.done():
             await self._react_task
-        self._react_task = asyncio.create_task(self._run_react(message))
+        if self._stream_mode:
+            self._react_task = asyncio.create_task(self._run_react_stream(message))
+        else:
+            self._react_task = asyncio.create_task(self._run_react(message))
 
     async def _run_react(self, message: dict[str, Any]) -> None:
         """react_task 主体 — 构造 ReActEngine + 跑 run() + 推 final 事件."""
@@ -186,6 +221,11 @@ class AgentLoop:
                 hooks=self._hooks,
                 event_callback=self._on_react_event,
                 event_log=self._event_log,
+                skill_registry=self._skill_registry,
+                image_store=self._image_store,
+                after_tool_hooks=self._after_tool_hooks,
+                output_guardrail=self._output_guardrail,
+                tool_registry=self._tool_registry,
             )
             context = ContextSnapshot(
                 case_id=CaseId(value=message.get("case_id") or "unknown"),
@@ -219,6 +259,101 @@ class AgentLoop:
         except Exception as e:
             logger.exception("react_task failed")
             await self._send_json({"type": "error", "error": str(e)})
+
+    async def _run_react_stream(self, message: dict[str, Any]) -> None:
+        """react_task 主体 (stream 模式) — 构造 ReActEngine + run_stream() + 逐事件推送."""
+        from cognitiveplane.control.react import ReActEngine
+        from cognitiveplane.shared.dto.context import ContextSnapshot
+        from cognitiveplane.shared.enums import EventType, NoveltyLevel
+        from cognitiveplane.shared.types import CaseId
+        from datetime import datetime, timezone
+
+        session_id = message.get("session_id", "default")
+        # 与 HTTP /stream 路径对齐: 注入 session image_refs + 持久化 history。
+        # 不做这步则 LLM 跨轮失忆 — 忘记已上传图片、上文决策。
+        user_msg, session_history = self._prepare_session_context(message, session_id)
+
+        try:
+            engine = ReActEngine(
+                self._deps,
+                hooks=self._hooks,
+                event_callback=self._on_react_event,
+                event_log=self._event_log,
+                skill_registry=self._skill_registry,
+                image_store=self._image_store,
+                after_tool_hooks=self._after_tool_hooks,
+                output_guardrail=self._output_guardrail,
+                tool_registry=self._tool_registry,
+            )
+            context = ContextSnapshot(
+                case_id=CaseId(value=message.get("case_id") or "unknown"),
+                event_type=EventType.WORKFLOW_ENTERED,
+                workflow_state={},
+                case_data={},
+                measurements=[],
+                memory_match_confidence=0.5,
+                knowledge_coverage=0.5,
+                event_novelty=NoveltyLevel.PARTIAL,
+                validation_critical_count=0,
+                timestamp=datetime.now(timezone.utc),
+            )
+            await self._drain_feedback_queue()
+
+            final_reply = ""
+            final_reasoning: str | None = None
+            tools_used_list: list[str] = []
+            workflow_ids_list: list[str] = []
+            async for event in engine.run_stream(
+                user_input=user_msg,
+                context=context,
+                session={"session_id": session_id, "history": session_history},
+            ):
+                # 捕获 final 事件用于持久化(不修改原 event)
+                if event.get("event") == "final":
+                    data = event.get("data", {})
+                    final_reply = data.get("reply", "")
+                    final_reasoning = data.get("reasoning_content")
+                    tools_used_list = data.get("tools_used", [])
+                    workflow_ids_list = data.get("workflow_ids", [])
+                await self._send_json(event)
+            # 流结束后持久化到 session_manager — 下一轮 LLM 才能读到本轮对话
+            self._persist_session(session_id, user_msg, final_reply, final_reasoning)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.exception("react_task stream failed")
+            await self._send_json({"event": "error", "data": {"message": str(e)}})
+
+    def _prepare_session_context(
+        self, message: dict[str, Any], session_id: str
+    ) -> tuple[str, list[dict]]:
+        """与 HTTP /stream 对齐: 注入 image_refs + 取 session.history.
+
+        委托给共享函数 prepare_session_context, 消除 /stream 和 /ws 路径的重复实现.
+
+        Returns:
+            (user_msg_with_image_refs, session_history)
+        """
+        from cognitiveplane.interaction.api._helpers import prepare_session_context
+        return prepare_session_context(
+            message, session_id, self._session_manager, self._router,
+        )
+
+    def _persist_session(
+        self,
+        session_id: str,
+        user_msg: str,
+        final_reply: str,
+        final_reasoning: str | None,
+    ) -> None:
+        """流结束后把本轮 user/assistant 消息追加到 session.messages — 与 HTTP /stream 一致.
+
+        委托给共享函数 persist_session, 消除 /stream 和 /ws 路径的重复实现.
+        """
+        from cognitiveplane.interaction.api._helpers import persist_session
+        persist_session(
+            self._session_manager, session_id, user_msg, final_reply, final_reasoning,
+        )
 
     async def _on_react_event(self, event_type: str, payload: dict[str, Any]) -> None:
         """ReActEngine event_callback → 转发到 WebSocket."""
@@ -278,7 +413,7 @@ class AgentLoop:
                 self._feedback_queue.get_nowait()
                 self._feedback_queue.put_nowait(summary)
             except asyncio.QueueEmpty:
-                pass
+                logger.debug("agent_loop cleanup error", exc_info=True)
             if self._event_log is not None:
                 self._event_log.emit(
                     BrainEventType.TOOL_RESULT,
@@ -352,7 +487,7 @@ class AgentLoop:
         try:
             await self._react_task
         except asyncio.CancelledError:
-            pass
+            logger.debug("agent_loop cleanup error", exc_info=True)
         self._react_task = None
 
         await self._send_json({

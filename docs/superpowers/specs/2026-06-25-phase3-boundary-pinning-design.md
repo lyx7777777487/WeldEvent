@@ -68,16 +68,27 @@ MCP            — Tool Pool 的一种底层协议，不是 Brain 直连对象
 
 **职责**：Tool Pool 的一种底层协议适配。Brain 不直接调 MCP server，MCP server 也不直接注册到 BrainToolRegistry。
 
-**两类 MCP（关键）**：
+**三类 MCP（关键 — 2026-07-06 修订，拆分"标注管理"为第三类）**：
 
-| 类别 | 例子 | 归属 | 调用方 |
-|------|------|------|--------|
-| 认知内容 MCP | web_search、文档检索、echo_server stub | 认知平面仓库（L1） | BrainToolRegistry → MCPAdapter（`phase=4`） |
-| 工业执行 MCP | detect_defects、annotate_label、update_annotation | `executionplane/` 仓库（L3） | Activity Pool → ToolPool → MCP client |
+| 类别 | 例子 | 归属 | 调用方 | 审批策略 |
+|------|------|------|--------|---------|
+| 认知内容 MCP | web_search、文档检索、echo_server stub | 认知平面仓库（L1） | BrainToolRegistry → MCPAdapter（`phase=4`） | Tier-A auto（查询类） |
+| 标注管理 MCP | list_datasets、get_dataset、create_job、upload_images、create_task、assign_task | L3 实现 + L1 adapter（`phase_override=3`） | BrainToolRegistry → MCPAdapter + approval gate | 查询类（list_/get_）Tier-A auto；写入类（create_/upload_/assign_）走 approval gate 用户确认 |
+| 严格工业执行 MCP | detect_defects、annotate_label（AI 写标注结果）、trigger_ai（AI 推理） | `executionplane/` 仓库（L3） | Activity Pool → ToolPool → MCP client | 永远不暴露给 Brain |
 
-认知内容 MCP 可以（在 phase≥4 时）作为 BrainTool 暴露给 LLM——这是"认知动作"的协议变体。工业执行 MCP 永远不暴露给 Brain，必须通过 WorkflowSpec → Activity → ToolPool 路径调用。
+认知内容 MCP 可以（在 phase≥4 时）作为 BrainTool 暴露给 LLM——这是"认知动作"的协议变体。
 
-**当前实现**：`MCPAdapter` 在 `adapters/mcp/base.py`，`phase=4`。Phase 2/3 默认 `current_phase=2` 下对 LLM 不可见。
+**标注管理 MCP** 是认知动作（LLM 在对话中帮用户管理标注作业 CRUD），可暴露给 Brain，但写操作（create_/upload_/assign_）**必须**经架构级 approval gate 拦截，emit `approval_request` 事件阻塞等前端用户确认。判定依据：`list_datasets` 类似 `search_standards`（认知检索），不是 `defect_detection`（工业推理）。
+
+**严格工业执行 MCP**（AI 模型推理类）永远不暴露给 Brain，必须通过 WorkflowSpec → Activity → ToolPool 路径调用。
+
+**为什么拆分**：原 spec 把"标注"一刀切归"工业执行 MCP"，但 Label Studio 的 `create_job` 是**管理动作**（创建作业），不是**写标注结果**（`annotate_label` 才是 AI 推理写标注）。spec §2.1 的判定测试"动词是认知还是工业"——`list_datasets`/`create_job` 是认知管理动词，`trigger_ai` 才接近工业推理动词。拆分后既符合业务现实，又保留 approval gate 缓解措施。
+
+**当前实现**：
+- `MCPAdapter` 在 `adapters/mcp/base.py`，`phase=4` 默认对 LLM 不可见
+- 标注管理 MCP 通过 `MCPServer(phase_override=3)` 在 `cognitiveplane/adapters/mcp/label_studio_server.py` 装配
+- 三层 ToolPolicy 判定：YAML override > annotations > 前缀启发式（`governance/mcp_policy.yaml` 配置 10 个标注工具分级）
+- 写入类 5 个工具（create_job/upload_images/create_task/trigger_ai/assign_task）注册到 `react.py::APPROVAL_REQUIRED_TOOLS`，架构级拦截走 approval gate
 
 ---
 

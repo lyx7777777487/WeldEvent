@@ -88,15 +88,30 @@ class MCPServer:
 
     Spec §2.4 — 持有 MCPClient，暴露 list_tools / call_tool / on_list_changed。
     Server 本身无状态 — 每次调用都委托 client。
+
+    phase_override: 当非 None 时，MCPRegistry 创建 adapter 时会传入此值
+    覆盖 MCPAdapter 默认 phase=4。用于让特定 server 的工具对 LLM 可见
+    （如 Label Studio 标注工具 phase=3 可见，其他工业 MCP 默认隐藏）。
     """
 
-    def __init__(self, client: MCPClient, name: str) -> None:
+    def __init__(
+        self,
+        client: MCPClient,
+        name: str,
+        phase_override: int | None = None,
+    ) -> None:
         self._client = client
         self._name = name
+        self._phase_override = phase_override
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def phase_override(self) -> int | None:
+        """若非 None，MCPRegistry 创建 adapter 时用此值覆盖默认 phase。"""
+        return self._phase_override
 
     async def list_tools(self) -> list[ToolDescriptor]:
         return await self._client.list_tools()
@@ -116,10 +131,12 @@ class MCPAdapter(BrainTool):
 
     Spec §2.4 + §3.2 — 无状态，每次 execute 都委托 server.call_tool。
     LLM 通过 ToolRegistry 看到的接口与内部工具完全一致。
+
+    phase 默认 4（工业/外部 MCP 工具默认对 LLM 不可见，等 ToolPool/Activity
+    边界就绪后再放行）。MCPServer.phase_override 可在构造时传入覆盖此默认值，
+    让特定 server 的工具提前对 LLM 可见（如 Label Studio 标注工具 phase=3）。
     """
 
-    # Industrial/external MCP adapters should not be visible to Brain by default
-    # before the ToolPool/Activity boundary is in place.
     phase = 4
 
     def __init__(
@@ -131,6 +148,12 @@ class MCPAdapter(BrainTool):
         self._server = server
         self._descriptor = descriptor
         self._policy = policy
+        # 若 server 声明了 phase_override，覆盖默认 phase
+        # 让该 server 的工具对 LLM 可见（如 Label Studio 标注工具）
+        # getattr 安全访问：测试可能传 server=None 或 FakeServer
+        phase_override = getattr(server, "phase_override", None)
+        if phase_override is not None:
+            self.phase = phase_override
 
     @property
     def name(self) -> str:

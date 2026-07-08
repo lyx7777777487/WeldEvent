@@ -14,8 +14,11 @@ Source: WeldEvent架构设计讨论
   - 支持运行时动态切换标准
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +113,9 @@ class QualityStandard:
         "reflection",          # 反光
         "abnormal_texture",    # 异常纹理
     ])
-    deep_vision_max_latency_ms: int = 3000
+    # P2-3 fix: 跨层超时统一 — L3 MLLM 30s < L2 activity 60s < L1 工具 90s
+    # 原 3000ms 对 Doubao-Vision-Pro 偏紧(实际 5-15s),会频繁 timeout 降级
+    deep_vision_max_latency_ms: int = 30000
     deep_vision_on_error: str = "fallback_to_rule"  # fallback_to_rule / mandatory_review / reject
     deep_vision_force_trigger_conditions: list[str] = field(default_factory=list)
     
@@ -217,7 +222,7 @@ class QualityStandard:
             deep_vision_enabled=data.get("deep_vision", {}).get("enabled", True),
             deep_vision_trigger_threshold=data.get("deep_vision", {}).get("trigger_threshold", 0.85),
             deep_vision_check_items=data.get("deep_vision", {}).get("check_items", []),
-            deep_vision_max_latency_ms=data.get("deep_vision", {}).get("max_latency_ms", 3000),
+            deep_vision_max_latency_ms=data.get("deep_vision", {}).get("max_latency_ms", 30000),
             deep_vision_on_error=data.get("deep_vision", {}).get("on_error", "fallback_to_rule"),
             deep_vision_force_trigger_conditions=data.get("deep_vision", {}).get("force_trigger_conditions", []),
             weights=data.get("weights", {}),
@@ -464,7 +469,7 @@ class QualityStandardRegistry:
             try:
                 results.append(self.get(sid, version="latest"))
             except KeyError:
-                pass
+                logger.warning("skip standard %s: KeyError", sid)
         return results
     
     def list_all(self, active_only: bool = True) -> list[QualityStandard]:
@@ -477,7 +482,7 @@ class QualityStandardRegistry:
                     continue
                 results.append(latest)
             except KeyError:
-                pass
+                logger.warning("skip standard %s: KeyError", sid)
         return results
     
     def list_ids(self) -> list[str]:

@@ -10,9 +10,27 @@ Plan §2.3 双轨设计:
 Plan §A.3:
   - ImageStore 分层存储 (thumbnail + original)
   - 工具内部用原图分析 (高清细节)，消息层用 thumbnail (成本闸门)
+
+图片传输前自动缩放：工业焊缝图片通常不需要超高分辨率，
+限制最大边 1024px + JPEG 80% 质量，确保 API 传输在 30s 内完成。
 """
 
+import base64
+import io
+from typing import NamedTuple
+
 from cognitiveplane.control.tools import BrainTool, ToolResult
+
+
+class _ImageSize(NamedTuple):
+    width: int
+    height: int
+
+
+# 发送给 vision API 的图片最大尺寸（最长边），超出等比缩放
+# 1024px 足够看清焊缝细节，同时控制 base64 体积在 ~100KB 以内
+MAX_DIM = 1024
+JPEG_QUALITY = 80
 
 
 class AnalyzeImageTool(BrainTool):
@@ -26,6 +44,7 @@ class AnalyzeImageTool(BrainTool):
     def __init__(self, llm_provider=None, image_store=None) -> None:
         self._llm = llm_provider
         self._image_store = image_store
+        self._result_cache: dict[str, ToolResult] = {}  # 会话级去重
 
     @property
     def name(self) -> str:
@@ -76,6 +95,10 @@ class AnalyzeImageTool(BrainTool):
         if not image_ref:
             return ToolResult(error="No image_ref provided")
 
+        # 会话级去重：同一张图已分析过直接返回缓存，避免重复调 vision API
+        if image_ref in self._result_cache:
+            return self._result_cache[image_ref]
+
         if self._llm is None or not hasattr(self._llm, "vision_complete"):
             return ToolResult(error="Multimodal model not available")
 
@@ -91,9 +114,15 @@ class AnalyzeImageTool(BrainTool):
                 error_type="invalid_image",
             )
 
+        # 缩放大图，控制 API 传输体积。
+        # 原始焊缝图片可能 4K+，base64 编码后数百 KB，导致 vision API
+        # HTTP 上传 + 模型处理超过 TOOL_TIMEOUT_SECONDS。
+        prepared_url, prep_info = self._prepare_for_vision(original_data_url)
+
         prompt_parts = [
             "你是焊接质检专家，请对以下焊缝图片进行质量分析：\n",
             f"用户问题：{question}\n",
+            f"（图片已缩放至最长边 {MAX_DIM}px，质量 {JPEG_QUALITY}%）\n",
         ]
         if material:
             prompt_parts.append(f"材料：{material}\n")
@@ -111,16 +140,62 @@ class AnalyzeImageTool(BrainTool):
         try:
             response = await self._llm.vision_complete(
                 text="".join(prompt_parts),
-                images=[original_data_url],
+                images=[prepared_url],
             )
-            return ToolResult(output={
+            result = ToolResult(output={
                 "analysis": response.content,
                 "model": getattr(response, "model", "unknown"),
                 "image_ref": image_ref,
             })
+            self._result_cache[image_ref] = result
+            return result
         except Exception as e:
             error_type, message = self._classify_vision_error(e)
             return ToolResult(error=message, error_type=error_type)
+
+    @staticmethod
+    def _prepare_for_vision(data_url: str) -> tuple[str, str]:
+        """缩放 + 压缩图片，控制 API 传输体积。
+
+        返回 (prepared_data_url, info_string)。
+        如果图片已经在尺寸限制内或 Pillow 不可用，返回原图。
+        """
+        try:
+            from PIL import Image
+        except ImportError:
+            return data_url, "original (Pillow not installed)"
+
+        # 解析 data URL → raw bytes
+        header, b64 = data_url.split(",", 1)
+        mime = "image/jpeg"
+        if ":" in header:
+            mime = header.split(":")[1].split(";")[0]
+        raw = base64.b64decode(b64)
+
+        try:
+            img = Image.open(io.BytesIO(raw))
+            img = img.convert("RGB")
+            w, h = img.size
+            max_dim = max(w, h)
+            if max_dim <= MAX_DIM:
+                return data_url, f"original {w}x{h} (within limit)"
+
+            scale = MAX_DIM / max_dim
+            new_size = (int(w * scale), int(h * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=JPEG_QUALITY)
+            compressed = buf.getvalue()
+            new_b64 = base64.b64encode(compressed).decode()
+            new_url = f"data:image/jpeg;base64,{new_b64}"
+            info = (
+                f"resized {w}x{h} → {new_size[0]}x{new_size[1]} "
+                f"({len(raw) // 1024}KB → {len(compressed) // 1024}KB)"
+            )
+            return new_url, info
+        except Exception:
+            return data_url, "original (decode failed)"
 
     @staticmethod
     def _classify_vision_error(exc: Exception) -> tuple[str, str]:

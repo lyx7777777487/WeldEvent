@@ -12,11 +12,14 @@ Source: boundary-pinning §6.2
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
 from cognitiveplane.shared.dto_workflow import WorkflowSpec
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,33 @@ class WorkflowLaunchPort(ABC):
 
     @abstractmethod
     async def submit(self, spec: WorkflowSpec) -> WorkflowLaunchResult: ...
+
+    async def query_status(self, workflow_id: str) -> dict[str, Any]:
+        """查询 workflow 状态。"""
+        raise NotImplementedError("query_status not supported by this port")
+
+    async def send_human_gate_signal(self, workflow_id: str, node_id: str, approved: bool) -> bool:
+        """发送 HumanGate signal。"""
+        raise NotImplementedError("send_human_gate_signal not supported by this port")
+
+    async def send_signal(
+        self, workflow_id: str, signal_name: str, args: Any = None
+    ) -> bool:
+        """P1-6: 发送通用 Temporal signal(pause/resume/cancel_by_user 等)。
+
+        Args:
+            workflow_id: 目标 workflow ID
+            signal_name: dag_runner_workflow.py 中 @workflow.signal 方法名
+            args: signal 参数(无参 signal 传 None)
+
+        Returns:
+            True=成功, False=失败或不支持
+        """
+        raise NotImplementedError("send_signal not supported by this port")
+
+    async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
+        """取消 workflow。"""
+        raise NotImplementedError("cancel_workflow not supported by this port")
 
 
 class WorkflowLauncher:
@@ -65,6 +95,42 @@ class WorkflowLauncher:
         if hasattr(self._port, 'is_healthy'):
             return await self._port.is_healthy()
         return True
+
+    async def query_status(self, workflow_id: str) -> dict[str, Any]:
+        """查询 workflow 状态（转发到底层 port）。"""
+        try:
+            return await self._port.query_status(workflow_id)
+        except NotImplementedError:
+            return {"error": "query_status not supported by current adapter"}
+
+    async def send_human_gate_signal(self, workflow_id: str, node_id: str, approved: bool) -> bool:
+        """发送 HumanGate signal（转发到底层 port）。"""
+        try:
+            return await self._port.send_human_gate_signal(workflow_id, node_id, approved)
+        except NotImplementedError:
+            logger.warning("send_human_gate_signal: port does not support signals (workflow=%s)", workflow_id)
+            return False
+
+    async def send_signal(
+        self, workflow_id: str, signal_name: str, args: Any = None
+    ) -> bool:
+        """P1-6: 发送通用 Temporal signal（转发到底层 port）。"""
+        try:
+            return await self._port.send_signal(workflow_id, signal_name, args)
+        except NotImplementedError:
+            logger.warning(
+                "send_signal: port does not support signals (workflow=%s signal=%s)",
+                workflow_id, signal_name,
+            )
+            return False
+
+    async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
+        """取消 workflow（转发到底层 port）。"""
+        try:
+            return await self._port.cancel_workflow(workflow_id, reason)
+        except NotImplementedError:
+            logger.warning("cancel_workflow: port does not support cancel (workflow=%s)", workflow_id)
+            return False
 
 
 class _NullWorkflowLaunchPort(WorkflowLaunchPort):

@@ -11,6 +11,7 @@ Source: boundary-pinning §6.2 + §1.3 Activity Pool + §1.4 Tool Pool
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, TYPE_CHECKING
 
@@ -151,15 +152,19 @@ async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
                     node_id, capability, result.get("status"),
                 )
                 return result
+        except (ConnectionError, OSError, ImportError, TimeoutError, asyncio.TimeoutError) as e:
+            # 瞬时故障 — re-raise 让 Temporal RetryPolicy 自动重试
+            logger.error(
+                "L3 dispatch transient failure (node=%s capability=%s): %s: %s — will be retried by Temporal",
+                node_id, capability, type(e).__name__, e, exc_info=True,
+            )
+            raise
         except Exception as e:
+            # 业务/非瞬时故障 — 返回 ERROR，让 workflow 走 on_failure 决策
             logger.error(
                 "L3 ActivityPool dispatch failed (node=%s capability=%s): %s: %s",
                 node_id, capability, type(e).__name__, e, exc_info=True,
             )
-            # P1-2 fix: L3 真实失败直接返回 ERROR，不用 mock 覆盖。
-            # mock 结果是假数据，掩盖真实故障会让下游 node 基于错误前提继续执行，
-            # 导致结果不可解释。Temporal RetryPolicy(maximum_attempts=3) 会自动
-            # 重试瞬时故障；持久性故障应让 workflow 走 on_failure 决策。
             return _to_dict(ActivityOutput(
                 status=ActivityStatus.ERROR,
                 data={"node_id": node_id, "capability": capability, "l3_error": str(e)},
@@ -167,6 +172,10 @@ async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
             ))
 
     # fallback: mock 分派（capability 未在 ActivityPool 注册）
+    # P0-2 fix: 工业质检场景下静默 mock OK 是安全风险(假合格)。
+    #   - mock 必须返回 MARGINAL(非 OK),让上层区分"未真执行"
+    #   - data 加 mock=True 标记,L2/L1/用户可识别
+    #   - L2 dag_runner 把 mock 节点单独计入 _mocked_nodes,_build_result 暴露
     activity_name = _CAPABILITY_DISPATCH.get(capability)
     if activity_name is None:
         # 未知 capability — 返回 error
@@ -176,16 +185,24 @@ async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
             error=f"Unknown capability: {capability}. Available: {list(_CAPABILITY_DISPATCH.keys())}",
         ))
 
-    # mock 结果（向后兼容）
+    # mock 结果 — MARGINAL + mock=True,绝不返回 OK
+    logger.warning(
+        "MOCK DISPATCH: node=%s capability=%s → %s (no L3 activity registered, "
+        "returning MARGINAL with mock=True; this MUST NOT be treated as real pass)",
+        node_id, capability, activity_name,
+    )
     return _to_dict(ActivityOutput(
-        status=ActivityStatus.OK,
+        status=ActivityStatus.MARGINAL,
         data={
             "node_id": node_id,
             "capability": capability,
             "dispatched_to": activity_name,
             "input": node_input_data,
+            "mock": True,  # P0-2: 显式 mock 标记,上层必须尊重
+            "mock_reason": "no L3 ActivityPool registered for this capability",
             "mock_result": f"{activity_name}_executed",
         },
+        error=None,
     ))
 
 
@@ -198,5 +215,66 @@ def _to_dict(output: ActivityOutput) -> dict[str, Any]:
     }
 
 
+# ── emit_workflow_event activity ─────────────────────────────────────
+# P1-4: L2→L1 节点事件回传。Temporal workflow 不能直接调 HTTP(sandbox 限制),
+# 必须通过 activity 执行。dag_runner_workflow 在节点 start/end/error 时调用此
+# activity,POST 事件到 L1 的 /api/v1/chat/workflow/events 端点。
+# L1 收到后按 session_id 路由到 WorkflowEventBus,广播给前端 SSE 订阅者。
+
+@activity.defn(name="emit_workflow_event")
+async def emit_workflow_event(event_data: dict[str, Any]) -> dict[str, Any]:
+    """向 L1 推送工作流节点事件(HTTP POST)。
+
+    入参 event_data:
+        session_id: str       — L1 路由用
+        workflow_id: str      — workflow 标识
+        event_type: str       — node_start | node_end | node_error | workflow_started | ...
+        callback_url: str     — L1 接收端点 URL
+        node_id: str | None
+        node_status: str | None
+        node_data: dict | None
+        error: str | None
+
+    返回:
+        {"ok": True/False, "error": str | None}
+
+    失败处理:
+        - HTTP 调用失败不阻断 workflow — 只记日志
+        - 用短超时(5s)避免拖慢节点执行
+        - retry_policy=0 次 — 节点事件不需要重试(丢一两条不影响整体流程)
+    """
+    callback_url = event_data.get("callback_url")
+    if not callback_url:
+        return {"ok": False, "error": "callback_url missing"}
+
+    import httpx
+    payload = {
+        "session_id": event_data.get("session_id", "unknown"),
+        "workflow_id": event_data.get("workflow_id", "unknown"),
+        "event_type": event_data.get("event_type", "unknown"),
+        "node_id": event_data.get("node_id"),
+        "node_status": event_data.get("node_status"),
+        "node_data": event_data.get("node_data"),
+        "error": event_data.get("error"),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(callback_url, json=payload)
+            if resp.status_code != 200:
+                logger.warning(
+                    "emit_workflow_event: L1 returned %s: %s",
+                    resp.status_code, resp.text[:200],
+                )
+                return {"ok": False, "error": f"L1 status={resp.status_code}"}
+        return {"ok": True}
+    except Exception as e:
+        # 节点事件回传失败不阻断 workflow
+        logger.warning(
+            "emit_workflow_event failed (non-blocking): %s: %s",
+            type(e).__name__, e,
+        )
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 # 导出供 worker.py 注册
-ALL_DAG_ACTIVITIES = [execute_node]
+ALL_DAG_ACTIVITIES = [execute_node, emit_workflow_event]

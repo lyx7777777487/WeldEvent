@@ -53,11 +53,30 @@ def _make_spec(
 
 
 class _RecordingPort(WorkflowLaunchPort):
-    """Fake port that records submitted specs."""
+    """Fake port that records submitted specs and other operations."""
 
-    def __init__(self, *, accept: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        accept: bool = True,
+        gate_ok: bool = True,
+        cancel_ok: bool = True,
+        status: dict | None = None,
+    ) -> None:
         self.submitted: list[WorkflowSpec] = []
         self._accept = accept
+        self._gate_ok = gate_ok
+        self._cancel_ok = cancel_ok
+        self._status = status or {
+            "status": "RUNNING",
+            "completed_nodes": ["n1"],
+            "failed_nodes": [],
+            "node_results": {},
+            "error": None,
+        }
+        self.queried: list[str] = []
+        self.gate_signals: list[tuple[str, str, bool]] = []
+        self.cancelled: list[tuple[str, str]] = []
 
     async def submit(self, spec: WorkflowSpec) -> WorkflowLaunchResult:
         self.submitted.append(spec)
@@ -68,6 +87,20 @@ class _RecordingPort(WorkflowLaunchPort):
             adapter="fake",
             error=None if self._accept else "fake rejection",
         )
+
+    async def query_status(self, workflow_id: str) -> dict:
+        self.queried.append(workflow_id)
+        return self._status
+
+    async def send_human_gate_signal(
+        self, workflow_id: str, node_id: str, approved: bool
+    ) -> bool:
+        self.gate_signals.append((workflow_id, node_id, approved))
+        return self._gate_ok
+
+    async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
+        self.cancelled.append((workflow_id, reason))
+        return self._cancel_ok
 
 
 class _RecordingGatewayWrite:
@@ -215,6 +248,54 @@ async def test_connector_is_healthy_forwards_to_launcher() -> None:
     healthy = await connector.is_healthy()
     # _RecordingPort 没有 is_healthy 方法 → launcher 默认返回 True
     assert healthy is True
+
+
+@pytest.mark.asyncio
+async def test_connector_query_status_forwards_to_launcher() -> None:
+    """query_status 转发到 launcher → port，返回状态 dict."""
+    port = _RecordingPort()
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+
+    status = await connector.query_status("wf-query-001")
+
+    assert status["status"] == "RUNNING"
+    assert status["completed_nodes"] == ["n1"]
+    assert len(port.queried) == 1
+    assert port.queried[0] == "wf-query-001"
+
+
+@pytest.mark.asyncio
+async def test_connector_send_human_gate_signal_forwards_to_launcher() -> None:
+    """send_human_gate_signal 转发到 launcher → port (boundary-pinning §6.2 契约 5)."""
+    port = _RecordingPort(gate_ok=True)
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+
+    ok = await connector.send_human_gate_signal("wf-gate-001", "node-gate", approved=True)
+
+    assert ok is True
+    assert len(port.gate_signals) == 1
+    wf_id, node_id, approved = port.gate_signals[0]
+    assert wf_id == "wf-gate-001"
+    assert node_id == "node-gate"
+    assert approved is True
+
+
+@pytest.mark.asyncio
+async def test_connector_cancel_workflow_forwards_to_launcher() -> None:
+    """cancel_workflow 转发到 launcher → port."""
+    port = _RecordingPort(cancel_ok=True)
+    launcher = WorkflowLauncher(port=port)
+    connector = EventConnector(launcher=launcher)
+
+    ok = await connector.cancel_workflow("wf-cancel-001", reason="user abort")
+
+    assert ok is True
+    assert len(port.cancelled) == 1
+    wf_id, reason = port.cancelled[0]
+    assert wf_id == "wf-cancel-001"
+    assert reason == "user abort"
 
 
 # ---------------------------------------------------------------------------

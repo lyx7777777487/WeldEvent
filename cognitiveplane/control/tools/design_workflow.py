@@ -19,6 +19,10 @@ from cognitiveplane.control.tools.activity_catalog import (
     get_catalog_text,
     get_supported_capabilities,
 )
+from cognitiveplane.shared.dto_workflow import (
+    ON_FAILURE_DEFAULT,
+    on_failure_enum_values,
+)
 
 
 class DesignWorkflowTool(BrainTool):
@@ -80,10 +84,13 @@ class DesignWorkflowTool(BrainTool):
                     "type": "array",
                     "items": {"type": "string"},
                     "description": (
-                        "Image references (PENDING:session_id:index) from user uploads. "
-                        "Pass the image_refs that appeared in the system prompt after user "
-                        "uploaded images. They will be attached to each tool_task node so "
-                        "L3 activities can resolve them to actual image files at launch time."
+                        "Exact image_ref strings from the system prompt's image list. "
+                        "After a user uploads an image, the system prompt includes a "
+                        "section like: 'image_ref 清单: PENDING:sess_xxx:0'. "
+                        "Copy the exact string(s) from that section — do NOT write "
+                        "'PENDING:session_id:0' literally. Real refs look like "
+                        "'PENDING:sess_1782815536200:0'. If no images were uploaded "
+                        "in this conversation, pass an empty array."
                     ),
                 },
                 "nodes": {
@@ -110,7 +117,15 @@ class DesignWorkflowTool(BrainTool):
                             "input_data": {"type": "object"},
                             "on_failure": {
                                 "type": "string",
-                                "enum": ["retry", "escalate", "skip"],
+                                # P0-1 fix: enum 从 SSOT 派生,禁止手写
+                                "enum": on_failure_enum_values(),
+                                "default": ON_FAILURE_DEFAULT,
+                                "description": (
+                                    "Failure handling policy. "
+                                    "abort=terminate workflow; continue=node failed but downstream proceeds; "
+                                    "escalate=continue + flag for human review; retry=node-level retry "
+                                    "(Phase 4+ by Activity RetryPolicy). Default: escalate."
+                                ),
                             },
                             "condition": {"type": "string"},
                         },
@@ -118,7 +133,7 @@ class DesignWorkflowTool(BrainTool):
                     },
                 },
             },
-            "required": ["objective", "reason"],
+            "required": ["objective"],
         }
 
     async def execute(self, **kwargs) -> ToolResult:
@@ -136,7 +151,7 @@ class DesignWorkflowTool(BrainTool):
                     objective=objective,
                     requirements=requirements,
                     case_id=case_id,
-                    reason=kwargs["reason"],
+                    reason=kwargs.get("reason", ""),
                     image_refs=image_refs,
                 )
             else:
@@ -145,7 +160,7 @@ class DesignWorkflowTool(BrainTool):
                     objective=objective,
                     requirements=requirements,
                     case_id=case_id,
-                    reason=kwargs["reason"],
+                    reason=kwargs.get("reason", ""),
                     image_refs=image_refs,
                 )
             # P3-6 fix: 把 spec 存入 registry，LLM 只需传 workflow_id 给 launch_workflow
@@ -229,7 +244,7 @@ def _build_spec_from_nodes(
         if node_type == "tool_task" and refs:
             input_data.setdefault("image_refs", refs)
 
-        on_failure = raw.get("on_failure") or "retry"
+        on_failure = raw.get("on_failure") or ON_FAILURE_DEFAULT
         condition = raw.get("condition")
 
         workflow_nodes.append(WorkflowNode(
@@ -339,7 +354,7 @@ def _build_workflow_spec_fallback(
         depends_on: list[str] | None = None,
         input_data: dict | None = None,
         condition: str | None = None,
-        on_failure: str = "escalate",
+        on_failure: str = ON_FAILURE_DEFAULT,
     ) -> None:
         nodes.append(WorkflowNode(
             node_id=node_id,
@@ -363,7 +378,8 @@ def _build_workflow_spec_fallback(
             "tool_task",
             capability="defect_detection",
             input_data=iqa_input,
-            on_failure="retry",
+            # escalate: IQA 失败需人工介入,而非静默 retry(L2 当前 retry 等同 escalate)
+            on_failure="escalate",
         )
         previous = ["defect_detection"]
 
@@ -380,7 +396,7 @@ def _build_workflow_spec_fallback(
             capability="preprocess",
             depends_on=previous,
             input_data=ppa_input,
-            on_failure="retry",
+            on_failure="escalate",
         )
         previous = ["image_preprocess"]
 
@@ -422,7 +438,7 @@ def _build_workflow_spec_fallback(
             capability="annotation",
             depends_on=previous,
             input_data=ls_input,
-            on_failure="retry",
+            on_failure="escalate",
         )
         previous = ["label_studio_annotation"]
 

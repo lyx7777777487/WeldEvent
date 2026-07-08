@@ -3,7 +3,7 @@
 import pytest
 
 from cognitiveplane.control.deps import CognitiveDependencies
-from cognitiveplane.control.tool_registry import ToolRegistry
+from cognitiveplane.control.registry.tool_registry import ToolRegistry
 from cognitiveplane.control.tools import BrainTool, ToolResult
 from cognitiveplane.control.tools.search_standards import SearchStandardsTool
 from cognitiveplane.control.tools.request_confirmation import RequestConfirmationTool
@@ -107,9 +107,12 @@ class TestToolPolicy:
         assert rule.require_reason is True
         assert rule.auto_approve is False
 
-    def test_adjust_parameter_max_calls(self):
-        policy = ToolPolicy()
-        rule = policy.get_rule("adjust_parameter")
+    def test_override_max_calls(self):
+        """override 可为工具设置 max_calls_per_session（DEFAULT_RULES 无内置 max_calls 工具）."""
+        policy = ToolPolicy(overrides={
+            "escalate": ToolRule(enabled=True, auto_approve=False, require_reason=True, max_calls_per_session=5),
+        })
+        rule = policy.get_rule("escalate")
         assert rule.max_calls_per_session == 5
 
     def test_overrides(self):
@@ -286,7 +289,7 @@ class TestSchemaValidation:
     Plan §3.6 line 653: schema 校验失败 → Tier-A retry / Tier-B reject."""
 
     def test_validate_accepts_valid_arguments(self) -> None:
-        from cognitiveplane.control.tool_registry import ToolRegistry
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):
@@ -311,7 +314,7 @@ class TestSchemaValidation:
         assert error is None
 
     def test_validate_rejects_missing_required(self) -> None:
-        from cognitiveplane.control.tool_registry import ToolRegistry
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):
@@ -336,7 +339,7 @@ class TestSchemaValidation:
         assert "query" in error
 
     def test_validate_rejects_wrong_type(self) -> None:
-        from cognitiveplane.control.tool_registry import ToolRegistry
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):
@@ -361,7 +364,7 @@ class TestSchemaValidation:
         assert "count" in error
 
     def test_validate_rejects_invalid_enum(self) -> None:
-        from cognitiveplane.control.tool_registry import ToolRegistry
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):
@@ -387,7 +390,7 @@ class TestSchemaValidation:
 
     def test_validate_allows_extra_properties(self) -> None:
         """Plan §3.5 原则 4 必填最少化: LLM 友好, 允许额外字段."""
-        from cognitiveplane.control.tool_registry import ToolRegistry
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):
@@ -413,7 +416,7 @@ class TestSchemaValidation:
 
     @pytest.mark.asyncio
     async def test_execute_returns_schema_invalid_error_type(self) -> None:
-        from cognitiveplane.control.tool_registry import ToolRegistry, SCHEMA_INVALID_ERROR_TYPE
+        from cognitiveplane.control.registry.tool_registry import ToolRegistry, SCHEMA_INVALID_ERROR_TYPE
         from cognitiveplane.control.tools import BrainTool, ToolResult
 
         class _Tool(BrainTool):

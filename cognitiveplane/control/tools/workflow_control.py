@@ -37,17 +37,14 @@ class WorkflowControlTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Control a running workflow: query status, pause, resume, or cancel. "
-            "Use this when the user asks about workflow progress, wants to "
-            "pause/resume/cancel an in-progress workflow, or asks 'what step "
-            "is the workflow on'.\n\n"
-            "Actions:\n"
-            "- query: Get current node statuses + completion progress. "
-            "Reads from L1 event cache first (fast), falls back to Temporal query.\n"
-            "- pause: Pause workflow before next node (won't interrupt running node).\n"
-            "- resume: Resume a paused workflow.\n"
-            "- cancel: Cancel workflow entirely (terminates, no rollback).\n\n"
-            "workflow_id is required. Get it from launch_workflow's output."
+            "控制正在运行的工作流（查询/暂停/恢复/取消）。\n"
+            "**何时使用**：用户询问进度、要求暂停/继续/取消工作流。\n"
+            "**用法**：传 action（query/pause/resume/cancel）+ workflow_id。"
+            "workflow_id 从 launch_workflow 的输出获取。\n"
+            "- query: 获取当前节点状态和完成进度（L1 缓存优先，回退到 Temporal）\n"
+            "- pause: 暂停工作流（当前节点完成后暂停）\n"
+            "- resume: 恢复暂停的工作流\n"
+            "- cancel: 终止工作流（无回滚）"
         )
 
     @property

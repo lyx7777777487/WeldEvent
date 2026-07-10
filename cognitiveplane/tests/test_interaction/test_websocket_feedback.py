@@ -109,7 +109,7 @@ def test_feedback_injected_into_next_react_system_prompt(app_with_mock_llm, monk
     class CapturingLLM(MockLLMProvider):
         @property
         def supports_function_calling(self) -> bool:
-            return True  # Tier-1 so complete() is called with full messages
+            return True  # Tier-1 so complete() is called with full system prompt
         async def complete(self, request):
             captured_messages.append(request.messages)
             return await super().complete(request)
@@ -139,7 +139,9 @@ def test_feedback_injected_into_next_react_system_prompt(app_with_mock_llm, monk
         })
         for _ in range(20):
             data = ws.receive_json()
-            if data.get("type") == "final":
+            # Tier-1 stream mode: {"event": "final", "data": {...}}
+            # Tier-2/3 non-stream: {"type": "final", ...}
+            if data.get("type") == "final" or data.get("event") == "final":
                 break
 
     # 验证 — 最后一轮 ReAct 的 system prompt 含 correction

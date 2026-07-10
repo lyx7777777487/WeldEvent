@@ -81,6 +81,7 @@ class ToolRegistry:
         from cognitiveplane.control.tools.archive_memory import ArchiveMemoryTool
         from cognitiveplane.control.tools.web_search import WebSearchTool
         from cognitiveplane.control.tools.analyze_image import AnalyzeImageTool
+        from cognitiveplane.control.tools.analyze_dataset import AnalyzeDatasetTool
         from cognitiveplane.control.tools.upload_image_to_dataset import UploadImageToDatasetTool
 
         # Knowledge tools
@@ -91,6 +92,14 @@ class ToolRegistry:
         if deps.knowledge.process_knowledge is not None:
             self.register(SearchProcessTool(deps.knowledge.process_knowledge))
 
+        # RAG 向量检索工具 — 视觉理解 + 文本推理
+        if deps.knowledge.vision_knowledge is not None:
+            from cognitiveplane.control.tools.search_vision_knowledge import SearchVisionKnowledgeTool
+            self.register(SearchVisionKnowledgeTool(deps.knowledge.vision_knowledge))
+        if deps.knowledge.reasoning_knowledge is not None:
+            from cognitiveplane.control.tools.search_reasoning_knowledge import SearchReasoningKnowledgeTool
+            self.register(SearchReasoningKnowledgeTool(deps.knowledge.reasoning_knowledge))
+
         # Vision tool — multimodal image analysis (plan §2.3: uses image_id, fetches original from ImageStore)
         # ImageStore passed explicitly (not in CapabilityDeps — §7 contract).
         if deps.capability.llm_provider is not None and image_store is not None:
@@ -98,6 +107,18 @@ class ToolRegistry:
                 deps.capability.llm_provider,
                 image_store,
             ))
+
+        # 大图分块工具 — 九宫格/自定义网格切分，支持多轮对话标注场景
+        # （大图拆解 → 分块标注 → 结果合并）。与 analyze_image 互补。
+        if image_store is not None:
+            from cognitiveplane.control.tools.split_image import SplitImageTool
+            self.register(SplitImageTool(image_store=image_store))
+
+        # Dataset understanding tool — 数据集级统计分析 + 多模态语义理解
+        # 与 analyze_image（单张图）互补：做分布统计、异常检测、重复检测、语义理解
+        self.register(AnalyzeDatasetTool(
+            deps.capability.llm_provider,
+        ))
 
         # L1 包装工具 — image_ref → Label Studio 数据集上传。
         # 解决 LLM 有 image_ref 但 MCP upload_images 需要 base64 的断层。
@@ -168,27 +189,47 @@ class ToolRegistry:
         Phase 5 Agent Skills: 传入 allowed_tools 可进一步按 skill 白名单过滤。
         """
         allowed = set(allowed_tools) if allowed_tools is not None else None
+        # allowed_tools 非空 = subagent 白名单模式，subagent_only 工具需可见
+        is_subagent = allowed is not None
         defs = [
             tool.to_function_definition()
             for tool in self._tools.values()
-            if self.is_llm_visible(tool.name)
-            and (allowed is None or tool.name in allowed)
+            if self.is_llm_visible(tool.name, is_subagent=is_subagent)
+            and (allowed is None or tool.name in allowed
+                 or getattr(tool, "always_available", False))
         ]
         return defs
 
-    def is_llm_visible(self, tool_name: str) -> bool:
-        """Whether a tool is visible/callable from the Brain LLM at this phase."""
+    def is_llm_visible(self, tool_name: str, is_subagent: bool = False) -> bool:
+        """Whether a tool is visible/callable from the Brain LLM at this phase.
+
+        subagent_only 工具只对声明了白名单的 subagent 可见，主 agent 看不到。
+        """
         tool = self._tools.get(tool_name)
-        return tool is not None and getattr(tool, "phase", 1) <= self._current_phase
+        if tool is None:
+            return False
+        if getattr(tool, "subagent_only", False) and not is_subagent:
+            return False
+        return getattr(tool, "phase", 1) <= self._current_phase
+
+    def is_always_available(self, tool_name: str) -> bool:
+        """Whether a tool is always available (exempt from skill allowed_tools whitelist).
+
+        基础工具层：知识检索/只读/询问类工具豁免 skill 白名单限制。
+        """
+        tool = self._tools.get(tool_name)
+        return bool(getattr(tool, "always_available", False)) if tool else False
 
     def list_llm_tools(self, allowed_tools: list[str] | None = None) -> list[str]:
         """List tools visible to the Brain LLM at this phase."""
         allowed = set(allowed_tools) if allowed_tools is not None else None
+        # allowed_tools 非空 = subagent 白名单模式，subagent_only 工具可见
+        is_subagent = allowed is not None
         return [
             name
             for name in self._tools
-            if self.is_llm_visible(name)
-            and (allowed is None or name in allowed)
+            if self.is_llm_visible(name, is_subagent=is_subagent)
+            and (allowed is None or name in allowed or self.is_always_available(name))
         ]
 
     def validate_arguments(self, tool_name: str, arguments: dict) -> tuple[bool, str | None]:

@@ -92,15 +92,12 @@ def create_app():
         # ReActEngine 从 WorkflowEventBus 读状态摘要注入 system prompt（见 react.py
         # _build_system_prompt 末尾的 _format_workflow_status_section）。
         from cognitiveplane.control.workflow_observer import WorkflowObserver
-        from cognitiveplane.interaction.notifications.store import (
-            get_notification_store,
-        )
         from cognitiveplane.interaction.workflow_events import (
             get_workflow_event_bus,
         )
         _workflow_observer = WorkflowObserver(
             event_bus=get_workflow_event_bus(),
-            notification_store=get_notification_store(),
+            notification_store=None,
         )
         await _workflow_observer.start()
 

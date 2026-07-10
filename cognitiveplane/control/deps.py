@@ -19,6 +19,8 @@ if TYPE_CHECKING:
         StandardsQueryPort,
         CaseLibraryQueryPort,
         ProcessKnowledgePort,
+        VisionKnowledgePort,
+        ReasoningKnowledgePort,
     )
     from cognitiveplane.shared.ports.memory import (
         MemorySearchPort,
@@ -62,6 +64,9 @@ class KnowledgeDeps:
     standards_query: StandardsQueryPort | None = None
     case_library: CaseLibraryQueryPort | None = None
     process_knowledge: ProcessKnowledgePort | None = None
+    # RAG 向量检索 collection（Chroma 向量库）
+    vision_knowledge: VisionKnowledgePort | None = None
+    reasoning_knowledge: ReasoningKnowledgePort | None = None
     # Phase 2g: reranker: RerankPort | None = None
     # Phase 2g: hybrid_search: HybridSearchPort | None = None
 

@@ -53,12 +53,12 @@ class AnalyzeImageTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Analyze a weld seam image for quality assessment. "
-            "Detects defects (porosity, slag inclusion, cracks, undercut, etc.), "
-            "evaluates quality grade, and provides improvement suggestions. "
-            "Pass image_ref (PENDING:session_id:index from the system prompt image list). "
-            "The tool fetches the high-resolution original internally — "
-            "do NOT pass base64 data URLs."
+            "分析工业图像，评估质量并检测缺陷。\n"
+            "**何时使用**：用户上传图片、要求看图、分析缺陷、评估质量、"
+            "或任何涉及图像内容理解的请求。\n"
+            "**用法**：传 image_ref（格式 PENDING:session_id:index），"
+            "工具内部从 ImageStore 取原图，不要传 base64。\n"
+            "**约束**：同一张图只调一次，多图时串行处理，禁止并发调用。"
         )
 
     @property

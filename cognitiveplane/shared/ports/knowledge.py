@@ -17,10 +17,14 @@ from cognitiveplane.shared.dto.knowledge import (
     ProcessKnowledgeQuery,
     ProcessKnowledgeResult,
     RAGQuery,
+    ReasoningKnowledgeQuery,
+    ReasoningKnowledgeResult,
     RuleQuery,
     RuleResult,
     StandardsQuery,
     StandardsResult,
+    VisionKnowledgeQuery,
+    VisionKnowledgeResult,
 )
 from cognitiveplane.shared.enums import KnowledgeType
 from cognitiveplane.shared.types import KnowledgeId
@@ -160,3 +164,39 @@ class CaseLibraryQueryPort(ABC):
 
     @abstractmethod
     async def query(self, input_data: CaseLibraryQueryInput) -> CaseLibraryQueryOutput: ...
+
+
+# ---------------------------------------------------------------------------
+# Knowledge port 7 — VisionKnowledgePort (视觉理解 RAG collection)
+# ---------------------------------------------------------------------------
+
+class VisionKnowledgeInput(BaseModel):
+    query: VisionKnowledgeQuery
+
+
+class VisionKnowledgeOutput(BaseModel):
+    results: list[VisionKnowledgeResult]
+
+
+class VisionKnowledgePort(ABC):
+
+    @abstractmethod
+    async def query(self, input_data: VisionKnowledgeInput) -> VisionKnowledgeOutput: ...
+
+
+# ---------------------------------------------------------------------------
+# Knowledge port 8 — ReasoningKnowledgePort (文本推理 RAG collection)
+# ---------------------------------------------------------------------------
+
+class ReasoningKnowledgeInput(BaseModel):
+    query: ReasoningKnowledgeQuery
+
+
+class ReasoningKnowledgeOutput(BaseModel):
+    results: list[ReasoningKnowledgeResult]
+
+
+class ReasoningKnowledgePort(ABC):
+
+    @abstractmethod
+    async def query(self, input_data: ReasoningKnowledgeInput) -> ReasoningKnowledgeOutput: ...

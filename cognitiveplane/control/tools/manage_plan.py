@@ -47,18 +47,13 @@ class ManagePlanTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Manage a task list (TodoWrite-style) for the current conversation. "
-            "Use when the task is complex enough to benefit from explicit tracking "
-            "(e.g. batch image analysis, multi-step investigation). "
-            "For simple single-step tasks, skip this tool entirely — not every "
-            "conversation needs a plan. "
-            "Actions: "
-            "'create' replaces the entire list with new todos; "
-            "'append' adds todos to the existing list; "
-            "'update_status' changes one todo's status; "
-            "'list' returns the current plan; "
-            "'clear' empties the list. "
-            "LLM decides autonomously whether and when to use this tool."
+            "管理当前会话的任务列表（TodoWrite 风格）。\n"
+            "**何时使用**：复杂多步骤任务需要跟踪进度时。简单单步任务不需要。\n"
+            "**用法**：action='create' 替换全部任务列表；"
+            "action='update_status' 更新单个任务状态（pending/in_progress/completed）；"
+            "action='append' 追加新任务；"
+            "action='list' 列出当前任务；"
+            "action='clear' 清空列表。"
         )
 
     @property

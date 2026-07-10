@@ -15,7 +15,7 @@ class TestLLMRequest:
         req = LLMRequest(messages=[{"role": "user", "content": "hello"}])
         assert len(req.messages) == 1
         assert req.temperature == 0.3
-        assert req.max_tokens == 2048
+        assert req.max_tokens == 8192
         assert req.model is None
         assert req.caller == ""
         assert req.purpose == ""

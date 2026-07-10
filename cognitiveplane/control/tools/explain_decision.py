@@ -35,8 +35,9 @@ class ExplainDecisionTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Explain the reasoning behind a decision. Returns the decision's "
-            "reasoning trace, persona, confidence, and validation status."
+            "解释决策的推理过程。\n"
+            "**何时使用**：用户询问\"为什么这样做\"、\"这个结论怎么来的\"。\n"
+            "**用法**：传 decision_id（决策 UUID）。"
         )
 
     @property

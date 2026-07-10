@@ -132,6 +132,7 @@ class ReActEngine:
         approval_store: ApprovalStore | None = None,
         context_compactor: Any = None,
         workflow_event_bus: "WorkflowEventBus | None" = None,
+        trajectory_store: Any = None,  # P0-3: TrajectoryStore 实例
     ) -> None:
         """Construct ReActEngine.
 
@@ -193,6 +194,8 @@ class ReActEngine:
         # 长路径 Temporal 观察者接入点 — boundary-pinning §3
         # 注入后 _build_system_prompt 会读取 workflow 状态摘要注入到 system prompt
         self._workflow_event_bus = workflow_event_bus
+        # P0-3: 轨迹存储 — 记录每次 ReAct 执行的 per-step 推理轨迹
+        self._trajectory_store = trajectory_store
 
         # ── Engine helper instances (extracted from former methods) ──
         self._hook_runner = HookRunner(self._hooks)
@@ -216,49 +219,28 @@ class ReActEngine:
             event_log=event_log,
         )
 
-    def _select_skill(self, user_input: str | list[dict], session: dict | None = None) -> Skill | None:
-        """根据用户输入选择最匹配的 Skill。未配置 registry 时返回 None。
+    async def _select_skill_async(self, user_input: str | list[dict], session: dict | None = None) -> Skill | None:
+        """根据用户输入选择最匹配的 Skill — LLM-first，对齐 Claude Code 渐进式披露。
 
-        Skill 锁定策略（修订版）:
-          - 同一意图内锁定,避免"图"命中 weld_iqa 后下一轮"分析下"重新选择
-          - 意图明显切换时解锁新 skill（如 weld_iqa → workflow_design）
-          - 解锁阈值:新 skill 命中分数 >= 2 且高于当前锁定的命中分数
-          - 仅短句"确认/好的/同意/列出来"等不带新关键词时保持锁定
-
-        注意: 算分前剥离 chat.py 注入的 [系统：...] 段落，避免注入的
-        "图片/分析"等词污染 skill 匹配（如「启动此工作流」被注入的
-        "图片"误导到 weld_iqa，应保持 workflow_design 锁定）。
+        选择策略：
+          1. 短句保持锁定 — "确认/好的/同意"等短回复保持当前 skill
+          2. 关键词高分捷径 — score >= 3 直接命中（极少数高置信度）
+          3. LLM 语义分类（首选）— LLM 看到所有 skill 元数据，自主决策
+          4. LLM 不可用 → 回退关键词匹配
+          5. 无匹配 → fallback 通用模式
         """
         if self._skill_registry is None:
             return None
-        # 剥离 chat.py 注入的 [系统：...] 段落，只对用户原始输入算分
         raw_text = self._skill_registry._coerce_text(user_input)
         clean_text = self._strip_system_injection(raw_text)
-        new_skill = self._skill_registry.select_skill(clean_text)
-        if session is None:
-            return new_skill
-        locked_name = session.get("locked_skill")
-        if not locked_name:
-            # 首次选定
-            if new_skill:
-                session["locked_skill"] = new_skill.name
-            return new_skill
-        # 复用已锁定的 skill（按 name 查 registry）
-        locked_skill: Skill | None = None
-        for s in self._skill_registry._skills:
-            if s.name == locked_name:
-                locked_skill = s
-                break
-        # 新 skill 明显匹配（命中分数 >=2）且与锁定不同 → 切换
-        if new_skill and new_skill.name != locked_name:
-            new_score = new_skill.match_score(clean_text)
-            locked_score = locked_skill.match_score(clean_text) if locked_skill else 0
-            if new_score >= 2 and new_score > locked_score:
-                # 意图切换:解锁并切换到新 skill
-                session["locked_skill"] = new_skill.name
-                return new_skill
-        # 保持锁定
-        return locked_skill
+
+        llm = self._deps.capability.llm_provider
+        skill = await self._skill_registry.select_skill_semantic(
+            clean_text, llm, session=session
+        )
+        if skill and session is not None:
+            session["locked_skill"] = skill.name
+        return skill
 
     @staticmethod
     def _strip_system_injection(text: str) -> str:
@@ -290,6 +272,35 @@ class ReActEngine:
             await self._event_callback(event_type, payload)
         except Exception:
             logger.debug("event_callback failed", exc_info=True)
+
+    @staticmethod
+    def _needs_web_search_consent(
+        tool_name: str,
+        session: dict[str, Any] | None,
+    ) -> bool:
+        """联网检索默认需要用户许可；同会话内批准一次后复用。"""
+        if tool_name != "web_search":
+            return False
+        permission = (session or {}).get("web_search_permission")
+        return not bool(permission and permission.get("granted"))
+
+    async def _publish_approval_notification(
+        self,
+        *,
+        approval_id: str,
+        session_id: str,
+        tool_name: str,
+        arguments: dict[str, Any],
+        iteration: int,
+        summary: str,
+    ) -> None:
+        """approval gate 通知推送 — 已废弃。
+
+        notifications.store 模块已删除，approval_request 事件现在通过 SSE
+        直接推送到前端（见 run_stream 中的 yield {"event": "approval_request", ...}）。
+        此方法保留为空壳避免破坏潜在的外部调用，无副作用。
+        """
+        return
 
     def _select_tier(self) -> InteractionTier:
         """Choose interaction tier based on LLM capabilities (plan §2.2).
@@ -329,19 +340,39 @@ class ReActEngine:
         # P3-5 fix: 收集 launch_workflow 产出的 workflow_id（结构化回传，避免正则提取）
         workflow_ids: list[str] = []
         tier = self._select_tier()
-        # Phase 5 Agent Skills: 根据用户输入选择专业化 skill（session 锁定，避免漂移）
-        skill = self._select_skill(user_input, session)
+        # Agent Skills: LLM-first 语义分类（对齐 Claude Code 渐进式披露）
+        skill = await self._select_skill_async(user_input, session)
+
+        # P0-3: TrajectoryRecorder
+        from cognitiveplane.control.trajectory import TrajectoryRecorder
+        session_id = str((session or {}).get("session_id", "default"))
+        trajectory = TrajectoryRecorder(
+            task=self._coerce_text(user_input) if isinstance(user_input, list) else user_input,
+            session_id=session_id,
+        )
+        trajectory.start()
 
         if tier == InteractionTier.REACT_FUNCTION_CALLING:
-            response = await self._run_react(user_input, context, session or {}, tier, tools_used, workflow_ids, skill=skill)
+            if session is not None:
+                async def runtime_event_callback(event_type: str, payload: dict[str, Any]) -> None:
+                    await self._emit(event_type, payload)
+
+                session["_runtime_event_callback"] = runtime_event_callback
+            response = await self._run_react(user_input, context, session or {}, tier, tools_used, workflow_ids, skill=skill, trajectory=trajectory)
         elif tier == InteractionTier.STRUCTURED_OUTPUT:
             response = await self._run_structured(self._coerce_text(user_input), context, session or {}, tools_used, skill=skill)
         else:
             response = await self._run_embedding_rules(self._coerce_text(user_input), context, session or {}, tools_used, skill=skill)
 
+        trajectory.finalize(result=response.text_reply, success=response.error is None)
+        # 存入 session 供导出端点 GET /sessions/{id}/trajectory 使用
+        if session is not None:
+            session["_trajectory"] = trajectory
+        if self._trajectory_store is not None:
+            self._trajectory_store.put(session_id, trajectory)
+
         # Phase 4 Guardrails: OutputGuardrail — LLM 最终输出护栏
         # REJECT 时替换为安全回复（在 emit final 之前）
-        session_id = str((session or {}).get("session_id", "default"))
         response.text_reply = await self._tool_executor.check_output_guardrail(
             reply=response.text_reply,
             tools_used=response.tools_used,
@@ -387,8 +418,19 @@ class ReActEngine:
         tools_used: list[str] = []
         workflow_ids: list[str] = []
         tier = self._select_tier()
-        # Phase 5 Agent Skills: 根据用户输入选择专业化 skill（session 锁定，避免漂移）
-        skill = self._select_skill(user_input, session)
+        # Agent Skills: LLM-first 语义分类（对齐 Claude Code 渐进式披露）
+        skill = await self._select_skill_async(user_input, session)
+
+        # P0-3: TrajectoryRecorder
+        session_id_trajectory = str((session or {}).get("session_id", "default"))
+        trajectory = None
+        if tier == InteractionTier.REACT_FUNCTION_CALLING:
+            from cognitiveplane.control.trajectory import TrajectoryRecorder
+            trajectory = TrajectoryRecorder(
+                task=self._coerce_text(user_input) if isinstance(user_input, list) else user_input,
+                session_id=session_id_trajectory,
+            )
+            trajectory.start()
 
         # 非 Tier-1 降级：直接调 run()，把结果包装成 final 事件
         if tier != InteractionTier.REACT_FUNCTION_CALLING:
@@ -412,6 +454,12 @@ class ReActEngine:
 
         session = session or {}
         session_id = str(session.get("session_id", "default"))
+        runtime_events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        async def runtime_event_callback(event_type: str, payload: dict[str, Any]) -> None:
+            await runtime_events.put({"event": event_type, "data": payload})
+
+        session["_runtime_event_callback"] = runtime_event_callback
 
         messages = await self._prompt_builder.build(context, session, skill=skill)
         # 注入历史对话（含 Context Compaction：超阈值时让 LLM 自己总结压缩）
@@ -426,8 +474,20 @@ class ReActEngine:
         # 后 reject 并提示 LLM 基于已有结果回答。
         same_tool_counts: dict[str, int] = {}
         SAME_TOOL_LIMIT = 3
+        # 询问节奏控制 — 防止 LLM 连续 request_confirmation 轰炸用户。
+        # 本轮已问次数达到 ASK_LIMIT 后，下一次 request_confirmation 被拦截，
+        # 强制 LLM 基于已有信息先给诊断/推进。
+        ask_count_this_round = 0
+        ASK_LIMIT = 2
         final_reply = ""
         allowed_tools = skill.allowed_tools if skill else None
+        # P0-1: Subagent 工具白名单 — 覆盖 skill 的 allowed_tools
+        subagent_config = session.get("subagent")
+        if subagent_config and isinstance(subagent_config, dict):
+            allowed_tools = list(subagent_config.get("allowed_tools", []))
+        # P0-3: 收集本轮工具调用结果（用于轨迹记录）
+        stream_tool_calls: list[dict] = []
+        stream_tool_results: list[dict] = []
         for i in range(self._max_iterations):
             # 增强 E：进度感知（Anthropic "course-correct early and often" 借鉴）
             messages.append({
@@ -509,12 +569,20 @@ class ReActEngine:
                         "reasoning_content": response.reasoning_content,
                     },
                 }
+                if trajectory is not None:
+                    trajectory.finalize(result=final_reply, success=True)
+                    session["_trajectory"] = trajectory
+                    if self._trajectory_store is not None:
+                        self._trajectory_store.put(session_id, trajectory)
                 return
 
             # 工具轮 — 并发执行多个 tool_call（与 _run_react 逻辑一致）
             # P1-2 fix: 阶段 1 校验抽到公共 _validate_tool_call,消除 300 行重复
             # rejected/retry 立即处理,accepted 收集到 pending_executions 进入并发
             pending_executions: list[dict] = []
+            # P0-3: 重置本轮收集器
+            stream_tool_calls.clear()
+            stream_tool_results.clear()
             for tool_call in tool_calls:
                 # 同轮同名工具调用上限检查 — 防止 LLM 反复调同一工具穷举参数
                 # (如 search_standards 换 7 种 query 反复查)。超过 SAME_TOOL_LIMIT
@@ -538,9 +606,28 @@ class ReActEngine:
                     messages.extend(_rej_msgs)
                     continue
 
+                # 询问节奏控制 — request_confirmation 轰炸拦截。
+                # 本轮已问 ASK_LIMIT 次后，拒绝再次询问，强制 LLM 先给诊断/推进。
+                if _tc_name == "request_confirmation" and ask_count_this_round >= ASK_LIMIT:
+                    _reason = (
+                        f"本轮已连续询问用户 {ask_count_this_round} 次,达到节奏上限 "
+                        f"{ASK_LIMIT}。用户体验上连续弹窗是轰炸。请基于已有信息先给出"
+                        f"初步诊断或推进到能推进的步骤,等用户在下一轮自然反馈后再问"
+                        f"剩余问题。如确实缺关键信息无法推进,在回复里说明需要用户"
+                        f"补充什么,但不要调 request_confirmation。"
+                    )
+                    _tool_call_id = tool_call.get("id", "")
+                    _rej_msgs = [
+                        {"role": "assistant", "content": None, "tool_calls": [tool_call], "reasoning_content": response.reasoning_content},
+                        {"role": "tool", "tool_call_id": _tool_call_id,
+                         "content": json.dumps({"error": _reason, "blocked_by": "ask_pace_control"}, ensure_ascii=False)},
+                    ]
+                    messages.extend(_rej_msgs)
+                    continue
+
                 outcome = await self._tool_validator.validate(
                     tool_call, context, session_id, tier_a_failures, tools_used,
-                    allowed_tools=skill.allowed_tools if skill else None,
+                    allowed_tools=allowed_tools,
                     session=session,
                     reasoning_content=response.reasoning_content,
                 )
@@ -554,7 +641,19 @@ class ReActEngine:
                 # extend messages(outcome 已构造好 assistant+tool 序列)
                 messages.extend(outcome["messages"])
 
+                # P0-3: 记录工具调用到本轮收集器
+                tool_name = outcome.get("tool_name", tool_call.get("function", {}).get("name", ""))
+                arguments = outcome.get("arguments", tool_call.get("function", {}).get("arguments", "{}"))
+                stream_tool_calls.append({
+                    "name": tool_name,
+                    "arguments": arguments,
+                    "accepted": outcome["kind"] == "accepted",
+                })
+
                 if outcome["kind"] == "accepted":
+                    # 询问节奏控制 — 记录本轮 request_confirmation 调用次数
+                    if outcome["tool_name"] == "request_confirmation":
+                        ask_count_this_round += 1
                     # P2-4 fix: 注入 session_id 供 launch_workflow 去重
                     # 只对 launch_workflow 注入 — 其他工具（如 list_datasets）
                     # 的 schema 不允许 session_id 字段，注入会触发 Schema validation 失败。
@@ -579,7 +678,11 @@ class ReActEngine:
                 still_pending: list[dict] = []
                 for item in pending_executions:
                     tname = item["tool_name"]
-                    if tname not in APPROVAL_REQUIRED_TOOLS:
+                    requires_approval = (
+                        tname in APPROVAL_REQUIRED_TOOLS
+                        or self._needs_web_search_consent(tname, session)
+                    )
+                    if not requires_approval:
                         still_pending.append(item)
                         continue
                     # 需要审批 — 构造请求并阻塞等待
@@ -589,40 +692,14 @@ class ReActEngine:
                         approval_id, session_id, i + 1, tname,
                         item["arguments"], summary,
                     )
-                    # 同时也发布到 Notification Store，让前端 WebSocket 收到实时通知
-                    try:
-                        from cognitiveplane.interaction.notifications.store import (
-                            get_notification_store,
-                            Notification,
-                            NotificationType,
-                        )
-                        from datetime import timedelta
-                        store = get_notification_store()
-                        tool_display_names = {
-                            "launch_workflow": "启动工作流",
-                            "create_job": "创建标注作业",
-                            "create_task": "创建标注任务",
-                            "trigger_ai": "触发AI自动标注",
-                            "upload_images": "上传图片",
-                            "assign_task": "分配标注任务",
-                        }
-                        display_name = tool_display_names.get(tname, tname)
-                        notification = Notification(
-                            notification_type=NotificationType.CONFIRMATION_REQUEST,
-                            title=f"需要您的确认：{display_name}",
-                            message=summary,
-                            payload={
-                                "approval_id": approval_id,
-                                "tool": tname,
-                                "arguments": item["arguments"],
-                                "iteration": i + 1,
-                            },
-                            expires_at=None,  # 让 approval store 自己管理超时
-                            operator_id=session_id,
-                        )
-                        await store.add(notification)
-                    except Exception:
-                        logger.debug("Failed to send approval notification", exc_info=True)
+                    await self._publish_approval_notification(
+                        approval_id=approval_id,
+                        session_id=session_id,
+                        tool_name=tname,
+                        arguments=item["arguments"],
+                        iteration=i + 1,
+                        summary=summary,
+                    )
 
                     yield {
                         "event": "approval_request",
@@ -642,6 +719,12 @@ class ReActEngine:
 
                     if req.decision == "approved":
                         # 用户批准 — 保留执行
+                        if tname == "web_search":
+                            session["web_search_permission"] = {
+                                "granted": True,
+                                "approved_at_iteration": i + 1,
+                                "query": item["arguments"].get("query", ""),
+                            }
                         still_pending.append(item)
                         yield {
                             "event": "tool_call",
@@ -685,10 +768,46 @@ class ReActEngine:
             # 阶段 2：并发执行 — 实际 execute 是最耗时部分，tool_calls 彼此独立可并发
             # 总耗时由最慢的工具决定，而非各工具耗时之和
             if pending_executions:
-                results = await asyncio.gather(
-                    *[self._tool_executor.execute_with_timeout(item["tool_name"], item["arguments"], session=session) for item in pending_executions],
-                    return_exceptions=False,
-                )
+                execution_tasks = [
+                    asyncio.create_task(
+                        self._tool_executor.execute_with_timeout(
+                            item["tool_name"], item["arguments"], session=session,
+                        )
+                    )
+                    for item in pending_executions
+                ]
+                task_to_index = {task: idx for idx, task in enumerate(execution_tasks)}
+                results: list[tuple[ToolResult, bool] | None] = [None] * len(execution_tasks)
+                pending_tasks = set(execution_tasks)
+                queue_task = asyncio.create_task(runtime_events.get())
+                while pending_tasks:
+                    done, _ = await asyncio.wait(
+                        pending_tasks | {queue_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if queue_task in done:
+                        event = queue_task.result()
+                        yield event
+                        finished_queue_task = queue_task
+                        queue_task = asyncio.create_task(runtime_events.get())
+                        done.remove(finished_queue_task)
+                    for task in done:
+                        pending_tasks.remove(task)
+                        results[task_to_index[task]] = task.result()
+                queue_task.cancel()
+                try:
+                    await queue_task
+                except asyncio.CancelledError:
+                    pass
+                # 排空残留事件 — delegate (subagent) 工具可能在完成前最后
+                # 一刻往队列塞了 subagent_completed 事件，但 queue_task
+                # 已被取消。不排空会导致前端子 agent 面板永远停在"执行中"。
+                while not runtime_events.empty():
+                    try:
+                        residual = runtime_events.get_nowait()
+                        yield residual
+                    except asyncio.QueueEmpty:
+                        break
             else:
                 results = []
 
@@ -761,6 +880,13 @@ class ReActEngine:
                     },
                 }
 
+                # P0-3: 记录工具结果到本轮收集器
+                stream_tool_results.append({
+                    "tool": tool_name,
+                    "error": result.error,
+                    "error_type": result.error_type,
+                })
+
                 messages.append({
                     "role": "assistant",
                     "content": None,
@@ -806,8 +932,28 @@ class ReActEngine:
                         if k.startswith(prefix):
                             del fail_counts[k]
 
+            # P0-3: 记录本轮推理轨迹（run_stream 模式）
+            if trajectory is not None:
+                from cognitiveplane.control.trajectory import AgentStep
+                step = AgentStep(
+                    step_number=i + 1,
+                    state="CALLING_TOOL" if stream_tool_calls else "COMPLETED",
+                    tool_calls=stream_tool_calls.copy(),
+                    tool_results=stream_tool_results.copy(),
+                    llm_usage={
+                        "prompt_tokens": getattr(response, "usage", {}).get("prompt_tokens", 0) if hasattr(response, "usage") else 0,
+                        "completion_tokens": getattr(response, "usage", {}).get("completion_tokens", 0) if hasattr(response, "usage") else 0,
+                    } if hasattr(response, "usage") else None,
+                )
+                trajectory.record_step(step)
+
         # max_iterations reached — 安全兜底
         final_reply = "Max iterations reached. Please refine your request."
+        if trajectory is not None:
+            trajectory.finalize(result=final_reply, success=False)
+            session["_trajectory"] = trajectory
+            if self._trajectory_store is not None:
+                self._trajectory_store.put(session_id, trajectory)
         yield {"event": "token", "data": {"content": final_reply}}
         yield {
             "event": "final",
@@ -829,11 +975,19 @@ class ReActEngine:
         tools_used: list[str],
         workflow_ids: list[str] | None = None,  # P3-5: 收集 launch_workflow 产出
         skill: Skill | None = None,  # Phase 5: 选中的 Agent Skill
+        trajectory: "TrajectoryRecorder | None" = None,  # P0-3: 推理轨迹记录器
     ) -> InteractionResponse:
         """Tier 1: Full ReAct with Function Calling."""
         llm = self._deps.capability.llm_provider
         if llm is None:
             return await self._run_embedding_rules(self._coerce_text(user_input), context, session, tools_used, skill=skill)
+
+        # P0-1: Subagent 工具白名单 — 覆盖 skill 的 allowed_tools
+        subagent_config = session.get("subagent")
+        if subagent_config and isinstance(subagent_config, dict):
+            allowed_tools = list(subagent_config.get("allowed_tools", []))
+        else:
+            allowed_tools = skill.allowed_tools if skill else None
 
         # Real session_id for max_calls_per_session enforcement (plan §4.2 line 761)
         session_id = str(session.get("session_id", "default")) if session else "default"
@@ -850,6 +1004,9 @@ class ReActEngine:
         # 同轮同名工具调用计数 — 防止 LLM 反复调同一工具穷举参数
         same_tool_counts: dict[str, int] = {}
         SAME_TOOL_LIMIT = 3
+        # 询问节奏控制 — 与 run_stream 保持一致，防止 _run_react 路径无限制提问
+        ask_count_this_round = 0
+        ASK_LIMIT = 2
         for i in range(self._max_iterations):
             await self._emit("thinking", {
                 "iteration": i + 1,
@@ -864,7 +1021,7 @@ class ReActEngine:
                 response = await llm.complete(
                     self._make_llm_request(
                         messages,
-                        allowed_tools=skill.allowed_tools if skill else None,
+                        allowed_tools=allowed_tools,
                     )
                 )
             except Exception as e:
@@ -909,9 +1066,25 @@ class ReActEngine:
                     messages.extend(_rej_msgs)
                     continue
 
+                # 询问节奏控制 — request_confirmation 轰炸拦截（与 run_stream 一致）
+                if _tc_name == "request_confirmation" and ask_count_this_round >= ASK_LIMIT:
+                    _reason = (
+                        f"本轮已连续询问用户 {ask_count_this_round} 次,达到节奏上限 "
+                        f"{ASK_LIMIT}。请基于已有信息先给出初步诊断或推进到能推进的"
+                        f"步骤,等用户在下一轮自然反馈后再问剩余问题。"
+                    )
+                    _tool_call_id = tool_call.get("id", "")
+                    _rej_msgs = [
+                        {"role": "assistant", "content": None, "tool_calls": [tool_call], "reasoning_content": response.reasoning_content},
+                        {"role": "tool", "tool_call_id": _tool_call_id,
+                         "content": json.dumps({"error": _reason, "blocked_by": "ask_pace_control"}, ensure_ascii=False)},
+                    ]
+                    messages.extend(_rej_msgs)
+                    continue
+
                 outcome = await self._tool_validator.validate(
                     tool_call, context, session_id, tier_a_failures, tools_used,
-                    allowed_tools=skill.allowed_tools if skill else None,
+                    allowed_tools=allowed_tools,
                     session=session,
                     reasoning_content=response.reasoning_content,
                 )
@@ -920,6 +1093,9 @@ class ReActEngine:
                     same_tool_counts[outcome["tool_name"]] = (
                         same_tool_counts.get(outcome["tool_name"], 0) + 1
                     )
+                    # 询问节奏控制 — 记录本轮 request_confirmation 调用次数
+                    if outcome["tool_name"] == "request_confirmation":
+                        ask_count_this_round += 1
                 # emit tool_call 事件(rejected 和 accepted 都 emit)
                 await self._emit("tool_call", outcome["event_data"])
                 # extend messages(outcome 已构造好 assistant+tool 序列)
@@ -1007,6 +1183,28 @@ class ReActEngine:
                     "role": "tool", "tool_call_id": tool_call_id,
                     "content": json.dumps(result.to_json()),
                 })
+
+            # P0-3: 记录本轮推理轨迹
+            if trajectory is not None:
+                from cognitiveplane.control.trajectory import AgentStep
+                step = AgentStep(
+                    step_number=i + 1,
+                    state="CALLING_TOOL" if tool_calls else "COMPLETED",
+                    tool_calls=[{
+                        "name": tc.get("function", {}).get("name", ""),
+                        "arguments": tc.get("function", {}).get("arguments", ""),
+                    } for tc in tool_calls],
+                    tool_results=[{
+                        "tool": item["tool_name"],
+                        "error": result.error,
+                        "error_type": result.error_type,
+                    } for item, (result, _) in zip(pending_executions, results)] if pending_executions else [],
+                    llm_usage={
+                        "prompt_tokens": getattr(response, "usage", {}).get("prompt_tokens", 0) if hasattr(response, "usage") else 0,
+                        "completion_tokens": getattr(response, "usage", {}).get("completion_tokens", 0) if hasattr(response, "usage") else 0,
+                    } if hasattr(response, "usage") else None,
+                )
+                trajectory.record_step(step)
 
         # max_iterations reached — safety guardrail, not LLM choice.
         return InteractionResponse(
@@ -1284,6 +1482,7 @@ class ReActEngine:
         """Build LLMRequest from messages.
 
         Phase 5 Agent Skills: 传入 allowed_tools 可限制 LLM 可见的工具白名单。
+        ReAct 主路径覆盖 max_tokens/temperature，确保输出质量和长度。
         """
         from cognitiveplane.capability.provider import LLMRequest
         tool_defs = self._tools.get_llm_tool_definitions(allowed_tools=allowed_tools)
@@ -1291,4 +1490,9 @@ class ReActEngine:
             messages=messages,
             tools=tool_defs if tool_defs else None,
             caller="react_engine",
+            max_tokens=8192,
+            temperature=0.3,  # 0.3 而非 0.7：Agent 场景需要高 system prompt 遵从度，
+            # 0.7 下 LLM 容易忽略后段引导（委派 subagent / 知识库 fallback / 询问节奏）。
+            # 0.3 既保留一定探索性，又确保 LLM 遵守 system prompt 中的决策框架。
+            top_p=0.95,
         )

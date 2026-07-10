@@ -11,6 +11,7 @@ class SearchStandardsTool(BrainTool):
     """Query welding standards (NB/T47014, ISO 3834, etc.)."""
 
     phase = 3
+    always_available = True  # 基础工具层：知识检索豁免 skill 白名单
 
     def __init__(self, port: StandardsQueryPort) -> None:
         self._port = port
@@ -22,8 +23,10 @@ class SearchStandardsTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Search welding standards and specifications. "
-            "Returns applicable standard clauses, parameter ranges, and requirements."
+            "查询工业标准、规范、技术条款。\n"
+            "**何时使用**：用户询问标准号、规范要求、参数范围、工艺评定条件。\n"
+            "**用法**：传 standard_id（如 NB/T47014、ISO-3834）和可选的 section/parameter。\n"
+            "**约束**：最多查 2 次，查不到就换 web_search 或弹窗问用户，不要穷举 query。"
         )
 
     @property

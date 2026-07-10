@@ -18,6 +18,8 @@ from cognitiveplane.interaction.api._helpers import (
     _trigger_evaluation,
     _EvalProxy,
     persist_session,
+    build_runtime_session,
+    persist_runtime_session_state,
 )
 from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
@@ -41,6 +43,8 @@ async def handle_chat_stream(
     skill_registry,
     approval_store,
     context_compactor,
+    workflow_event_bus,
+    trajectory_store,
 ):
     """流式聊天端点 — SSE (Server-Sent Events)。POST /api/v1/chat/stream.
 
@@ -77,6 +81,7 @@ async def handle_chat_stream(
 
     session_id_str = str(session.session_id.value)
     user_msg = _inject_session_image_refs(request.message, session_id_str, router)
+    runtime_session = build_runtime_session(session)
 
     async def event_generator():
         """SSE 事件生成器 — 每请求独立 ReActEngine，避免并发缓存污染。
@@ -98,6 +103,8 @@ async def handle_chat_stream(
             skill_registry=skill_registry,
             approval_store=approval_store,
             context_compactor=context_compactor,
+            workflow_event_bus=workflow_event_bus,
+            trajectory_store=trajectory_store,
             tool_registry=engine._tools,
         )
         final_reply = ""
@@ -108,10 +115,7 @@ async def handle_chat_stream(
             async for event in stream_engine.run_stream(
                 user_input=user_msg,
                 context=context,
-                session={
-                    "session_id": session_id_str,
-                    "history": session.messages,
-                },
+                session=runtime_session,
             ):
                 if event["event"] == "final":
                     final_reply = event["data"].get("reply", "")
@@ -127,6 +131,7 @@ async def handle_chat_stream(
             # 共享 persist_session 函数, 与 WS /ws 路径行为一致
             persist_session(session_manager, session_id_str, user_msg, final_reply, final_reasoning,
             operator_id=request.operator_id)
+            persist_runtime_session_state(session, runtime_session)
             logger.info("[STREAM] session=%s tools=%s wf_ids=%s reply_len=%d",
                         session_id_str, tools_used_list, workflow_ids_list, len(final_reply))
             # Phase 5: 流式响应结束后异步评估
@@ -164,6 +169,10 @@ async def handle_websocket_chat(
     session_manager,
     image_sessions,
     router,
+    approval_store,
+    context_compactor,
+    workflow_event_bus,
+    trajectory_store,
 ) -> None:
     """WebSocket 聊天端点 — WS /api/v1/chat/ws.
 
@@ -181,6 +190,8 @@ async def handle_websocket_chat(
 
     # 治理一致: /ws 路径必须与 HTTP /api/v1/chat 用同一套 hooks (SafetyHook + PolicyHook).
     # 不能让同一工具调用因入口不同而绕过 ToolPolicy.
+    # 同样必须传 approval_store / context_compactor / workflow_event_bus —
+    # 否则 WS 路径绕过 human-in-the-loop 门禁、长对话压缩、长路径 workflow 观察者注入。
     # stream_mode=True: WS 客户端获得逐 token 流式输出（打字机效果）.
     loop = AgentLoop(
         deps=deps,
@@ -196,6 +207,10 @@ async def handle_websocket_chat(
         session_manager=session_manager,
         image_sessions=image_sessions,
         router=router,
+        approval_store=approval_store,
+        context_compactor=context_compactor,
+        workflow_event_bus=workflow_event_bus,
+        trajectory_store=trajectory_store,
     )
     await loop.start()
 

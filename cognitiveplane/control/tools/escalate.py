@@ -64,7 +64,7 @@ class EscalateTool(BrainTool):
         from cognitiveplane.shared.dto_decision.outputs import EvidenceReference
         from cognitiveplane.shared.enums import UrgencyLevel, FallbackMode
         from cognitiveplane.shared.types import CaseId, DecisionId
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timezone
         from uuid import uuid4
 
         urgency_map = {
@@ -74,33 +74,11 @@ class EscalateTool(BrainTool):
         }
         urgency = urgency_map.get(kwargs.get("urgency", "urgent"), UrgencyLevel.URGENT)
 
-        # Publish to notification store for real-time push
-        from cognitiveplane.interaction.notifications.store import (
-            get_notification_store,
-            Notification,
-            NotificationType,
-        )
-
-        store = get_notification_store()
-        reason = kwargs["reason"]
-        notification = Notification(
-            NotificationType.ESCALATION,
-            "需要人工介入",
-            reason,
-            payload={
-                "reason": reason,
-                "urgency": kwargs.get("urgency", "urgent"),
-                "case_id": kwargs.get("case_id", "unknown"),
-            },
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
-        )
-        await store.add(notification)
-
         escalation = Escalation(
             escalation_id=uuid4(),
             decision_id=DecisionId(value=uuid4()),
             case_id=CaseId(value=kwargs.get("case_id", "unknown")),
-            reason=reason,
+            reason=kwargs["reason"],
             urgency=urgency,
             fallback_mode=FallbackMode.HUMAN_INTERVENTION,
             supporting_evidence=[],
@@ -113,7 +91,6 @@ class EscalateTool(BrainTool):
                 "escalation_id": str(escalation.escalation_id),
                 "success": result.success,
                 "urgency": urgency.value,
-                "notification_id": str(notification.notification_id),
             })
         except Exception as e:
             return ToolResult(error=str(e))

@@ -24,16 +24,11 @@ Spec: docs/superpowers/specs/2026-06-25-phase3-boundary-pinning-design.md §3
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from cognitiveplane.interaction.notifications.store import (
-        Notification,
-        NotificationStore,
-        NotificationType,
-    )
     from cognitiveplane.interaction.workflow_events import WorkflowEvent, WorkflowEventBus
 
 
@@ -67,7 +62,7 @@ class WorkflowObserver:
     def __init__(
         self,
         event_bus: "WorkflowEventBus",
-        notification_store: "NotificationStore",
+        notification_store: Any = None,
     ) -> None:
         self._event_bus = event_bus
         self._notification_store = notification_store
@@ -94,31 +89,27 @@ class WorkflowObserver:
         if event.event_type not in _KEY_EVENTS:
             return
 
-        # 延迟 import 避免循环依赖
-        from cognitiveplane.interaction.notifications.store import (
-            Notification,
-            NotificationType,
-        )
+        if self._notification_store is None:
+            logger.debug("[WorkflowObserver] event %s received (no notification store)",
+                         event.event_type)
+            return
 
         # 构造通知标题和消息
         title, message = self._build_notification(event)
 
-        notification = Notification(
-            notification_type=NotificationType.WORKFLOW_UPDATE,
-            title=title,
-            message=message,
-            payload={
-                "workflow_id": event.workflow_id,
-                "session_id": event.session_id,
-                "event_type": event.event_type,
-                "node_data": event.node_data,
-                "error": event.error,
-            },
-            expires_at=None,
-            operator_id=event.session_id,
-        )
         try:
-            await self._notification_store.add(notification)
+            await self._notification_store.add_notification(
+                title=title,
+                message=message,
+                payload={
+                    "workflow_id": event.workflow_id,
+                    "session_id": event.session_id,
+                    "event_type": event.event_type,
+                    "node_data": event.node_data,
+                    "error": event.error,
+                },
+                operator_id=event.session_id,
+            )
         except Exception:
             logger.debug("WorkflowObserver notification add failed", exc_info=True)
 

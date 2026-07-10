@@ -58,6 +58,21 @@ def build_dependencies(llm_available: bool) -> "CognitiveDependencies":
         process_knowledge=knowledge_adapter,
     )
 
+    # RAG 向量检索 — Chroma 向量库（视觉理解 + 文本推理双 collection）
+    # 仅在 LLM 可用时装配（需要 embed() 生成向量）
+    if llm_available:
+        try:
+            from cognitiveplane.knowledge.adapters.chroma_rag import ChromaRAGAdapter
+            llm_provider = get_llm()
+            chroma_adapter = ChromaRAGAdapter(llm_provider=llm_provider)
+            knowledge_deps.vision_knowledge = chroma_adapter
+            knowledge_deps.reasoning_knowledge = chroma_adapter
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "ChromaRAGAdapter 装配失败，RAG 向量检索不可用", exc_info=True
+            )
+
     # Gateway
     gateway_adapter = InMemoryGatewayAdapter()
     gateway_deps = GatewayDeps(read=gateway_adapter, write=gateway_adapter)

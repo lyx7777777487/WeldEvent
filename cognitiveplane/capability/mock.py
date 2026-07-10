@@ -34,6 +34,12 @@ class MockLLMProvider(LLMProvider):
         return True
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        # Skill classification requests — return null so keyword fallback is used.
+        # This prevents mock LLMs from interfering with skill selection in tests.
+        sys_msg = next((m.get("content", "") for m in request.messages if m.get("role") == "system"), "")
+        if "意图分类器" in sys_msg:
+            return LLMResponse(content='{"skill": null}', model_used="mock-classification")
+
         content = self._default
         for msg in request.messages:
             text = msg.get("content", "")

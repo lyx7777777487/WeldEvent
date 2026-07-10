@@ -8,6 +8,7 @@ class SearchProcessTool(BrainTool):
     """Search process knowledge for recommended welding parameters."""
 
     phase = 4
+    always_available = True  # 基础工具层：工艺知识检索豁免 skill 白名单
 
     def __init__(self, port: ProcessKnowledgePort) -> None:
         self._port = port
@@ -19,8 +20,10 @@ class SearchProcessTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Search process knowledge for recommended welding parameters, "
-            "quality criteria, and common defect patterns for specific processes."
+            "查询工艺知识库，获取推荐参数和质量标准。\n"
+            "**何时使用**：用户询问工艺参数（电流/电压/速度/预热等）、"
+            "质量判据、或常见缺陷模式。\n"
+            "**用法**：传 process_type（工艺类型如 GMAW/GTAW/SMAW）和可选的 material。"
         )
 
     @property

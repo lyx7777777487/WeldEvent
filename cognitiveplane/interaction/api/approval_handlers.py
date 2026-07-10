@@ -20,13 +20,15 @@ class ApproveRequest(BaseModel):
     前端收到 SSE approval_request 事件后展示确认 UI，用户点击确认/拒绝时
     调此端点 resolve 对应的 ApprovalRequest，唤醒阻塞中的 ReAct loop。
 
-    decision 字段兼容两种语义：
+    decision 字段兼容三种语义：
     - "approved" / "rejected" — APPROVAL_REQUIRED_TOOLS 拦截场景的固定决策
     - 任意选项值（如 "气孔" / "张工"）— request_confirmation 工具的多选项
       弹窗场景，用户点哪个选项就把选项值作为 decision 传回
+    - 空字符串 "" — 用户未选择任何选项，仅通过 feedback 输入框提供建议。
+      此场景下 feedback 是用户的主输入，LLM 应以 feedback 为准。
     """
     approval_id: str
-    decision: str
+    decision: str = ""
     feedback: str | None = None
 
 

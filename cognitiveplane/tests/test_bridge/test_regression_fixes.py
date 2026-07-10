@@ -458,6 +458,7 @@ class TestLaunchWorkflowRateLimit:
         result = await tool.execute(
             workflow_spec=_make_launch_spec().model_dump(),
             reason="test",
+            wait_for_completion=True,
         )
 
         assert result.error is None
@@ -472,12 +473,19 @@ class TestLaunchWorkflowRateLimit:
         connector = EventConnector(launcher=launcher)
         deps = CognitiveDependencies(bridge=BridgeDeps(event_connector=connector))
         tool = LaunchWorkflowTool(deps)
-        # 预设已启动过该 workflow_id
-        tool._launched_ids["wf-launch-test"] = None
-
-        result = await tool.execute(
-            workflow_spec=_make_launch_spec().model_dump(),
+        # 先真实 launch 一次（wait_for_completion 让计数器正确递增）
+        spec = _make_launch_spec()
+        await tool.execute(
+            workflow_spec=spec.model_dump(),
             reason="test",
+            wait_for_completion=True,
+        )
+
+        # 再用同一 objective 重复 launch —— 应被去重拦截
+        result = await tool.execute(
+            workflow_spec=spec.model_dump(),
+            reason="test",
+            wait_for_completion=True,
         )
 
         assert result.error is not None
@@ -486,25 +494,30 @@ class TestLaunchWorkflowRateLimit:
     @pytest.mark.asyncio
     async def test_launch_evicts_oldest_at_total_limit(self):
         """P3-2: 达到全局上限时 LRU 淘汰最老条目，新 launch 仍成功."""
+        import hashlib
         port = _AcceptingPort()
         launcher = WorkflowLauncher(port=port)
         connector = EventConnector(launcher=launcher)
         deps = CognitiveDependencies(bridge=BridgeDeps(event_connector=connector))
         tool = LaunchWorkflowTool(deps)
-        # 预设到全局上限
+        # 预设到全局上限——用正确的 dedup 键格式 session_id:objective_hash[:12]
         for i in range(tool._MAX_TOTAL_LAUNCHES):
-            tool._launched_ids[f"wf-existing-{i}"] = None
+            obj_hash = hashlib.sha1(f"existing-{i}".encode("utf-8")).hexdigest()[:12]
+            tool._launched_ids[f"default:{obj_hash}"] = f"wf-existing-{i}"
+        tool._launch_count = tool._MAX_TOTAL_LAUNCHES
+        oldest_key = next(iter(tool._launched_ids))
 
         result = await tool.execute(
-            workflow_spec=_make_launch_spec().model_dump(),  # wf-launch-test 不在 OrderedDict 中
+            workflow_spec=_make_launch_spec().model_dump(),  # 新的 objective，不在 OrderedDict 中
             reason="test",
+            wait_for_completion=True,
         )
 
-        # P3-2: LRU eviction — 新 launch 成功，最老的 wf-existing-0 被淘汰
+        # P3-2: LRU eviction — 新 launch 成功，最老的条目被淘汰
         assert result.error is None
         assert result.output["status"] == "COMPLETED"
-        assert "wf-existing-0" not in tool._launched_ids
-        assert "wf-launch-test" in tool._launched_ids
+        assert oldest_key not in tool._launched_ids
+        assert tool._launch_count == tool._MAX_TOTAL_LAUNCHES + 1
 
     @pytest.mark.asyncio
     async def test_launch_count_increments_only_on_success(self):
@@ -544,9 +557,11 @@ class TestLaunchWorkflowRateLimit:
         for i in range(3):
             spec = _make_launch_spec()
             spec.workflow_id = f"wf-{i}"
+            spec.objective = f"test launch {i}"  # 每个 objective 不同，避免去重拦截
             await tool.execute(
                 workflow_spec=spec.model_dump(),
                 reason=f"launch {i}",
+                wait_for_completion=True,
             )
 
         assert tool._launch_count == 3

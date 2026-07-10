@@ -263,7 +263,8 @@ async def test_request_confirmation_with_gateway():
     tool = RequestConfirmationTool(gateway_write=gw)
     result = await tool.execute(question="Approve?", options=["yes", "no"], urgency="urgent")
     assert result.error is None
-    assert result.output["success"] is True
+    # gateway-only 模式（无 approval_store）返回 confirmation_requested 状态
+    assert result.output["status"] == "confirmation_requested"
     assert len(gw.published) == 1
     assert gw.published[0][0] == "instruction"
 

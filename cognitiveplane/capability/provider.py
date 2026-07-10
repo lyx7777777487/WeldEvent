@@ -21,9 +21,9 @@ class LLMRequest(BaseModel):
     response_format: type | dict | None = None
     tools: list[dict] | None = None
 
-    temperature: float = 0.3
-    max_tokens: int = 2048
-    top_p: float = 0.9
+    temperature: float = 0.3  # Agent 场景默认低 temperature 以保证 system prompt 遵从度
+    max_tokens: int = 8192
+    top_p: float = 0.95
 
     caller: str = ""
     case_id: str | None = None

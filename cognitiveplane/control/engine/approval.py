@@ -171,6 +171,14 @@ def summarize_for_approval(tool_name: str, arguments: dict[str, Any]) -> str:
             f"- 作业 ID: {job_id}\n"
             f"- 任务 ID: {task_id}"
         )
+    if tool_name == "web_search":
+        query = arguments.get("query") or arguments.get("question") or "（未提供）"
+        return (
+            f"**联网检索申请**\n"
+            f"- 查询内容: {query}\n"
+            f"- 说明: 系统已优先使用内部知识 / RAG / 会话上下文，"
+            f"现在需要外部最新信息，请确认是否允许联网搜索。"
+        )
 
     # ── launch_workflow 摘要 ──
     if tool_name != "launch_workflow":

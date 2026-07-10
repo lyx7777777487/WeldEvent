@@ -129,6 +129,11 @@ class _ScriptedLLM(LLMProvider):
         self.captured_user_messages: list = []
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        # Skill classification requests — return null so keyword fallback is used.
+        # This prevents the classification call from consuming the scripted call sequence.
+        sys_msg = next((m.get("content", "") for m in request.messages if m.get("role") == "system"), "")
+        if "意图分类器" in sys_msg:
+            return LLMResponse(content='{"skill": null}', model_used="classification")
         self._call_count += 1
         # First call: capture the user message (first message with role=user).
         if self._call_count == 1:
@@ -689,6 +694,10 @@ class _CapturingLLM(LLMProvider):
         self.captured_system: str | None = None
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        # Skill classification requests — return null so keyword fallback is used.
+        sys_msg = next((m.get("content", "") for m in request.messages if m.get("role") == "system"), "")
+        if "意图分类器" in sys_msg:
+            return LLMResponse(content='{"skill": null}', model_used="classification")
         for m in request.messages:
             if m.get("role") == "system":
                 self.captured_system = m.get("content", "")
@@ -781,7 +790,7 @@ class TestWorldviewInjection:
         await engine.run("hi", empty_context)
         assert llm.captured_system is not None
         # Tools + rules section always present
-        assert "你可以使用以下工具" in llm.captured_system
+        assert "可用工具" in llm.captured_system
         # WELDEVENT.md / OPERATOR.md files don't exist in test env — not in prompt
         assert "项目规约" not in llm.captured_system
         assert "操作员偏好" not in llm.captured_system

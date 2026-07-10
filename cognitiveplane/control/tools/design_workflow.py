@@ -40,14 +40,13 @@ class DesignWorkflowTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Design a WorkflowSpec DAG for an inspection case. "
-            "Returns a draft only: it does not start Temporal, write labels, "
-            "or call industrial MCP directly. Requires a reason.\n\n"
-            "RECOMMENDED: pass `nodes` array to explicitly orchestrate the "
-            "workflow. Choose capabilities from the L3 Activity Catalog below. "
-            "Each node should specify capability + depends_on (referencing "
-            "prior node_ids). image_refs will be auto-injected into each "
-            "tool_task node's input — do NOT repeat them per-node.\n\n"
+            "设计工作流方案（DAG），产出 WorkflowSpec 草稿。\n"
+            "**何时使用**：用户要求执行检测/标注/批量处理等工业操作时，"
+            "先调用本工具设计方案，再调 launch_workflow 启动。\n"
+            "**用法**：传 nodes 数组（每项含 capability + depends_on），"
+            "参考下方 Activity Catalog 选择能力。\n"
+            "**约束**：本工具只设计方案不执行，返回后必须调 launch_workflow 启动。"
+            "不要对纯问答请求调用本工具。\n\n"
             + get_catalog_text()
         )
 

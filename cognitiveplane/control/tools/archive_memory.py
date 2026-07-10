@@ -26,9 +26,9 @@ class ArchiveMemoryTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Archive content to long-term memory. Agent-controlled: the Brain decides "
-            "what to store, no automatic promotion. Use to persist important findings, "
-            "decisions, or learned patterns for future reference."
+            "归档重要内容到长期记忆。\n"
+            "**何时使用**：需要持久化重要发现、决策或模式，供未来会话参考。\n"
+            "**用法**：传 content（要归档的文本）和可选的 tags 标签。"
         )
 
     @property

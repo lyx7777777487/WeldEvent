@@ -25,8 +25,10 @@ class ReadWeldMapTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Read current WeldMap state for a case: workflow progress, "
-            "case data, previous decisions, and measurements."
+            "读取当前 Case 的 WeldMap 状态。\n"
+            "**何时使用**：需要了解工作流进度、已产生的数据、"
+            "之前的决策记录或测量结果。\n"
+            "**用法**：无需参数，自动读取当前 case 的完整状态快照。"
         )
 
     @property

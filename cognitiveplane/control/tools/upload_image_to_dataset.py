@@ -65,10 +65,12 @@ class UploadImageToDatasetTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Upload a weld image (referenced by image_ref) to a Label Studio dataset version. "
-            "Pass image_ref (PENDING:session_id:index from the system-provided image list) "
-            "and version_id (from get_dataset's latestVersionId field). "
-            "The tool fetches the original image internally — do NOT pass base64 data."
+            "上传图片到标注平台数据集。\n"
+            "**何时使用**：需要将当前会话的图片上传到 Label Studio 数据集进行标注。\n"
+            "**用法**：传 image_ref（格式 PENDING:session_id:index）+ "
+            "version_id（从 get_dataset 的 latestVersionId 获取）。\n"
+            "**注意**：不要尝试直接调 MCP upload_images（需要 base64，你拿不到），"
+            "用本工具即可，内部自动从 ImageStore 取图。"
         )
 
     @property

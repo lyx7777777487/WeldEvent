@@ -7,6 +7,7 @@ chat.py (chat.py imports this module at top level).
 Source: 7-plane redesign spec §7 FastAPI + plan §2.3 + §A.3.
 """
 
+from copy import deepcopy
 from dataclasses import dataclass
 from fastapi import APIRouter
 from cognitiveplane.governance.evaluation import EvaluationInput
@@ -22,6 +23,15 @@ if not logger.handlers:
     logger.addHandler(h)
     logger.setLevel(logging.INFO)
     logger.propagate = False  # 避免重复输出
+
+
+_RUNTIME_SESSION_RESERVED_KEYS = {
+    "session_id",
+    "history",
+    "_runtime_event_callback",
+    "_parent_agent_id",
+    "_trajectory",
+}
 
 
 def _inject_session_image_refs(
@@ -55,6 +65,33 @@ def _inject_session_image_refs(
 def _get_or_create_session(session_manager, operator_id, session_id, case_id):
     """获取或创建会话（复用前端传的 session_id，保证历史对话累积）。"""
     return session_manager.get_or_create_session(operator_id, session_id, case_id)
+
+
+def build_runtime_session(session) -> dict:
+    """把持久化 Session 映射为本轮 ReAct 可变运行态。
+
+    Session.messages 是权威对话历史；其余跨轮状态统一放在 Session.metadata。
+    每轮运行前做一次浅隔离拷贝，避免中途修改直接污染持久层。
+    """
+    runtime = {
+        "session_id": str(session.session_id.value),
+        "history": session.messages,
+    }
+    for key, value in (getattr(session, "metadata", None) or {}).items():
+        runtime[key] = deepcopy(value)
+    return runtime
+
+
+def persist_runtime_session_state(session, runtime_session: dict | None) -> None:
+    """把本轮运行态中可持久化的部分回写到 Session.metadata。"""
+    if runtime_session is None:
+        return
+    metadata: dict = {}
+    for key, value in runtime_session.items():
+        if key in _RUNTIME_SESSION_RESERVED_KEYS or key.startswith("_"):
+            continue
+        metadata[key] = deepcopy(value)
+    session.metadata = metadata
 
 
 @dataclass

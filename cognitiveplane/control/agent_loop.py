@@ -112,6 +112,10 @@ class AgentLoop:
         session_manager: Any = None,
         image_sessions: Any = None,
         router: Any = None,
+        approval_store: Any = None,
+        context_compactor: Any = None,
+        workflow_event_bus: Any = None,
+        trajectory_store: Any = None,
     ) -> None:
         self._deps = deps
         self._event_log = event_log
@@ -131,6 +135,15 @@ class AgentLoop:
         self._session_manager = session_manager
         self._image_sessions = image_sessions
         self._router = router
+        # 治理一致: /ws 路径必须与 HTTP /stream 路径用同一套治理组件。
+        # approval_store — APPROVAL_REQUIRED_TOOLS (如 launch_workflow) 的 human-in-the-loop 门禁
+        # context_compactor — 长对话历史压缩 (Anthropic Context Engineering)
+        # workflow_event_bus — 长路径 Temporal 观察者注入 (boundary-pinning §3)
+        # 缺失任一都会导致 WS 路径绕过 HTTP 路径的治理/能力。
+        self._approval_store = approval_store
+        self._context_compactor = context_compactor
+        self._workflow_event_bus = workflow_event_bus
+        self._trajectory_store = trajectory_store
         self._incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self._feedback_queue: asyncio.Queue[FeedbackSummary] = asyncio.Queue(maxsize=10)
         self._receive_task: asyncio.Task | None = None
@@ -218,6 +231,10 @@ class AgentLoop:
         session_id = message.get("session_id", "default")
         # 与 HTTP /stream 路径对齐: 注入 session image_refs + 持久化 history.
         user_msg, session_history = self._prepare_session_context(message, session_id)
+        runtime_session = getattr(self, "_current_runtime_session", None) or {
+            "session_id": session_id,
+            "history": session_history,
+        }
 
         try:
             engine = ReActEngine(
@@ -230,6 +247,10 @@ class AgentLoop:
                 after_tool_hooks=self._after_tool_hooks,
                 output_guardrail=self._output_guardrail,
                 tool_registry=self._tool_registry,
+                approval_store=self._approval_store,
+                context_compactor=self._context_compactor,
+                workflow_event_bus=self._workflow_event_bus,
+                trajectory_store=self._trajectory_store,
             )
             context = ContextSnapshot(
                 case_id=CaseId(value=message.get("case_id") or "unknown"),
@@ -248,7 +269,7 @@ class AgentLoop:
             response = await engine.run(
                 user_input=user_msg,
                 context=context,
-                session={"session_id": session_id, "history": session_history},
+                session=runtime_session,
             )
             await self._send_json({
                 "type": "final",
@@ -282,6 +303,10 @@ class AgentLoop:
         # 与 HTTP /stream 路径对齐: 注入 session image_refs + 持久化 history。
         # 不做这步则 LLM 跨轮失忆 — 忘记已上传图片、上文决策。
         user_msg, session_history = self._prepare_session_context(message, session_id)
+        runtime_session = getattr(self, "_current_runtime_session", None) or {
+            "session_id": session_id,
+            "history": session_history,
+        }
 
         try:
             engine = ReActEngine(
@@ -294,6 +319,10 @@ class AgentLoop:
                 after_tool_hooks=self._after_tool_hooks,
                 output_guardrail=self._output_guardrail,
                 tool_registry=self._tool_registry,
+                approval_store=self._approval_store,
+                context_compactor=self._context_compactor,
+                workflow_event_bus=self._workflow_event_bus,
+                trajectory_store=self._trajectory_store,
             )
             context = ContextSnapshot(
                 case_id=CaseId(value=message.get("case_id") or "unknown"),
@@ -316,7 +345,7 @@ class AgentLoop:
             async for event in engine.run_stream(
                 user_input=user_msg,
                 context=context,
-                session={"session_id": session_id, "history": session_history},
+                session=runtime_session,
             ):
                 # 捕获 final 事件用于持久化(不修改原 event)
                 if event.get("event") == "final":
@@ -344,11 +373,23 @@ class AgentLoop:
         Returns:
             (user_msg_with_image_refs, session_history)
         """
-        from cognitiveplane.interaction.api._helpers import prepare_session_context
+        from cognitiveplane.interaction.api._helpers import (
+            prepare_session_context,
+            build_runtime_session,
+        )
         user_msg, session_history = prepare_session_context(
             message, session_id, self._session_manager, self._router,
         )
         self._current_operator_id = message.get("operator_id", "operator-001")
+        self._current_runtime_session = None
+        if self._session_manager is not None:
+            try:
+                sess = self._session_manager.get_or_create_session(
+                    self._current_operator_id, session_id, None,
+                )
+                self._current_runtime_session = build_runtime_session(sess)
+            except Exception:
+                logger.debug("build runtime session failed", exc_info=True)
         return user_msg, session_history
 
     def _persist_session(
@@ -363,10 +404,24 @@ class AgentLoop:
         委托给共享函数 persist_session, 消除 /stream 和 /ws 路径的重复实现.
         """
         from cognitiveplane.interaction.api._helpers import persist_session
+        from cognitiveplane.interaction.api._helpers import persist_runtime_session_state
         persist_session(
             self._session_manager, session_id, user_msg, final_reply, final_reasoning,
             operator_id=getattr(self, "_current_operator_id", "operator-001"),
         )
+        if self._session_manager is not None:
+            try:
+                sess = self._session_manager.get_or_create_session(
+                    getattr(self, "_current_operator_id", "operator-001"),
+                    session_id,
+                    None,
+                )
+                persist_runtime_session_state(
+                    sess,
+                    getattr(self, "_current_runtime_session", None),
+                )
+            except Exception:
+                logger.debug("persist runtime session state failed", exc_info=True)
 
     async def _on_react_event(self, event_type: str, payload: dict[str, Any]) -> None:
         """ReActEngine event_callback → 转发到 WebSocket."""
@@ -422,11 +477,17 @@ class AgentLoop:
         try:
             self._feedback_queue.put_nowait(summary)
         except asyncio.QueueFull:
+            # 队列满 — 丢弃最旧的一条腾出空间，再尝试放入新 summary。
+            # get_nowait 在并发清空后可能抛 QueueEmpty（此时队列已空，下方 put 必成功）；
+            # put_nowait 在并发重新填满后可能再次抛 QueueFull（此时只能放弃这条 summary）。
             try:
                 self._feedback_queue.get_nowait()
-                self._feedback_queue.put_nowait(summary)
             except asyncio.QueueEmpty:
-                logger.debug("agent_loop cleanup error", exc_info=True)
+                pass  # 队列已被其他协程清空，下方 put 必成功
+            try:
+                self._feedback_queue.put_nowait(summary)
+            except asyncio.QueueFull:
+                logger.warning("feedback_queue still full after eviction, dropping summary")
             if self._event_log is not None:
                 self._event_log.emit(
                     BrainEventType.TOOL_RESULT,

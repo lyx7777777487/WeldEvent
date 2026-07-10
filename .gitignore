@@ -28,3 +28,9 @@ cognitiveplane/tests/fixtures/weld_images/**/*.tif
 cognitiveplane/tests/fixtures/weld_images/**/*.tiff
 cognitiveplane/tests/fixtures/weld_images/**/*.bmp
 cognitiveplane/tests/fixtures/weld_images/**/*.webp
+
+# Runtime data — vector DB is generated at runtime, not source code
+data/
+
+# Claude Code local config
+.claude/

@@ -54,6 +54,10 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
         中管理 TTL 清理 task 的启动/停止（C4 fix）。
     """
     from cognitiveplane.control.react import ReActEngine, ApprovalStore
+    from cognitiveplane.control.trajectory import TrajectoryStore  # P0-3
+    from cognitiveplane.control.declaration import DeclarationLoader  # P0-1
+    from cognitiveplane.control.subagent import SubAgentRunner  # P0-1
+    from cognitiveplane.control.tools.delegate import DelegateTool  # P0-1
     from cognitiveplane.control.hooks import SafetyHook, PolicyHook
     from cognitiveplane.memory.compaction import ContextCompactor, CompactionStrategy
     from cognitiveplane.control.event_log import EventLog
@@ -107,6 +111,8 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
         get_workflow_event_bus,
     )
     workflow_event_bus = get_workflow_event_bus()
+    # P0-3: 轨迹存储 — 进程内 TrajectoryStore，按 session_id 索引
+    trajectory_store = TrajectoryStore()
     engine = ReActEngine(
         deps, hooks=hooks, image_store=image_store, event_log=event_log,
         after_tool_hooks=after_tool_hooks,
@@ -115,7 +121,19 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
         approval_store=approval_store,
         context_compactor=context_compactor,
         workflow_event_bus=workflow_event_bus,
+        trajectory_store=trajectory_store,
     )
+    # P0-1: Subagent 系统 — 注册 delegate tool，统一使用 DeclarationLoader
+    declaration_loader = DeclarationLoader()
+    subagent_runner = SubAgentRunner(
+        deps=deps,
+        declaration_loader=declaration_loader,
+        tool_registry=engine._tools,
+        image_store=image_store,
+        event_log=event_log,
+        trajectory_store=trajectory_store,
+    )
+    engine._tools.register(DelegateTool(subagent_runner))
     # Phase 5 评估框架: LLM-as-a-Judge + Langfuse scoring
     # 在线评估（异步，不阻塞聊天返回）
     evaluator = build_evaluator(deps.capability.llm_provider, enabled=True)
@@ -162,6 +180,9 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
     )
     from cognitiveplane.interaction.api.session_handlers import (
         handle_list_sessions, handle_export_session,
+    )
+    from cognitiveplane.interaction.api.chat_handlers import (
+        handle_trajectory,
     )
 
     # ── JSON 纯文本聊天 ──
@@ -215,6 +236,8 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
             skill_registry=skill_registry,
             approval_store=approval_store,
             context_compactor=context_compactor,
+            workflow_event_bus=workflow_event_bus,
+            trajectory_store=trajectory_store,
         )
 
     # ── WebSocket ── (Phase 3 子项目 D: AgentLoop 双 task)
@@ -233,6 +256,10 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
             session_manager=session_manager,
             image_sessions=image_sessions,
             router=router,
+            approval_store=approval_store,
+            context_compactor=context_compactor,
+            workflow_event_bus=workflow_event_bus,
+            trajectory_store=trajectory_store,
         )
 
     # ── 取消 workflow ──
@@ -288,6 +315,14 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
     async def approve_tool(request: ApproveRequest):
         return await handle_approve_tool(
             request, approval_store=approval_store,
+        )
+
+    # ── P0-3: 轨迹导出 ──
+
+    @router.get("/sessions/{session_id}/trajectory")
+    async def trajectory(session_id: str):
+        return await handle_trajectory(
+            session_id, trajectory_store=trajectory_store,
         )
 
     return router, session_manager

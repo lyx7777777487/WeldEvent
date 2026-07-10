@@ -6,6 +6,7 @@ Requires: `openai` package (pip install openai)
 Fallback: raises RuntimeError if openai is not installed.
 """
 
+import json
 import logging
 import re
 from collections.abc import AsyncGenerator

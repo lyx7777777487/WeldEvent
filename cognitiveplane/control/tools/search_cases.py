@@ -8,6 +8,7 @@ class SearchCasesTool(BrainTool):
     """Search historical case library for similar defect cases."""
 
     phase = 3
+    always_available = True  # 基础工具层：知识检索豁免 skill 白名单
 
     def __init__(self, port: CaseLibraryQueryPort) -> None:
         self._port = port
@@ -19,8 +20,10 @@ class SearchCasesTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Search the case library for similar historical inspection cases. "
-            "Returns case details, resolutions, and outcomes."
+            "搜索历史案例库，查找相似案例及处理方案。\n"
+            "**何时使用**：需要参考历史经验、了解类似缺陷的处理方式、"
+            "或在设计工作流前了解常见做法。\n"
+            "**用法**：传 defect_type（缺陷类型）和可选的 material/thickness 等筛选条件。"
         )
 
     @property

@@ -39,7 +39,7 @@ class TestWebSearchTool:
     def test_name_and_description(self):
         tool = WebSearchTool(StubWebSearchProvider())
         assert tool.name == "web_search"
-        assert "web" in tool.description.lower()
+        assert "搜索" in tool.description
 
     def test_parameters_schema(self):
         tool = WebSearchTool(StubWebSearchProvider())

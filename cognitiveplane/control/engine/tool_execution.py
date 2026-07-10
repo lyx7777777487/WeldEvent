@@ -10,6 +10,7 @@ Extracted from react.py. Contains:
 
 import asyncio
 import hashlib
+import inspect
 import json
 import logging
 from typing import Any, TYPE_CHECKING
@@ -211,7 +212,9 @@ class ToolCallValidator:
         #   1. 先尝试"工具驱动 skill 自动切换" — 找到包含该工具的 skill 则切换并放行
         #      （让工具调用意图驱动路由，而非靠关键词匹配猜意图 — 真正智能的 skill 路由）
         #   2. 找不到包含该工具的 skill → 走 3 级漂移检测（提示→强提示→解锁）
-        if allowed_tools and tool_name not in allowed_tools:
+        # 基础工具层豁免：always_available 工具（知识检索/只读/询问）不受 skill 白名单限制
+        if (allowed_tools and tool_name not in allowed_tools
+                and not self._tools.is_always_available(tool_name)):
             # 尝试工具驱动 skill 切换
             switched = False
             if self._skill_registry is not None and session is not None:
@@ -539,12 +542,66 @@ class ToolExecutor:
             if cache_key in cache:
                 return cache[cache_key], False
 
-        import asyncio
-        try:
-            result = await asyncio.wait_for(
-                self._tools.execute(tool_name, arguments),
-                timeout=TOOL_TIMEOUT_SECONDS,
+        tool = self._tools.get_tool(tool_name)
+        if tool is None:
+            return ToolResult(
+                error=f"Tool '{tool_name}' not found",
+                error_type="state",
+            ), False
+
+        runtime_kwargs: dict[str, Any] = {}
+        if session is not None:
+            session_id = session.get("session_id")
+            if session_id and "session_id" not in arguments:
+                runtime_kwargs["session_id"] = session_id
+            runtime_event_callback = session.get("_runtime_event_callback")
+            if runtime_event_callback is not None:
+                runtime_kwargs["event_callback"] = runtime_event_callback
+            parent_agent_id = session.get("_parent_agent_id")
+            if parent_agent_id is not None:
+                runtime_kwargs["parent_agent_id"] = parent_agent_id
+
+        if runtime_kwargs:
+            sig = inspect.signature(tool.execute)
+            accepts_var_kwargs = any(
+                param.kind == inspect.Parameter.VAR_KEYWORD
+                for param in sig.parameters.values()
             )
+            if not accepts_var_kwargs:
+                # 工具不接受 **kwargs — 只传显式声明的参数
+                runtime_kwargs = {
+                    key: value
+                    for key, value in runtime_kwargs.items()
+                    if key in sig.parameters
+                }
+            else:
+                # 工具接受 **kwargs — 仍需过滤运行时上下文参数，避免把它们
+                # 传给不接受该参数的 MCP handler（如 echo server）。
+                # 只注入工具 execute 方法显式声明的参数（非 **kwargs）。
+                explicit_params = {
+                    name
+                    for name, param in sig.parameters.items()
+                    if param.kind != inspect.Parameter.VAR_KEYWORD
+                }
+                runtime_kwargs = {
+                    key: value
+                    for key, value in runtime_kwargs.items()
+                    if key in explicit_params
+                }
+
+        try:
+            # request_confirmation 是阻塞等待用户输入的工具，不应被通用
+            # TOOL_TIMEOUT_SECONDS(180s) 强杀。用户可能要想 5 分钟才点选项。
+            # 工具内部用自己的 timeout_seconds 参数控制超时（默认 300s）。
+            # 修复前 BUG：180s 超时强杀 → LLM 收到超时错误 → 反复问同一问题
+            # → 用户点的选项被丢弃 → 体验灾难（同一问题被问 4 次）。
+            if tool_name == "request_confirmation":
+                result = await tool.execute(**arguments, **runtime_kwargs)
+            else:
+                result = await asyncio.wait_for(
+                    tool.execute(**arguments, **runtime_kwargs),
+                    timeout=TOOL_TIMEOUT_SECONDS,
+                )
         except asyncio.TimeoutError:
             return ToolResult(
                 error=f"Tool '{tool_name}' timed out after {TOOL_TIMEOUT_SECONDS}s",

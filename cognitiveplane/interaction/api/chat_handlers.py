@@ -1,4 +1,4 @@
-"""Chat endpoint handlers — POST / and POST /upload.
+"""Chat endpoint handlers — POST / and POST /upload and GET /sessions/{id}/trajectory.
 
 Extracted from chat.py create_chat_router. Each handler is a module-level
 async function receiving its dependencies as explicit parameters; chat.py
@@ -8,7 +8,8 @@ registers them via ``@router.post(...)`` thin wrappers inside
 Source: 7-plane redesign spec §7 FastAPI + plan §2.3 + §A.3.
 """
 
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
+from fastapi.responses import JSONResponse
 from typing import Optional
 
 from cognitiveplane.interaction.api.chat import ChatRequest, ChatResponse
@@ -17,6 +18,8 @@ from cognitiveplane.interaction.api._helpers import (
     _inject_session_image_refs,
     _get_or_create_session,
     _trigger_evaluation,
+    build_runtime_session,
+    persist_runtime_session_state,
 )
 from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import EventType, NoveltyLevel
@@ -50,16 +53,15 @@ async def handle_chat(
         timestamp=datetime.now(timezone.utc),
     )
 
+    runtime_session = build_runtime_session(session)
     response = await engine.run(
         user_input=_inject_session_image_refs(
             request.message, session.session_id.value, router,
         ),
         context=context,
-        session={
-            "session_id": str(session.session_id.value),
-            "history": session.messages,  # 传入历史对话，避免 LLM 失忆
-        },
+        session=runtime_session,
     )
+    persist_runtime_session_state(session, runtime_session)
 
     # 追加本轮对话到 session.messages，供下一轮作为历史
     session.messages.append({"role": "user", "content": request.message})
@@ -132,16 +134,15 @@ async def handle_chat_with_files(
             validation_critical_count=0,
             timestamp=datetime.now(timezone.utc),
         )
+        runtime_session = build_runtime_session(session)
         response = await engine.run(
             user_input=_inject_session_image_refs(
                 message, str(session.session_id.value), router,
             ),
             context=context,
-            session={
-                "session_id": str(session.session_id.value),
-                "history": session.messages,
-            },
+            session=runtime_session,
         )
+        persist_runtime_session_state(session, runtime_session)
         session.messages.append({"role": "user", "content": message})
         if response.text_reply:
             assistant_msg = {"role": "assistant", "content": response.text_reply}
@@ -302,14 +303,13 @@ async def _handle_file_upload_via_react(
         timestamp=datetime.now(timezone.utc),
     )
 
+    runtime_session = build_runtime_session(session)
     response = await engine.run(
         user_input=user_message,
         context=context,
-        session={
-            "session_id": session_id_str,
-            "history": session.messages,
-        },
+        session=runtime_session,
     )
+    persist_runtime_session_state(session, runtime_session)
 
     return ChatResponse(
         reply=response.text_reply,
@@ -319,3 +319,18 @@ async def _handle_file_upload_via_react(
         error=response.error,
         workflow_ids=getattr(response, "workflow_ids", []),
     )
+
+
+async def handle_trajectory(
+    session_id: str,
+    *,
+    trajectory_store,
+) -> JSONResponse:
+    """导出 LLM 推理轨迹 — GET /api/v1/chat/sessions/{session_id}/trajectory.
+
+    P0-3: 借鉴 trae-agent AgentExecution 导出，返回 per-step 推理轨迹 JSON。
+    """
+    recorder = trajectory_store.get(session_id)
+    if recorder is None:
+        raise HTTPException(status_code=404, detail=f"No trajectory found for session {session_id}")
+    return JSONResponse(content=recorder._to_dict())

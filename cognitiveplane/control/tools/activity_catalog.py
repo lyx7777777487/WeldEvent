@@ -172,6 +172,22 @@ ACTIVITY_CATALOG: list[ActivityDescriptor] = [
         depends_on_hint=["defect_detection"],
         aliases=["human_review", "annotation_write"],
     ),
+    ActivityDescriptor(
+        capability="dsa",
+        name="数据集理解 (DSA)",
+        description=(
+            "数据集级统计分析与多模态语义理解。"
+            "两类能力：(1) 统计与CV特征分析（尺寸分布/质量分布/异常检测/重复检测）；"
+            "(2) 多模态语义理解（对象识别/缺陷类别/场景语义/数据偏差/预标注建议）。"
+            "有标注数据额外做标签统计分析。"
+            "适用场景：用户说'分析数据集'/'数据质量怎么样'/'数据分布'/'数据探查'。"
+        ),
+        implementation="real",
+        inputs=["image_dir", "data_kind", "depth", "labels"],
+        outputs=["cv_report", "label_stats", "semantic_understanding", "summary", "recommendations"],
+        depends_on_hint=[],
+        aliases=["dataset_analysis", "data_understanding", "dataset_stats"],
+    ),
 ]
 
 

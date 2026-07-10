@@ -163,19 +163,11 @@ class LaunchWorkflowTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Launch a previously designed WorkflowSpec to the L2 Temporal "
-            "Control Plane. Pass the workflow_spec dict from design_workflow's "
-            "output, or pass workflow_id to reuse a previously designed spec. "
-            "Returns Temporal workflow_id and run_id on success. "
-            "Requires explicit reason.\n\n"
-            "⚠️ HUMAN-IN-THE-LOOP GATE (mandatory):\n"
-            "Call this tool ONLY when the user has explicitly confirmed they want "
-            "to launch — e.g. the user said '启动/确认/执行/launch/start'. "
-            "After design_workflow returns a draft, you MUST first present the "
-            "full plan to the user and ask for confirmation. Do NOT call "
-            "launch_workflow until the user explicitly says to proceed.\n"
-            "If the user's message is a question or modification request, "
-            "answer it and wait for explicit confirmation before launching."
+            "启动已设计的工作流到 L2 执行层。\n"
+            "**何时使用**：design_workflow 返回方案后，立即调用本工具启动执行。\n"
+            "**用法**：传 workflow_spec（design_workflow 的输出）或 workflow_id（复用已有方案）。\n"
+            "**约束**：本工具走架构级 human-in-the-loop gate，调用后前端会弹确认卡片，"
+            "你只需直接调用，无需在调用前再弹窗确认。"
         )
 
     @property

@@ -69,6 +69,10 @@ def bootstrap_llm() -> bool:
             planning_model=model,
             explanation_model=model,
         )
+        # Embedding 模型配置 — DeepSeek 暂不提供 embedding API，
+        # 回退到 OpenAI embedding（若有 OPENAI_API_KEY）或 Chroma 内置
+        embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+        cfg.embedding_model = embedding_model
         # 火山引擎多模态模型配置
         if volc_key:
             volc_base = os.getenv("VOLC_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")

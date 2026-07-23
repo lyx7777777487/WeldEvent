@@ -55,6 +55,48 @@ class SubAgentRunner:
         self._image_store = image_store
         self._event_log = event_log
         self._trajectory_store = trajectory_store
+        # Op 8.6: Capability matcher for dynamic subagent selection
+        from cognitiveplane.control.planner.capability_match import CapabilityMatcher
+        from cognitiveplane.control.planner.advanced import ParallelSpecialistRunner
+        from cognitiveplane.control.planner.ledger import SpecialistRole
+        self._capability_matcher = CapabilityMatcher(
+            llm_provider=deps.capability.llm_provider if deps and hasattr(deps, 'capability') else None,
+        )
+        # Op 35: Parallel specialist runner for independent sub-tasks
+        self._parallel_runner = ParallelSpecialistRunner()
+
+    async def run_parallel(
+        self,
+        tasks: list[tuple[str, str]],
+        parent_session_id: str = "",
+        event_callback: Any | None = None,
+        parent_agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Op 35: Run multiple independent subagents in parallel.
+
+        Source: Anthropic orchestrator-workers pattern.
+
+        Args:
+            tasks: list of (subagent_name, task_text) pairs
+        Returns aggregated results from all subagents.
+        """
+        from cognitiveplane.control.planner.ledger import SpecialistRole
+        import asyncio
+
+        async def _run_one(name: str, task_text: str) -> dict[str, Any]:
+            return await self.run(name, task_text, parent_session_id,
+                                  event_callback, parent_agent_id)
+
+        coros = [
+            (SpecialistRole.EXECUTOR, _run_one(name, task_text))
+            for name, task_text in tasks
+        ]
+        results = await self._parallel_runner.run_parallel(coros)
+        return {
+            "success": all(r.get("success", False) for r in results.values()),
+            "results": results,
+            "parallel_count": len(tasks),
+        }
 
     async def run(
         self,
@@ -83,14 +125,36 @@ class SubAgentRunner:
         agent_id = f"subagent_{uuid4().hex[:10]}"
         decl = self._loader.get_agent(subagent_name)
         if decl is None:
-            available = list(self._loader.load_agents().keys())
-            return {
-                "success": False,
-                "result": "",
-                "error": f"Subagent '{subagent_name}' not found. Available: {available}",
-                "tools_used": [],
-                "agent_id": agent_id,
-            }
+            # Op 8.6: Try capability-based matching before giving up
+            available_agents = self._loader.load_agents()
+            if available_agents:
+                # Register all available agents with the matcher
+                for name, d in available_agents.items():
+                    self._capability_matcher.register_from_dict({
+                        "agent_id": name,
+                        "name": name,
+                        "description": getattr(d, 'description', name),
+                        "capabilities": [getattr(d, 'description', name)],
+                        "tools": getattr(d, 'allowed_tools', []),
+                    })
+                # Try to match by task description
+                try:
+                    import asyncio
+                    matches = await self._capability_matcher.match(task, top_k=1)
+                    if matches:
+                        subagent_name = matches[0].agent_id
+                        decl = self._loader.get_agent(subagent_name)
+                except Exception:
+                    pass
+            if decl is None:
+                available = list(available_agents.keys())
+                return {
+                    "success": False,
+                    "result": "",
+                    "error": f"Subagent '{subagent_name}' not found. Available: {available}",
+                    "tools_used": [],
+                    "agent_id": agent_id,
+                }
 
         from cognitiveplane.control.engine.react import ReActEngine
         from cognitiveplane.shared.dto.context import ContextSnapshot

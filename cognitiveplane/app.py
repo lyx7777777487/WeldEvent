@@ -209,7 +209,16 @@ def create_app():
     app.include_router(chat_router)
     app.include_router(create_notifications_router())
 
-    # MCP server — 协议化工具层（2026 MCP 标准）
+    # 评估报告路由 - 对话场景并行执行 + 结果展示
+    from cognitiveplane.tests.dialogue_scenarios.eval_api import router as _eval_router
+    app.include_router(_eval_router)
+
+    @app.get("/eval")
+    async def _eval_page():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/static/eval.html")
+
+    # MCP server - 协议化工具层（2026 MCP 标准）
     # mcp_app 已在 lifespan 之前构建（_mcp_app），这里只负责挂载
     # task group 初始化在 lifespan 中完成（见上方 lifespan 函数）
     try:

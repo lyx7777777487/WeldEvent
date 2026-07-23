@@ -1,0 +1,96 @@
+{
+  "test_type": "signal_delivery",
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "results": [
+    {
+      "item_id": "B1",
+      "description": "pause+resume",
+      "signal": "pause",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "RUNNING",
+      "passed": true,
+      "error": null,
+      "note": "pause sent=True, RUNNING->RUNNING"
+    },
+    {
+      "item_id": "B11",
+      "description": "cancel",
+      "signal": "cancel_by_user",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "FAILED",
+      "passed": true,
+      "error": null,
+      "note": "cancel -> FAILED"
+    },
+    {
+      "item_id": "C1",
+      "description": "rework_node",
+      "signal": "rework_node",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "rework_node sent=True, status=COMPLETED"
+    },
+    {
+      "item_id": "L1",
+      "description": "inject_context",
+      "signal": "inject_context",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "inject_context sent=True, status=COMPLETED"
+    },
+    {
+      "item_id": "E10",
+      "description": "batch_hold via batch_signals",
+      "signal": "batch_signals",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "batch_hold sent=True, status=COMPLETED"
+    },
+    {
+      "item_id": "B2",
+      "description": "pause_scope via batch_signals",
+      "signal": "batch_signals",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "pause_scope sent=True, status=COMPLETED"
+    },
+    {
+      "item_id": "O1",
+      "description": "human_review (直接)",
+      "signal": "human_review",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "human_review sent=True, status=COMPLETED"
+    },
+    {
+      "item_id": "N1",
+      "description": "modify_spec (参数变更)",
+      "signal": "modify_spec",
+      "sent": true,
+      "status_before": "RUNNING",
+      "status_after": "COMPLETED",
+      "passed": true,
+      "error": null,
+      "note": "modify_spec sent=True, status=COMPLETED"
+    }
+  ]
+}

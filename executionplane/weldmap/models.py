@@ -223,3 +223,102 @@ class WeldMapEvent(BaseModel):
     new_value: Any | None = None
     source: str = ""                  # 写入者 Agent 标识
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ---------------------------------------------------------------------------
+# Op 26: ArtifactVersion + Lineage (data versioning)
+# Source: DVC data versioning + MLflow model lineage
+# ---------------------------------------------------------------------------
+
+from datetime import datetime, timezone
+
+
+class ArtifactVersion(BaseModel):
+    """Op 26: Versioned artifact with lineage tracking.
+
+    Every significant data artifact (IQA report, PPA result, annotation set)
+    gets a version number and parent reference, enabling full provenance
+    tracking and rollback.
+    """
+    artifact_id: str
+    artifact_type: str          # "iqa_report" | "ppa_result" | "annotation_set" | "decision"
+    version: int = 1
+    parent_artifact_id: str | None = None
+    workflow_id: str = ""
+    node_id: str = ""
+    data: dict[str, Any] = Field(default_factory=dict)
+    hash: str = ""              # content hash for integrity check
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str = ""        # agent/activity that created this
+
+
+class LineageRecord(BaseModel):
+    """Op 26: Lineage edge - tracks artifact derivation.
+
+    Records how an artifact was derived from other artifacts.
+    E.g. PPA result derived from IQA report + original image.
+    """
+    artifact_id: str
+    derived_from: list[str] = Field(default_factory=list)  # parent artifact IDs
+    derivation_method: str = ""  # "iqa_analysis" | "ppa_preprocess" | "annotation"
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ArtifactLineageGraph:
+    """Op 26: In-memory lineage graph for tracking artifact provenance.
+
+    Supports queries like:
+    - "what artifacts derived from this IQA report?"
+    - "what's the full lineage of this annotation set?"
+    """
+    def __init__(self) -> None:
+        self._versions: dict[str, list[ArtifactVersion]] = {}  # artifact_id -> versions
+        self._lineage: dict[str, LineageRecord] = {}  # artifact_id -> lineage
+
+    def record_version(self, version: ArtifactVersion) -> None:
+        self._versions.setdefault(version.artifact_id, []).append(version)
+        self._lineage[version.artifact_id] = LineageRecord(
+            artifact_id=version.artifact_id,
+            derived_from=[version.parent_artifact_id] if version.parent_artifact_id else [],
+            derivation_method=version.artifact_type,
+        )
+
+    def get_versions(self, artifact_id: str) -> list[ArtifactVersion]:
+        return self._versions.get(artifact_id, [])
+
+    def get_latest_version(self, artifact_id: str) -> ArtifactVersion | None:
+        versions = self._versions.get(artifact_id, [])
+        return versions[-1] if versions else None
+
+    def get_lineage(self, artifact_id: str) -> list[str]:
+        """Get full lineage chain (all ancestors)."""
+        visited: set[str] = set()
+        chain: list[str] = []
+        queue = [artifact_id]
+        while queue:
+            current = queue.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+            record = self._lineage.get(current)
+            if record:
+                for parent in record.derived_from:
+                    if parent and parent not in visited:
+                        chain.append(parent)
+                        queue.append(parent)
+        return chain
+
+    def get_downstream(self, artifact_id: str) -> list[str]:
+        """Get all artifacts derived from this one (reverse lineage)."""
+        downstream: list[str] = []
+        for aid, record in self._lineage.items():
+            if artifact_id in record.derived_from:
+                downstream.append(aid)
+                # recursive
+                downstream.extend(self.get_downstream(aid))
+        return list(set(downstream))
+
+
+__all__ = ["WeldMapEntry", "IQAPort", "ImageQualityReport", "MaskData",
+           "AnnotationSet", "ValidationData", "DecisionData", "WeldMapEvent",
+           "ArtifactVersion", "LineageRecord", "ArtifactLineageGraph"]

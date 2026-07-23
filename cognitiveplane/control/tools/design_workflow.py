@@ -19,10 +19,36 @@ from cognitiveplane.control.tools.activity_catalog import (
     get_catalog_text,
     get_supported_capabilities,
 )
+from cognitiveplane.audit.pattern_learning import PatternStore, CBRStore
+from cognitiveplane.memory.trajectory_store import TrajectoryMemoryStore
+from cognitiveplane.control.planner.ledger import MagenticPlanner, SpecialistRole
+from cognitiveplane.control.planner.advanced import ReWOOPlan
 from cognitiveplane.shared.dto_workflow import (
     ON_FAILURE_DEFAULT,
     on_failure_enum_values,
 )
+
+
+# Op 30: Pattern + CBR stores (module-level singletons)
+_pattern_store = PatternStore()
+_cbr_store = CBRStore()
+# Op 8.2: Global TrajectoryMemoryStore for episodic memory + Reflexion notes
+_trajectory_memory = TrajectoryMemoryStore()
+
+
+def get_trajectory_memory() -> TrajectoryMemoryStore:
+    """Op 8.2: Get the global TrajectoryMemoryStore for learning."""
+    return _trajectory_memory
+
+
+def get_pattern_store() -> PatternStore:
+    """Op 30: Get the global PatternStore for workflow design."""
+    return _pattern_store
+
+
+def get_cbr_store() -> CBRStore:
+    """Op 30: Get the global CBRStore for workflow design."""
+    return _cbr_store
 
 
 class DesignWorkflowTool(BrainTool):
@@ -162,6 +188,67 @@ class DesignWorkflowTool(BrainTool):
                     reason=kwargs.get("reason", ""),
                     image_refs=image_refs,
                 )
+            # Op 30: Retrieve patterns + cases for this objective
+            patterns_prompt = _pattern_store.to_prompt_text(max_patterns=3)
+            cases_prompt = _cbr_store.to_prompt_text(objective, max_cases=2)
+            # Op 8.2/32: Retrieve similar past episodes + Reflexion notes
+            similar_episodes = await _trajectory_memory.retrieve_similar(objective, top_k=2)
+            episodes_prompt = ""
+            if similar_episodes:
+                eps_texts = []
+                for ep in similar_episodes:
+                    eps_texts.append(
+                        f"- Goal: {ep.goal[:80]}, Outcome: {ep.outcome}, "
+                        f"Quality: {ep.quality_score:.1f}"
+                    )
+                episodes_prompt = "\nPast experiences:\n" + "\n".join(eps_texts)
+            reflexion_prompt = _trajectory_memory.get_reflexion_prompt(objective)
+            # Op 31: ReWOO batch plan - separate reasoning from observation
+            # Build a batch plan of all node steps upfront for parallel execution groups
+            rewoo = ReWOOPlan()
+            for n in spec.nodes:
+                dep_ids = [d for d in n.depends_on]
+                rewoo.add_step(
+                    step_id=n.node_id,
+                    tool=n.capability or n.type,
+                    args={"action": (n.input or {}).get("action", "")},
+                    depends_on=dep_ids,
+                )
+            execution_groups = rewoo.get_execution_order()
+
+            # Op 13-15: Track planning with Magentic dual-ledger for complex designs
+            if len(spec.nodes) >= 3:
+                planner = MagenticPlanner(objective)
+                planner.plan([
+                    f"{n.capability or n.type}: {n.node_id}"
+                    for n in spec.nodes
+                ])
+                # Track specialist assignments for audit trail
+                for n in spec.nodes:
+                    desc = f"{n.capability or n.type}: {n.node_id}"
+                    task = planner.task_ledger.add_task(desc)
+                    # Assign based on capability
+                    cap_lower = (n.capability or "").lower()
+                    if any(k in cap_lower for k in ("iqa", "quality", "defect")):
+                        planner.task_ledger.assign_task(task.task_id, SpecialistRole.PROFILER)
+                    elif any(k in cap_lower for k in ("ppa", "process", "parameter")):
+                        planner.task_ledger.assign_task(task.task_id, SpecialistRole.STRATEGIST)
+                    elif any(k in cap_lower for k in ("annot", "label", "review")):
+                        planner.task_ledger.assign_task(task.task_id, SpecialistRole.CRITIC)
+                    else:
+                        planner.task_ledger.assign_task(task.task_id, SpecialistRole.EXECUTOR)
+                planner_dict = planner.to_dict()
+            else:
+                planner_dict = None
+
+            # Store case for future CBR
+            _cbr_store.add_case(
+                problem=objective,
+                solution=str(len(spec.nodes)) + " nodes: " + " -> ".join(n.capability or "?" for n in spec.nodes),
+                outcome="designed",  # will be updated after execution
+                quality_score=0.0,  # will be updated after execution
+                spec_summary={"node_count": len(spec.nodes)},
+            )
             # P3-6 fix: 把 spec 存入 registry，LLM 只需传 workflow_id 给 launch_workflow
             from cognitiveplane.control.tools.spec_registry import get_default_registry
             workflow_id = get_default_registry().put(spec)
@@ -170,6 +257,13 @@ class DesignWorkflowTool(BrainTool):
                 "workflow_id": workflow_id,
                 "workflow_spec": spec.model_dump(),
                 "orchestration_mode": "llm_nodes" if nodes_param else "keyword_fallback",
+                # Op 13-15: Include dual-ledger plan for complex designs
+                "magentic_plan": planner_dict,
+                # Op 31: ReWOO batch execution groups (for parallel dispatch)
+                "execution_groups": [
+                    [s["step_id"] for s in group]
+                    for group in execution_groups
+                ],
             })
         except ValueError as e:
             # 校验错误：明确返回，让 LLM 修正 nodes 后重试

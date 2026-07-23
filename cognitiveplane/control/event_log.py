@@ -21,6 +21,23 @@ class BrainEventType(str, Enum):
     DECISION = "decision"
     CHECKPOINT = "checkpoint"
 
+class ToolEffectState(str, Enum):
+    """Op 9: Four-state tool-effect ledger.
+
+    Source: Pydantic AI Harness tool-effect ledger (调研报告 §5.4).
+
+    Tracks the side effects of tool calls (external state changes like
+    DB writes, workflow launches, file mutations). On crash recovery,
+    any tool in STARTED state without a terminal state becomes
+    UNKNOWN_AFTER_CRASH, signaling that side effects may or may not
+    have been applied.
+    """
+    STARTED = "started"                # Tool call initiated, side effects may be in progress
+    COMPLETED = "completed"            # Tool call finished, all side effects applied successfully
+    FAILED = "failed"                  # Tool call finished with error, side effects may be partially applied
+    UNKNOWN_AFTER_CRASH = "unknown_after_crash"  # Process crashed while tool was STARTED; effect state unknown
+
+
 
 @dataclass(frozen=True)
 class BrainEvent:
@@ -59,6 +76,49 @@ class ToolResultEvent(BrainEvent):
     success: bool = True
     result: dict | None = None
     error: str | None = None
+
+
+@dataclass
+class ToolEffectRecord:
+    """Op 9: Tool-effect ledger entry tracking external side effects.
+
+    Source: Pydantic AI Harness tool-effect ledger (调研报告 §5.4).
+
+    Unlike ToolCallEvent/ToolResultEvent (which track the tool call itself),
+    ToolEffectRecord tracks what the tool *did to the outside world* --
+    database writes, workflow launches, file mutations, API calls.
+
+    Four-state lifecycle: STARTED -> COMPLETED | FAILED
+    On crash: STARTED -> UNKNOWN_AFTER_CRASH (via mark_unknown_after_crash)
+
+    This is critical for Saga compensation (Op 21) and crash recovery:
+    if a tool's effect is UNKNOWN_AFTER_CRASH, the system must verify
+    the external state before retrying or compensating.
+    """
+    tool_call_id: str
+    tool_name: str
+    state: ToolEffectState
+    # Human-readable description of side effects (for audit + compensation)
+    side_effect_description: str = ""
+    # Structured side-effect data (e.g. {"workflow_id": "...", "action": "launch"})
+    side_effect_data: dict = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # When state changed to terminal (COMPLETED/FAILED/UNKNOWN_AFTER_CRASH)
+    resolved_at: datetime | None = None
+
+    def is_terminal(self) -> bool:
+        return self.state in (ToolEffectState.COMPLETED, ToolEffectState.FAILED, ToolEffectState.UNKNOWN_AFTER_CRASH)
+
+    def to_dict(self) -> dict:
+        return {
+            "tool_call_id": self.tool_call_id,
+            "tool_name": self.tool_name,
+            "state": self.state.value,
+            "side_effect_description": self.side_effect_description,
+            "side_effect_data": self.side_effect_data,
+            "timestamp": self.timestamp.isoformat(),
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+        }
 
 
 class DecisionPipelineView:
@@ -117,6 +177,8 @@ class EventLog:
     def __init__(self, case_id: CaseId) -> None:
         self.case_id = case_id
         self._events: list[BrainEvent] = []
+        # Op 9: Tool-effect ledger (separate from event list)
+        self._tool_effect_ledger: list[ToolEffectRecord] = []
 
     def append(self, event: BrainEvent) -> BrainEvent:
         """Append an event. Raises ValueError if event_id already exists."""
@@ -217,6 +279,97 @@ class EventLog:
         for event in self._events:
             view.apply(event)
         return view
+
+
+    # ── Op 9: ToolEffectRecord ledger ──────────────────────────
+
+    def record_tool_effect_started(
+        self,
+        tool_call_id: str,
+        tool_name: str,
+        side_effect_description: str = "",
+        side_effect_data: dict | None = None,
+    ) -> ToolEffectRecord:
+        """Record that a tool call has started and may produce side effects.
+
+        Call this BEFORE the tool executes (after ToolCallEvent is emitted).
+        If the process crashes after this call, the effect will be marked
+        UNKNOWN_AFTER_CRASH on next recovery.
+        """
+        record = ToolEffectRecord(
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            state=ToolEffectState.STARTED,
+            side_effect_description=side_effect_description,
+            side_effect_data=side_effect_data or {},
+        )
+        self._tool_effect_ledger.append(record)
+        return record
+
+    def record_tool_effect_completed(
+        self,
+        tool_call_id: str,
+        side_effect_description: str = "",
+        side_effect_data: dict | None = None,
+    ) -> ToolEffectRecord | None:
+        """Mark a tool effect as completed (all side effects applied)."""
+        for record in reversed(self._tool_effect_ledger):
+            if record.tool_call_id == tool_call_id and not record.is_terminal():
+                record.state = ToolEffectState.COMPLETED
+                record.resolved_at = datetime.now(timezone.utc)
+                if side_effect_description:
+                    record.side_effect_description = side_effect_description
+                if side_effect_data:
+                    record.side_effect_data.update(side_effect_data)
+                return record
+        return None
+
+    def record_tool_effect_failed(
+        self,
+        tool_call_id: str,
+        error: str = "",
+    ) -> ToolEffectRecord | None:
+        """Mark a tool effect as failed (side effects may be partially applied)."""
+        for record in reversed(self._tool_effect_ledger):
+            if record.tool_call_id == tool_call_id and not record.is_terminal():
+                record.state = ToolEffectState.FAILED
+                record.resolved_at = datetime.now(timezone.utc)
+                if error:
+                    record.side_effect_description += f" ERROR: {error}"
+                return record
+        return None
+
+    def mark_unknown_after_crash(self) -> list[ToolEffectRecord]:
+        """On crash recovery: mark all STARTED effects as UNKNOWN_AFTER_CRASH.
+
+        Returns the list of records that were marked unknown, so the engine
+        can decide how to handle each (retry, verify, compensate, or escalate).
+        """
+        unknown: list[ToolEffectRecord] = []
+        for record in self._tool_effect_ledger:
+            if record.state == ToolEffectState.STARTED:
+                record.state = ToolEffectState.UNKNOWN_AFTER_CRASH
+                record.resolved_at = datetime.now(timezone.utc)
+                unknown.append(record)
+        return unknown
+
+    def get_tool_effect_ledger(self) -> list[ToolEffectRecord]:
+        """Return the full tool-effect ledger."""
+        return list(self._tool_effect_ledger)
+
+    def get_unknown_effects(self) -> list[ToolEffectRecord]:
+        """Return all effects in UNKNOWN_AFTER_CRASH state (needs attention)."""
+        return [
+            r for r in self._tool_effect_ledger
+            if r.state == ToolEffectState.UNKNOWN_AFTER_CRASH
+        ]
+
+    def get_effect_for_tool_call(self, tool_call_id: str) -> ToolEffectRecord | None:
+        """Get the latest tool-effect record for a given tool_call_id."""
+        for record in reversed(self._tool_effect_ledger):
+            if record.tool_call_id == tool_call_id:
+                return record
+        return None
 
     def __len__(self) -> int:
         return len(self._events)

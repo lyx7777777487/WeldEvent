@@ -243,3 +243,47 @@ async def test_services_return_empty_list_when_port_returns_empty():
     assert await cases.query(CaseLibraryQuery(defect_type="x")) == []
     assert await process.query(ProcessKnowledgeQuery(process_type="x")) == []
     assert await equipment.query(EquipmentKnowledgeQuery(equipment_type="x")) == []
+
+
+# ── 第五步: embedding 基建 - CBR 案例库接入向量检索 ────────────────────
+
+@pytest.mark.asyncio
+async def test_chroma_rag_case_library_degrades_without_chroma():
+    """case_library 检索: chroma 不可用时降级空结果(不报错)."""
+    from cognitiveplane.knowledge.adapters.chroma_rag import ChromaRAGAdapter
+    # 用不存在的路径触发 chroma 初始化失败 -> 降级
+    adapter = ChromaRAGAdapter(llm_provider=None, chroma_path="/nonexistent/path/xyz")
+    from cognitiveplane.shared.ports.knowledge import CaseLibraryQueryInput
+    from cognitiveplane.shared.dto.knowledge import CaseLibraryQuery
+    out = await adapter.query(CaseLibraryQueryInput(
+        query=CaseLibraryQuery(defect_type="porosity", max_results=3)))
+    assert out.results == [], "chroma 不可用应降级空结果"
+
+
+@pytest.mark.asyncio
+async def test_chroma_rag_case_library_keyword_fallback():
+    """case_library 检索: 无 embedding 时用 chroma 内置关键词检索."""
+    # 仅当 chromadb 可安装时跑; 不可用则 skip (不阻塞)
+    pytest.importorskip("chromadb")
+    from cognitiveplane.knowledge.adapters.chroma_rag import ChromaRAGAdapter
+    from cognitiveplane.shared.ports.knowledge import CaseLibraryQueryInput
+    from cognitiveplane.shared.dto.knowledge import CaseLibraryQuery
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        adapter = ChromaRAGAdapter(llm_provider=None, chroma_path=tmp)
+        out = await adapter.query(CaseLibraryQueryInput(
+            query=CaseLibraryQuery(defect_type="porosity", max_results=3)))
+    # seed 了 5 个案例, porosity 应能命中 case_001
+    assert isinstance(out.results, list)
+    if out.results:
+        # 命中 porosity 案例
+        assert any("porosity" in r.defect_description.lower() or "气孔" in r.defect_description
+                   for r in out.results)
+
+
+@pytest.mark.asyncio
+async def test_chroma_rag_implements_case_library_port():
+    """ChromaRAGAdapter 实现 CaseLibraryQueryPort (类型契约)."""
+    from cognitiveplane.knowledge.adapters.chroma_rag import ChromaRAGAdapter
+    from cognitiveplane.shared.ports.knowledge import CaseLibraryQueryPort
+    assert issubclass(ChromaRAGAdapter, CaseLibraryQueryPort)

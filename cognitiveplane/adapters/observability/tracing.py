@@ -61,7 +61,7 @@ class TracingConfig:
     enabled: bool = True
     public_key: str | None = None
     secret_key: str | None = None
-    host: str = "https://cloud.langfuse.com"
+    host: str | None = None  # None -> 从 LANGFUSE_HOST env 读
 
 
 # ── No-op 降级实现（无 langfuse 包或无 key 时使用）──

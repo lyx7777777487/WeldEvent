@@ -181,6 +181,12 @@ class EventConnector:
         """
         return await self._launcher.send_human_gate_signal(workflow_id, node_id, approved)
 
+    async def send_human_review_signal(
+        self, workflow_id: str, node_id: str, review_result: dict
+    ) -> bool:
+        """Op 2: 发送 human_review signal (五决策: approve/rework/modify/reject/escalate)。"""
+        return await self._launcher.send_human_review_signal(workflow_id, node_id, review_result)
+
     async def send_signal(
         self, workflow_id: str, signal_name: str, args: Any = None
     ) -> bool:

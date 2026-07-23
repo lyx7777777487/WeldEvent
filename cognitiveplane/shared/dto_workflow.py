@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 NodeType = Literal["brain_task", "tool_task", "human_task", "wait_task"]
 OnFailure = Literal["abort", "continue", "escalate", "retry"]
 CallerType = Literal["brain_direct", "activity", "system"]
+ReviewPolicy = Literal["auto", "required", "conditional", "never"]
 
 # ── enum 派生辅助:所有 schema 必须用这些函数生成 enum 列表,禁止手写 ──
 # 这样加/删 enum 值时只需改上面的 Literal,所有 schema 自动同步
@@ -49,9 +50,23 @@ def caller_type_enum_values() -> list[str]:
     """CallerType 的 enum 值列表(schema 派生用)。"""
     return list(get_args(CallerType))
 
+def review_policy_enum_values() -> list[str]:
+    """ReviewPolicy 的 enum 值列表(schema 派生用)。
+
+    语义:
+      - auto:        执行完直接进下一节点
+      - required:    执行完暂停,等 human_review signal
+      - conditional: OK->auto / MARGINAL,NG->暂停审查
+      - never:       不审查(纯查询/无副作用节点)
+    """
+    return list(get_args(ReviewPolicy))
+
 
 # OnFailure 默认值常量 — DTO 默认值、schema 默认值、L2 workflow 默认值都用此
 ON_FAILURE_DEFAULT: OnFailure = "escalate"
+
+# ReviewPolicy 默认值 - 工业质检场景 MARGINAL 结果需人工判断
+REVIEW_POLICY_DEFAULT: ReviewPolicy = "conditional"
 
 
 class ToolIntent(BaseModel):
@@ -81,6 +96,7 @@ class WorkflowNode(BaseModel):
     input: dict[str, Any] = Field(default_factory=dict)
     condition: str | None = None
     on_failure: OnFailure = ON_FAILURE_DEFAULT
+    review_policy: ReviewPolicy = REVIEW_POLICY_DEFAULT
     caller_context: CallerContext = Field(default_factory=CallerContext)
 
 

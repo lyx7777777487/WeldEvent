@@ -172,6 +172,18 @@ def derive_note(
         status = output.get("status", "triggered")
         return f"✅ 已触发AI预标注：task_id={task_id} status={status}"
 
+    # control_workflow — 记录操作结果，防止 LLM 下一轮失忆
+    if tool_name == "control_workflow":
+        action = output.get("action", "")
+        message = output.get("message", "")
+        if action == "rework_node":
+            node_id = output.get("node_id", "")
+            return f"🔄 已回溯工作流：节点 {node_id} 及下游将重新执行"
+        if action == "inject_context":
+            key = output.get("key", "")
+            return f"📝 已注入上下文：{key}"
+        return f"工作流控制：{action} {message[:80] if message else ''}"
+
     # archive_memory 等无状态工具不生成笔记
     return None
 

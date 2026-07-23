@@ -58,6 +58,7 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
     from cognitiveplane.control.declaration import DeclarationLoader  # P0-1
     from cognitiveplane.control.subagent import SubAgentRunner  # P0-1
     from cognitiveplane.control.tools.delegate import DelegateTool  # P0-1
+    from cognitiveplane.control.tools.inject_context import InjectContextTool  # Op 4
     from cognitiveplane.control.hooks import SafetyHook, PolicyHook
     from cognitiveplane.memory.compaction import ContextCompactor, CompactionStrategy
     from cognitiveplane.control.event_log import EventLog
@@ -134,6 +135,7 @@ def create_chat_router(deps: CognitiveDependencies) -> tuple[APIRouter, "Session
         trajectory_store=trajectory_store,
     )
     engine._tools.register(DelegateTool(subagent_runner))
+    engine._tools.register(InjectContextTool(deps))  # Op 4: inject_context tool
     # Phase 5 评估框架: LLM-as-a-Judge + Langfuse scoring
     # 在线评估（异步，不阻塞聊天返回）
     evaluator = build_evaluator(deps.capability.llm_provider, enabled=True)

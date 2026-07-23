@@ -1522,10 +1522,266 @@ body::after {
   color: var(--red);
 }
 
-/* 面板内容区 */
+/* 面板内容区 — 上下两栏 */
 .exec-panel-body {
-  flex: 1; overflow-y: auto; padding: 16px 18px;
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  position: relative;
 }
+
+/* 空状态 — 无工作流时覆盖整个 body */
+.exec-empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  background: var(--bg-sidebar);
+  z-index: 2;
+}
+.exec-panel.has-data .exec-empty-state { display: none; }
+
+/* 上栏:工作流流程图 */
+.exec-flow-section {
+  flex: 0 0 42%;
+  min-height: 160px;
+  display: flex; flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(159,180,216,0.02), transparent);
+}
+.exec-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 8px;
+  flex-shrink: 0;
+}
+.exec-section-title {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  display: flex; align-items: center; gap: 6px;
+}
+.exec-section-title::before {
+  content: '';
+  width: 3px; height: 11px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+.exec-section-meta {
+  font-size: 10.5px; color: var(--text-muted);
+  font-family: var(--font-mono); font-weight: 500;
+}
+.exec-flow-canvas {
+  flex: 1; min-height: 0;
+  overflow: auto;
+  padding: 4px 12px 14px;
+}
+.exec-flow-canvas svg {
+  display: block;
+  min-width: 100%;
+}
+
+/* 流程图节点 — SVG 内部用 class 控制 */
+.flow-node { cursor: default; }
+.flow-node-rect {
+  fill: var(--bg-card);
+  stroke: var(--border);
+  stroke-width: 1;
+  rx: 8; ry: 8;
+  transition: all .3s ease;
+}
+.flow-node.pending .flow-node-rect {
+  fill: rgba(107,114,128,0.08);
+  stroke: rgba(107,114,128,0.3);
+}
+.flow-node.running .flow-node-rect {
+  fill: rgba(159,180,216,0.12);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 6px rgba(159,180,216,0.4));
+  animation: flowNodePulse 1.5s ease-in-out infinite;
+}
+@keyframes flowNodePulse {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(159,180,216,0.3)); }
+  50% { filter: drop-shadow(0 0 10px rgba(159,180,216,0.55)); }
+}
+.flow-node.done .flow-node-rect {
+  fill: rgba(16,185,129,0.1);
+  stroke: rgba(16,185,129,0.4);
+}
+.flow-node.failed .flow-node-rect {
+  fill: rgba(239,68,68,0.1);
+  stroke: rgba(239,68,68,0.45);
+}
+.flow-node-text {
+  fill: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.flow-node.done .flow-node-text { fill: var(--green); }
+.flow-node.running .flow-node-text { fill: var(--accent-2); }
+.flow-node.failed .flow-node-text { fill: var(--red); }
+.flow-node-icon {
+  font-size: 10px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.flow-edge {
+  stroke: var(--border);
+  stroke-width: 1.2;
+  fill: none;
+  transition: stroke .3s ease;
+}
+.flow-edge.active {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+  animation: flowDash 0.8s linear infinite;
+}
+.flow-edge.done { stroke: rgba(16,185,129,0.45); }
+@keyframes flowDash {
+  to { stroke-dashoffset: -14; }
+}
+.flow-edge-marker { fill: var(--border); }
+.flow-edge.active .flow-edge-marker { fill: var(--accent); }
+.flow-edge.done .flow-edge-marker { fill: rgba(16,185,129,0.45); }
+
+/* 分割条(预留拖拽) */
+.exec-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* 下栏:实时执行细节 */
+.exec-detail-section {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.exec-detail-list {
+  flex: 1; overflow-y: auto;
+  padding: 4px 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+/* 执行细节卡片 — 人类可读的节点执行记录 */
+.exec-detail-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  animation: msgIn .3s cubic-bezier(.4,0,.2,1);
+}
+.exec-detail-card.running {
+  border-color: rgba(159,180,216,0.3);
+  box-shadow: 0 0 0 1px rgba(159,180,216,0.1);
+}
+.exec-detail-card.done { border-color: rgba(16,185,129,0.2); }
+.exec-detail-card.failed { border-color: rgba(239,68,68,0.25); }
+
+.edc-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,0.02);
+}
+.edc-step {
+  font-size: 9.5px; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: .5px;
+  flex-shrink: 0;
+}
+.edc-title {
+  flex: 1; font-size: 12.5px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -.1px;
+  min-width: 0;
+}
+.edc-status {
+  font-size: 10px; font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: .3px;
+  flex-shrink: 0;
+}
+.edc-status.running { background: rgba(159,180,216,0.12); color: var(--accent-2); }
+.edc-status.done { background: var(--green-soft); color: var(--green); }
+.edc-status.failed { background: var(--red-soft); color: var(--red); }
+
+.edc-body { padding: 10px 12px 12px; }
+.edc-row {
+  display: flex; gap: 8px;
+  padding: 5px 0;
+  font-size: 11.5px; line-height: 1.6;
+}
+.edc-label {
+  flex-shrink: 0;
+  width: 52px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  padding-top: 2px;
+}
+.edc-value {
+  flex: 1; min-width: 0;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.edc-value strong { color: var(--text-primary); font-weight: 600; }
+.edc-value code {
+  font-family: var(--font-mono); font-size: 10.5px;
+  background: var(--bg-hover); padding: 1px 5px;
+  border-radius: 3px; color: var(--accent);
+}
+.edc-thumb {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+}
+.edc-thumb img {
+  width: 100%; display: block;
+  max-height: 140px; object-fit: cover;
+}
+.edc-result {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11.5px; line-height: 1.6;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.edc-result.pass {
+  background: var(--green-soft);
+  border-left: 2px solid var(--green);
+  color: var(--text-primary);
+}
+.edc-result.fail {
+  background: var(--red-soft);
+  border-left: 2px solid var(--red);
+  color: var(--text-primary);
+}
+.edc-result.wait {
+  background: var(--amber-soft);
+  border-left: 2px solid var(--amber);
+  color: var(--text-secondary);
+}
+.edc-result-icon { flex-shrink: 0; font-weight: 700; }
+
+/* 旧节点列表(保留给流程图数据源,不再渲染为列表) */
 
 .exec-workflow-title {
   font-size: 13px; font-weight: 500; color: var(--text-secondary);
@@ -1844,29 +2100,44 @@ body::after {
     </div>
   </div>
 
-  <div class="exec-panel" id="execPanel">
+  <div class="exec-panel open" id="execPanel">
     <div class="exec-panel-header">
       <div class="exec-agent-badge">
         <span class="exec-agent-dot"></span>
-        <span>Execution Agent</span>
+        <span>Workflow Monitor</span>
       </div>
       <div class="exec-panel-actions">
-        <button class="btn-exec-stop" id="execStopBtn" onclick="stopExecution()" title="停止执行">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
-        </button>
         <span class="exec-panel-stats" id="execPanelStats"></span>
-        <button class="btn-exec-close" onclick="closeExecPanel()" title="关闭面板">
+        <button class="btn-exec-close" onclick="closeExecPanel()" title="Collapse panel">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     </div>
     <div class="exec-panel-body">
-      <div class="exec-workflow-title" id="execWorkflowTitle"></div>
-      <div class="exec-progress">
-        <div class="exec-progress-bar"><div class="exec-progress-fill" id="execProgressFill" style="width:0%"></div></div>
+      <div class="exec-empty-state" id="execEmptyState">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3;margin-bottom:14px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500">No workflow running</div>
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.7">Once a workflow is designed or launched,<br>flow graph and execution details appear here</div>
       </div>
-      <div class="exec-progress-text" id="execProgressText"></div>
-      <div class="exec-node-list" id="execNodeList"></div>
+
+      <div class="exec-flow-section">
+        <div class="exec-section-header">
+          <span class="exec-section-title">Flow Graph</span>
+          <span class="exec-section-meta" id="flowMeta"></span>
+        </div>
+        <div class="exec-flow-canvas" id="execFlowCanvas"></div>
+      </div>
+
+      <div class="exec-divider"></div>
+
+      <div class="exec-detail-section">
+        <div class="exec-section-header">
+          <span class="exec-section-title">Execution Details</span>
+          <span class="exec-section-meta" id="detailMeta"></span>
+        </div>
+        <div class="exec-detail-list" id="execDetailList"></div>
+      </div>
+
       <div class="exec-summary" id="execSummary" style="display:none"></div>
     </div>
   </div>
@@ -1914,7 +2185,10 @@ let wfExpandedCard = null;
 
 // ── 执行监控面板状态 ──
 let execNodes = [];
-let execPanelOpen = false;
+// 执行细节卡片 — 每个节点的人类可读执行记录(下栏数据源)
+// 结构: { node_id, label, step, status, action, image, standard, method, result, result_kind, data }
+let execDetails = [];
+let execPanelOpen = true;
 let execRunCompleted = false;
 let execActiveWorkflowId = null;
 let activeAbortController = null;
@@ -2013,7 +2287,7 @@ function switchSession(id) {
   // 窄屏选中会话后自动收起 sidebar
   closeSidebar();
   resetExecPanel();
-  // P1-7: 启动工作流节点事件 EventSource — 长连接订阅 L2→L1 节点事件
+  // 切回已有会话时，如果该会话有活跃工作流，重新连接事件流
   startWorkflowEventStream(id);
 }
 
@@ -2061,8 +2335,6 @@ function handleWorkflowEvent(evt) {
       execActiveWorkflowId = wfId;
       // 不调 initExecPanel(无 node 列表) — 等节点 start 事件逐个加入
       openExecPanel();
-      document.getElementById('execWorkflowTitle').textContent = `工作流 ${wfId}`;
-      document.getElementById('execWorkflowTitle').style.display = 'block';
     }
     return;
   }
@@ -2078,10 +2350,23 @@ function handleWorkflowEvent(evt) {
         summary: '',
         data: null,
       });
+      // 同步加一张执行细节卡片
+      execDetails.push({
+        node_id: nodeId,
+        label: nodeId,
+        step: String(execDetails.length + 1).padStart(2, '0'),
+        status: 'running',
+        action: '', image: null, standard: '', method: '',
+        result: '', result_kind: 'wait', data: null,
+      });
     } else if (node.status === 'pending') {
       node.status = 'running';
+      const d = execDetails.find(x => x.node_id === nodeId);
+      if (d) d.status = 'running';
     }
-    renderExecNodes();
+    renderFlowGraph();
+    renderExecDetails();
+    updateExecDataState();
     updateExecProgress();
     openExecPanel();
     return;
@@ -2094,22 +2379,39 @@ function handleWorkflowEvent(evt) {
       // 节点未在 execPanel 中(可能是 L2 事件先到,LLM 的 workflow_progress 后到)
       node = { node_id: nodeId, label: nodeId, status: 'done', summary: '', data: null };
       execNodes.push(node);
+      execDetails.push({
+        node_id: nodeId, label: nodeId,
+        step: String(execDetails.length + 1).padStart(2, '0'),
+        status: 'done', action: '', image: null, standard: '', method: '',
+        result: '', result_kind: 'pass', data: null,
+      });
     }
     const status = (evt.node_status || '').toUpperCase();
-    if (status === 'OK' || status === 'MARGINAL') {
-      node.status = 'done';
-    } else {
-      node.status = 'failed';
-    }
-    // 节点数据存起来,供点击展开查看详情
+    const isOk = (status === 'OK' || status === 'MARGINAL');
+    node.status = isOk ? 'done' : 'failed';
+    // 节点数据存起来,供执行细节卡片展示
     node.data = evt.node_data || {};
     if (evt.error) node.data._error = evt.error;
     // 生成摘要(取关键字段)
     node.summary = summarizeNodeData(node.data, status);
+    // 同步更新细节卡片
+    const detail = execDetails.find(x => x.node_id === nodeId);
+    if (detail) {
+      detail.status = node.status;
+      detail.data = node.data;
+      detail.result = node.summary;
+      detail.result_kind = node.status === 'done' ? 'pass' : 'fail';
+    }
     // 推进下一个 pending 节点为 running
     const nextPending = execNodes.find(n => n.status === 'pending');
-    if (nextPending) nextPending.status = 'running';
-    renderExecNodes();
+    if (nextPending) {
+      nextPending.status = 'running';
+      const nd = execDetails.find(x => x.node_id === nextPending.node_id);
+      if (nd) nd.status = 'running';
+    }
+    renderFlowGraph();
+    renderExecDetails();
+    updateExecDataState();
     updateExecProgress();
     return;
   }
@@ -2117,11 +2419,16 @@ function handleWorkflowEvent(evt) {
   // workflow_completed / workflow_failed — 整体结束
   if (type === 'workflow_completed' || type === 'workflow_failed') {
     execRunCompleted = true;
+    // 工作流结束，关闭事件流
+    if (workflowEventSource) {
+      workflowEventSource.close();
+      workflowEventSource = null;
+    }
     if (type === 'workflow_failed' && evt.error) {
       const summaryEl = document.getElementById('execSummary');
       if (summaryEl) {
         summaryEl.style.display = 'block';
-        summaryEl.innerHTML = `<div class="exec-summary-title" style="color:var(--red)">工作流失败</div><div class="exec-summary-text">${escHtml(evt.error)}</div>`;
+        summaryEl.innerHTML = `<div class="exec-summary-title" style="color:var(--red)">Workflow failed</div><div class="exec-summary-text">${escHtml(evt.error)}</div>`;
       }
     }
     updateExecProgress();
@@ -2131,12 +2438,12 @@ function handleWorkflowEvent(evt) {
   // workflow_paused / workflow_resumed — 暂停/恢复
   if (type === 'workflow_paused') {
     const statsEl = document.getElementById('execPanelStats');
-    if (statsEl) statsEl.textContent = '⏸ 已暂停';
+    if (statsEl) statsEl.textContent = '⏸ paused';
     return;
   }
   if (type === 'workflow_resumed') {
     const statsEl = document.getElementById('execPanelStats');
-    if (statsEl) statsEl.textContent = '▶ 已恢复';
+    if (statsEl) statsEl.textContent = '▶ resumed';
     return;
   }
 }
@@ -2232,7 +2539,7 @@ function msgHTML(m) {
     const summary = renderMarkdown(m.summary || '');
     const label = toolLabel(m.tool);
     const resolved = m.resolved;
-    const isConfirm = m.tool === 'request_confirmation';
+    const isConfirm = m.tool === 'request_confirmation' || (m.tool === 'control_workflow' && m.options && m.options.length);
     const resolvedTag = resolved
       ? `<div class="ap-resolved-tag" style="color: ${resolved === 'rejected' ? 'var(--red)' : 'var(--green)'};">${resolved === 'rejected' ? '✗ 已取消' : '✓ 已选择：' + escHtml(resolved)}</div>`
       : '';
@@ -2260,7 +2567,7 @@ function msgHTML(m) {
           </div>`;
       }
     }
-    const titleText = isConfirm ? 'Volcano的疑问' : `确认启动工作流 · ${escHtml(label)}`;
+    const titleText = m.tool === 'control_workflow' ? '需确认操作' : (isConfirm ? 'Volcano的疑问' : `确认启动工作流 · ${escHtml(label)}`);
     return `<div class="approval-card ${resolved ? 'resolved' : ''}">
       <div class="ap-header">
         <span class="ap-title">${escHtml(titleText)}</span>
@@ -2721,27 +3028,26 @@ function closeExecPanel() {
   execPanelOpen = false;
   const panel = document.getElementById('execPanel');
   panel.classList.remove('open');
-  if (execActiveWorkflowId && !execRunCompleted) {
-    document.getElementById('execToggleBtn').style.display = 'flex';
-  }
+  // 收起后始终显示 toggle 按钮,点击可重新展开
+  document.getElementById('execToggleBtn').style.display = 'flex';
+  document.getElementById('execToggleLabel').textContent = 'Workflow Monitor';
 }
 
 function resetExecPanel() {
   execNodes = [];
-  execPanelOpen = false;
+  execDetails = [];
   execRunCompleted = false;
   execActiveWorkflowId = null;
-  const panel = document.getElementById('execPanel');
-  panel.classList.remove('open');
+  // 保持面板常驻展开,只清空数据
   document.getElementById('execToggleBtn').style.display = 'none';
   document.getElementById('execToggleLabel').textContent = '';
-  document.getElementById('execWorkflowTitle').textContent = '';
-  document.getElementById('execWorkflowTitle').style.display = 'none';
-  document.getElementById('execProgressFill').style.width = '0%';
-  document.getElementById('execProgressText').textContent = '';
   document.getElementById('execPanelStats').textContent = '';
-  document.getElementById('execNodeList').innerHTML = '';
+  document.getElementById('flowMeta').textContent = '';
+  document.getElementById('detailMeta').textContent = '';
+  document.getElementById('execFlowCanvas').innerHTML = '';
+  document.getElementById('execDetailList').innerHTML = '';
   document.getElementById('execSummary').style.display = 'none';
+  updateExecDataState();
 }
 
 async function stopExecution() {
@@ -2770,8 +3076,14 @@ async function stopExecution() {
       n.status = 'cancelled';
     }
   });
+  execDetails.forEach(d => {
+    if (d.status === 'running' || d.status === 'pending') {
+      d.status = 'cancelled';
+    }
+  });
   execRunCompleted = true;
-  renderExecNodes();
+  renderFlowGraph();
+  renderExecDetails();
   updateExecProgress();
   showStopSummary();
 
@@ -2841,99 +3153,221 @@ function initExecPanel(title, nodeList) {
     status: 'pending',
     summary: ''
   }));
+  // 同步初始化执行细节卡片(每个节点一张卡)
+  execDetails = nodeList.map((n, i) => ({
+    node_id: n.node_id,
+    label: n.label || n.node_id,
+    step: String(i + 1).padStart(2, '0'),
+    status: 'pending',
+    action: n.action || '',
+    image: n.image || null,
+    standard: n.standard || '',
+    method: n.method || '',
+    result: '',
+    result_kind: 'wait',
+    data: null,
+  }));
   execRunCompleted = false;
-
-  const titleEl = document.getElementById('execWorkflowTitle');
-  if (title) {
-    titleEl.textContent = title;
-    titleEl.style.display = 'block';
-  } else {
-    titleEl.style.display = 'none';
-  }
 
   // 第一个节点标记为 running
   if (execNodes.length > 0) {
     execNodes[0].status = 'running';
+    execDetails[0].status = 'running';
   }
 
   document.getElementById('execSummary').style.display = 'none';
-  renderExecNodes();
+  renderFlowGraph();
+  renderExecDetails();
+  updateExecDataState();
   updateExecProgress();
   openExecPanel();
+  // 启动 L2→L1 工作流事件流，实时同步节点状态到面板
+  if (currentSessionId) startWorkflowEventStream(currentSessionId);
 }
 
 function updateExecNode(nodeId, status, summary) {
   const node = execNodes.find(n => n.node_id === nodeId);
+  const detail = execDetails.find(d => d.node_id === nodeId);
   if (!node) return;
 
   node.status = status;
   if (summary) node.summary = summary;
+  if (detail) {
+    detail.status = status;
+    if (summary) detail.result = summary;
+    detail.result_kind = status === 'done' ? 'pass' : status === 'failed' ? 'fail' : 'wait';
+  }
 
   // 推进下一个 pending 节点为 running
   if (status === 'done' || status === 'failed') {
     const nextPending = execNodes.find(n => n.status === 'pending');
     if (nextPending) {
       nextPending.status = 'running';
+      const nextDetail = execDetails.find(d => d.node_id === nextPending.node_id);
+      if (nextDetail) nextDetail.status = 'running';
     }
   }
 
-  renderExecNodes();
+  renderFlowGraph();
+  renderExecDetails();
+  updateExecDataState();
   updateExecProgress();
 }
 
-function renderExecNodes() {
-  const list = document.getElementById('execNodeList');
-  const icons = {
-    pending: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>',
-    running: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>',
-    done: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
-    failed: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-  };
-
-  // P1-7: 节点支持点击展开查看详情(若有 data)
-  list.innerHTML = execNodes.map((n, idx) => {
-    const cls = n.status;
-    const icon = icons[cls] || icons.pending;
-    const label = escHtml(n.label);
-    const summary = n.summary ? `<div class="exec-node-summary">${escHtml(n.summary)}</div>` : '';
-    // 有数据时显示展开按钮
-    const hasDetail = n.data && Object.keys(n.data).length > 0;
-    const clickable = hasDetail ? ` style="cursor:pointer" onclick="toggleNodeDetail(${idx})"` : '';
-    const detailIcon = hasDetail ? ' <span style="font-size:10px;opacity:.6">▾</span>' : '';
-    // 详情区域(默认隐藏)
-    const detailHtml = hasDetail ? `<div class="exec-node-detail" id="nodeDetail${idx}" style="display:none;margin-top:6px;padding:6px 8px;background:var(--bg-secondary);border-radius:6px;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:200px;overflow:auto">${escHtml(JSON.stringify(n.data, null, 2))}</div>` : '';
-    return `<div class="exec-node ${cls}"${clickable}>
-      <div class="exec-node-icon ${cls}">${icon}</div>
-      <div class="exec-node-info">
-        <div class="exec-node-label">${label}${detailIcon}</div>
-        ${summary}
-        ${detailHtml}
-      </div>
-    </div>`;
-  }).join('');
+// 更新面板 has-data 状态 — 控制空状态显隐
+function updateExecDataState() {
+  const panel = document.getElementById('execPanel');
+  if (execNodes.length > 0) panel.classList.add('has-data');
+  else panel.classList.remove('has-data');
 }
 
-// P1-7: 切换节点详情展开/折叠
+// ══════════════════════════════════════════════
+// 上栏:工作流 DAG 流程图渲染(SVG)
+// ══════════════════════════════════════════════
+function renderFlowGraph() {
+  const canvas = document.getElementById('execFlowCanvas');
+  if (!execNodes.length) { canvas.innerHTML = ''; return; }
+
+  const n = execNodes.length;
+  const nodeW = 110, nodeH = 42;
+  const gapX = 28;
+  const padX = 14, padY = 14;
+  // 单行能放下的节点宽度,超出则换行
+  const canvasW = canvas.clientWidth || 340;
+  const perRow = Math.max(1, Math.floor((canvasW - padX * 2 + gapX) / (nodeW + gapX)));
+  const rows = Math.ceil(n / perRow);
+  const rowH = nodeH + 36; // 节点 + 行间距(含折返连线)
+
+  const width = Math.max(canvasW, perRow * (nodeW + gapX) - gapX + padX * 2);
+  const height = rows * rowH + padY * 2;
+
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<defs><marker id="flowArrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path class="flow-edge-marker" d="M0,0 L6,4 L0,8 z"/></marker></defs>`;
+
+  // 节点坐标(按行排列,S 型折返)
+  const coords = execNodes.map((node, i) => {
+    const row = Math.floor(i / perRow);
+    const col = row % 2 === 0 ? (i % perRow) : (perRow - 1 - (i % perRow));
+    const x = padX + col * (nodeW + gapX);
+    const y = padY + row * rowH;
+    return { x, y, node };
+  });
+
+  // 连线(相邻节点之间)
+  for (let i = 0; i < coords.length - 1; i++) {
+    const a = coords[i], b = coords[i + 1];
+    const aStatus = a.node.status;
+    let edgeCls = '';
+    // 当前节点完成 → 下条边标为 done
+    if (aStatus === 'done' || aStatus === 'failed') edgeCls = 'done';
+    // 当前节点 running 且下一节点 pending → 边为 active
+    if (aStatus === 'running' && b.node.status === 'pending') edgeCls = 'active';
+
+    if (a.y === b.y) {
+      // 同行直线
+      const x1 = a.x + nodeW, y1 = a.y + nodeH / 2;
+      const x2 = b.x, y2 = b.y + nodeH / 2;
+      svg += `<path class="flow-edge ${edgeCls}" d="M${x1},${y1} L${x2},${y2}" marker-end="url(#flowArrow)"/>`;
+    } else {
+      // 折返:从 a 右侧出,向下绕到 b 左侧
+      const x1 = a.x + nodeW, y1 = a.y + nodeH / 2;
+      const x2 = b.x + nodeW / 2, y2 = b.y - 12;
+      const midY = (y1 + y2) / 2;
+      svg += `<path class="flow-edge ${edgeCls}" d="M${x1},${y1} C${x1 + 20},${y1} ${x2},${midY} ${x2},${y2}" marker-end="url(#flowArrow)"/>`;
+    }
+  }
+
+  // 节点矩形 + 文字
+  coords.forEach(({ x, y, node }) => {
+    const status = node.status;
+    const icon = status === 'done' ? '✓' : status === 'failed' ? '✗' : status === 'running' ? '▶' : '·';
+    svg += `<g class="flow-node ${status}">`;
+    svg += `<rect class="flow-node-rect" x="${x}" y="${y}" width="${nodeW}" height="${nodeH}"/>`;
+    svg += `<text class="flow-node-icon" x="${x + nodeW / 2}" y="${y + 15}">${icon}</text>`;
+    svg += `<text class="flow-node-text" x="${x + nodeW / 2}" y="${y + 31}">${escHtml(truncateLabel(node.label, 12))}</text>`;
+    svg += `</g>`;
+  });
+
+  svg += `</svg>`;
+  canvas.innerHTML = svg;
+}
+
+function truncateLabel(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+// ══════════════════════════════════════════════
+// 下栏:执行细节卡片渲染(人类可读)
+// ══════════════════════════════════════════════
+function renderExecDetails() {
+  const list = document.getElementById('execDetailList');
+  if (!execDetails.length) { list.innerHTML = ''; return; }
+  list.innerHTML = execDetails.map(d => execDetailCardHTML(d)).join('');
+  // 滚到底部,看最新执行进度
+  list.scrollTop = list.scrollHeight;
+}
+
+function execDetailCardHTML(d) {
+  const statusText = { pending: 'PENDING', running: 'RUNNING', done: 'DONE', failed: 'FAILED', cancelled: 'CANCELLED' };
+  const st = statusText[d.status] || d.status;
+
+  let body = '';
+  // 动作描述
+  if (d.action) {
+    body += `<div class="edc-row"><div class="edc-label">ACTION</div><div class="edc-value">${escHtml(d.action)}</div></div>`;
+  }
+  // 图片缩略图
+  if (d.image) {
+    body += `<div class="edc-thumb"><img src="${escHtml(d.image)}" alt="inspect"></div>`;
+  }
+  // 标准/依据
+  if (d.standard) {
+    body += `<div class="edc-row"><div class="edc-label">STD</div><div class="edc-value">${escHtml(d.standard)}</div></div>`;
+  }
+  // 检测方法
+  if (d.method) {
+    body += `<div class="edc-row"><div class="edc-label">HOW</div><div class="edc-value">${escHtml(d.method)}</div></div>`;
+  }
+  // 结果
+  if (d.result) {
+    const icon = d.result_kind === 'pass' ? '✓' : d.result_kind === 'fail' ? '✗' : '⏳';
+    body += `<div class="edc-result ${d.result_kind}"><span class="edc-result-icon">${icon}</span><div>${escHtml(d.result)}</div></div>`;
+  }
+
+  return `<div class="exec-detail-card ${d.status}">
+    <div class="edc-header">
+      <span class="edc-step">STEP ${escHtml(d.step)}</span>
+      <span class="edc-title">${escHtml(d.label)}</span>
+      <span class="edc-status ${d.status}">${st}</span>
+    </div>
+    <div class="edc-body">${body}</div>
+  </div>`;
+}
+
+// P1-7: 切换节点详情展开/折叠(保留兼容旧调用)
 function toggleNodeDetail(idx) {
-  const el = document.getElementById(`nodeDetail${idx}`);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  // 新版细节卡片已直接展示,无需展开
 }
 
 function updateExecProgress() {
   const total = execNodes.length;
   const done = execNodes.filter(n => n.status === 'done' || n.status === 'failed').length;
   const running = execNodes.filter(n => n.status === 'running').length;
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  document.getElementById('execProgressFill').style.width = pct + '%';
-  document.getElementById('execProgressText').textContent =
-    `${done}/${total} 完成` + (running > 0 ? ' · 1 执行中' : '');
-  document.getElementById('execPanelStats').textContent = `${done}/${total}`;
+  const flowMeta = document.getElementById('flowMeta');
+  const detailMeta = document.getElementById('detailMeta');
+  const statsEl = document.getElementById('execPanelStats');
+
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  if (flowMeta) flowMeta.textContent = total ? `${done}/${total} · ${pct}%` : '';
+  if (detailMeta) detailMeta.textContent = running > 0 ? 'live' : (total && done >= total ? 'complete' : '');
+  if (statsEl) statsEl.textContent = total ? `${done}/${total}` : '';
 
   // 更新 toggle 按钮
   const btn = document.getElementById('execToggleBtn');
   if (execActiveWorkflowId && total > 0) {
-    document.getElementById('execToggleLabel').textContent = `执行中 ${done}/${total}`;
+    document.getElementById('execToggleLabel').textContent = `Running ${done}/${total}`;
     if (!execPanelOpen && !execRunCompleted) {
       btn.style.display = 'flex';
     }

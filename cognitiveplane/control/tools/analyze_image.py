@@ -54,6 +54,9 @@ class AnalyzeImageTool(BrainTool):
     def description(self) -> str:
         return (
             "分析工业图像，评估质量并检测缺陷。\n"
+            "**注意**：此工具仅返回多模态模型的初步判断，不是最终答案。\n"
+            "调用后必须用 search_cases / search_reasoning_knowledge / "
+            "search_vision_knowledge 对照验证，如有矛盾需标注。\n"
             "**何时使用**：用户上传图片、要求看图、分析缺陷、评估质量、"
             "或任何涉及图像内容理解的请求。\n"
             "**用法**：传 image_ref（格式 PENDING:session_id:index），"
@@ -119,8 +122,13 @@ class AnalyzeImageTool(BrainTool):
         # HTTP 上传 + 模型处理超过 TOOL_TIMEOUT_SECONDS。
         prepared_url, prep_info = self._prepare_for_vision(original_data_url)
 
+        # 双轨设计（Hybrid Vision-Language, arXiv 2605.26533）：
+        #   本工具只做"理解/观察"——识别焊缝类型、可见特征、疑似缺陷及位置；
+        #   不直接给权威质量等级（等级判定须由确定性测量 MEA + 缺陷识别 RDA +
+        #   标准数字化 search_standards 综合后给出，避免 MLLM 一把梭判级）。
         prompt_parts = [
-            "你是焊接质检专家，请对以下焊缝图片进行质量分析：\n",
+            "你是焊接质检视觉分析专家。请对以下焊缝图片做【观察性分析】"
+            "（识别与描述，不下最终判定）：\n",
             f"用户问题：{question}\n",
             f"（图片已缩放至最长边 {MAX_DIM}px，质量 {JPEG_QUALITY}%）\n",
         ]
@@ -130,11 +138,18 @@ class AnalyzeImageTool(BrainTool):
             prompt_parts.append(f"板厚：{thickness}mm\n")
 
         prompt_parts.append(
-            "\n请按以下格式输出：\n"
-            "1. 焊缝外观评价（成形、余高、宽度）\n"
-            "2. 缺陷检测（气孔/夹渣/裂纹/咬边/未熔合/未焊透/焊瘤）\n"
-            "3. 质量等级评估（I/II/III/IV级，参照GB/T3323或NB/T47014）\n"
-            "4. 改进建议（如有缺陷）"
+            "\n请按以下结构输出（客观观察优先，疑似项标注【疑似】）：\n"
+            "1. 焊缝类型与接头形式（如 T 型角焊缝/对接焊缝/搭接，单道/多道）\n"
+            "2. 焊缝成形外观（成形是否均匀、余高/宽度直观印象、焊趾过渡）\n"
+            "3. 可见疑似缺陷及位置（气孔/夹渣/裂纹/咬边/未熔合/未焊透/焊瘤/焊穿，"
+            "逐项标【有/无/疑似】并给出在图中的大致位置；不确定的不要臆断）\n"
+            "4. 图片本身质量（对焦/曝光/完整性，是否影响判读）\n"
+            "5. 初步印象与后续建议（仅作参考；最终质量等级须结合确定性几何测量、"
+            "缺陷检测与适用标准数字化后由系统综合判定）\n\n"
+            "标准提示：角焊缝外观表面缺陷分级参照 GB/T 19418（焊缝缺陷质量分级）；"
+            "GB/T 3323 适用于射线检测（射线底片缺陷），不用于外观判级，请勿混用。\n\n"
+            "重要：以上是多模态模型的【非确定性估计】，不等于确定性测量结论。"
+            "涉及判废/让步接收等不可逆决策时，必须以确定性测量结果为准并人工复核。"
         )
 
         try:

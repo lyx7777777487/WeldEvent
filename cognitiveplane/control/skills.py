@@ -69,6 +69,11 @@ def _declaration_to_skill(decl: Declaration) -> Skill:
     )
 
 
+
+# Sentinel for unparseable LLM classification responses
+# Distinguishes explicit null from unparseable JSON
+_UNPARSABLE = object()
+
 class SkillRegistry:
     """技能注册表 — 管理所有 Skill 并提供语义选择能力。
 
@@ -84,7 +89,7 @@ class SkillRegistry:
     # 高置信度关键词匹配阈值 — 超过此值直接命中，不走 LLM
     KEYWORD_FAST_PATH_THRESHOLD = 3
     # 短句长度阈值 — 低于此长度认为是确认/跟进，保持锁定 skill
-    SHORT_INPUT_THRESHOLD = 8
+    SHORT_INPUT_THRESHOLD = 5
 
     def __init__(self, skills: list[Skill] | None = None) -> None:
         self._skills: list[Skill] = skills or []
@@ -142,12 +147,20 @@ class SkillRegistry:
         if not text.strip():
             return None
 
-        # 1. 短句保持锁定 — "确认/好的/同意/继续/列出来" 等不带新意图
+        # 1. 短句保持锁定 - 但先检查是否含其他 skill 的触发词（上下文切换检测）
         if session and len(text.strip()) <= self.SHORT_INPUT_THRESHOLD:
             locked_name = session.get("locked_skill")
             if locked_name and locked_name in self._by_name:
-                logger.info("[skills] short input '%s' keeps locked skill=%s", text, locked_name)
-                return self._by_name[locked_name]
+                # 检查短句是否命中其他 skill 的触发词 -> 命中则解锁，走正常分类
+                other = self.select_skill(text)
+                if other is None or other.name == locked_name:
+                    logger.info("[skills] short input '%s' keeps locked skill=%s", text, locked_name)
+                    return self._by_name[locked_name]
+                logger.info(
+                    "[skills] short input '%s' matches other skill=%s, unlocking from %s",
+                    text, other.name, locked_name,
+                )
+                # fall through to normal classification
 
         # 2. 关键词高分捷径 — 极高置信度直接命中
         keyword_best = self.select_skill(text)
@@ -190,22 +203,33 @@ class SkillRegistry:
                 ],
                 max_tokens=100,  # 50→100：防止 LLM 输出前缀文本后 JSON 被截断
                 temperature=0.0,
+                caller="skills",
+                purpose="skill_routing",
             )
             llm_response = await llm_provider.complete(request)
             response_text = llm_response.content
 
             result = self._parse_classification_result(response_text)
+            if result is _UNPARSABLE:
+                # LLM response was not parseable JSON
+                logger.info('[skills] LLM response unparseable, falling back to keyword')
+                if keyword_best is not None:
+                    return keyword_best
+                return None
+
             if result and result in self._by_name:
                 logger.info("[skills] LLM-classified skill=%s", result)
                 return self._by_name[result]
             elif result is None:
-                # LLM 明确返回 null — 意图不明确或无匹配
-                logger.info("[skills] LLM returned null (no match or ambiguous)")
-                # 回退到关键词低分匹配（如果有）
+                # LLM 明确返回 null - 意图不明确或无匹配
+                # 不回退到弱关键词匹配（score<threshold 的弱匹配常误锁 skill）
+                # 返回 None -> 解锁到通用模式（所有 LLM 可见工具可用）
+                logger.info("[skills] LLM returned null, falling back to keyword match")
                 return keyword_best
         except Exception:
             logger.debug("[skills] LLM classification failed, falling back to keyword", exc_info=True)
 
+        # LLM 分类失败时回退到关键词匹配
         return keyword_best
 
     def _build_classification_prompt(self, user_text: str) -> str:
@@ -229,11 +253,15 @@ class SkillRegistry:
         return "\n".join(lines)
 
     def _parse_classification_result(self, response: str) -> str | None:
-        """解析 LLM 分类结果。"""
+        """Parse LLM classification result.
+
+        Returns:
+            str: skill name if LLM returned a valid classification
+            None: if LLM explicitly returned {"skill": null}
+            _UNPARSABLE sentinel: if response is not valid JSON at all
+        """
         try:
-            # 尝试提取 JSON
             text = response.strip()
-            # 处理可能的 markdown 代码块包裹
             if text.startswith("```"):
                 text = text.split("\n", 1)[1] if "\n" in text else text[3:]
                 if text.endswith("```"):
@@ -242,9 +270,9 @@ class SkillRegistry:
             if text.startswith("{"):
                 parsed = json.loads(text)
                 return parsed.get("skill")
+            return _UNPARSABLE
         except (json.JSONDecodeError, KeyError):
-            pass
-        return None
+            return _UNPARSABLE
 
     @staticmethod
     def _coerce_text(user_input: str | list[dict]) -> str:
@@ -266,15 +294,15 @@ class SkillRegistry:
 
 
 def build_welding_skill_registry() -> SkillRegistry:
-    """工厂函数 — 从 .weldevent/skills/*.md 声明文件加载 skill 集合。
+    """工厂函数 — 从 .weldevent/agents/*.md 声明文件加载 skill 集合。
 
-    替代了之前硬编码的 WELDING_SKILLS 列表。用户只需在 .weldevent/skills/ 下
-    添加 .md 文件即可扩展 skill，无需修改代码或重启。
+    替代了之前硬编码的 WELDING_SKILLS 列表。用户只需在 .weldevent/agents/ 下
+    添加 .md 文件即可扩展 skill（mode=inline）或 subagent（mode=delegated），无需修改代码或重启。
     """
     loader = DeclarationLoader()
     skills = [_declaration_to_skill(d) for d in loader.load_skills().values()]
     if not skills:
-        logger.warning("[skills] 未加载到任何 skill 声明，请检查 .weldevent/skills/ 目录")
+        logger.warning("[skills] 未加载到任何 skill 声明，请检查 .weldevent/agents/ 目录")
     return SkillRegistry(skills)
 
 

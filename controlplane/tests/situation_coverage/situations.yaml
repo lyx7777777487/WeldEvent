@@ -1,0 +1,1346 @@
+# 执行期情况 -> 测试 -> 覆盖状态 映射表
+# 源: docs/superpowers/specs/2026-07-20-execution-situation-catalog.md (315 条, 22 大类)
+# 三分类: docs/superpowers/specs/2026-07-20-status-vs-frontier-three-category.md
+#
+# 覆盖状态:
+#   tested  - 有测试且断言了状态迁移/不变量 (绿)
+#   covered - 代码有机制但无直接测试 (shadow)
+#   pending - 待补充确认 (清单 ❓) / 待实现 (8 模块)
+#
+# test 字段: 按命名约定 test_<ID>_<desc>, coverage_tracker 自动发现
+# tier 字段: L0 状态机 | L1 回放 | L2 情况覆盖 | L3 语义质量
+
+# ── A. 节点级执行结果 (12) ──────────────────────────────────
+- id: A1
+  desc: 正常成功
+  tier: L0
+  coverage: tested
+  test: test_standard_happy_path
+  test: test_standard_happy_path
+- id: A2
+  desc: 成功带警告 marginal
+  tier: L3
+  coverage: covered
+- id: A3
+  desc: 参数错失败 rework
+  tier: L0
+  coverage: tested
+  test: test_failure_path
+  test: test_failure_path
+- id: A4
+  desc: 能力不足 fallback
+  tier: L2
+  coverage: pending
+- id: A5
+  desc: 外部依赖挂 retry/escalate
+  tier: L2
+  coverage: pending
+- id: A6
+  desc: 超时失败 unknown 判定
+  tier: L2
+  coverage: pending
+- id: A7
+  desc: 崩溃失败 unknown_after_crash
+  tier: L1
+  coverage: covered
+- id: A8
+  desc: 部分成功
+  tier: L2
+  coverage: pending
+- id: A9
+  desc: 输出无效-schema retry
+  tier: L0
+  coverage: covered
+- id: A10
+  desc: 输出无效-语义 retry/rework
+  tier: L3
+  coverage: covered
+- id: A11
+  desc: 空结果
+  tier: L2
+  coverage: pending
+- id: A12
+  desc: 非确定性波动
+  tier: L1
+  coverage: pending
+
+# ── B. 节点暂停 (14) 重点 ──────────────────────────────────
+- id: B1
+  desc: 暂停整 Run
+  tier: L2
+  coverage: covered
+- id: B2
+  desc: 暂停单工位 scope=STATION
+  tier: L2
+  coverage: pending
+- id: B3
+  desc: 暂停批次 scope=BATCH
+  tier: L2
+  coverage: pending
+- id: B4
+  desc: 暂停在 mid-activity 到 checkpoint
+  tier: L2
+  coverage: covered
+- id: B5
+  desc: 暂停在 PREPARE 前
+  tier: L0
+  coverage: pending
+- id: B6
+  desc: COMMIT 前暂停恢复后重跑
+  tier: L0
+  coverage: tested
+  test: test_B6_commit_前暂停_恢复后重跑
+- id: B7
+  desc: 暂停期间信号堆积
+  tier: L0
+  coverage: covered
+- id: B8
+  desc: 暂停期间上游完成
+  tier: L2
+  coverage: pending
+- id: B9
+  desc: 暂停期间上游回溯下游重跑
+  tier: L2
+  coverage: pending
+- id: B10
+  desc: 暂停期间依赖过期
+  tier: L2
+  coverage: pending
+- id: B11
+  desc: 暂停转取消
+  tier: L0
+  coverage: tested
+  test: test_B11_暂停转取消
+- id: B12
+  desc: 暂停超时放弃
+  tier: L0
+  coverage: tested
+  test: test_B12_暂停超时放弃
+- id: B13
+  desc: 暂停与超时叠加
+  tier: L2
+  coverage: pending
+- id: B14
+  desc: 分级暂停组合 scope 交集并集
+  tier: L2
+  coverage: pending
+
+# ── C. 回溯/回退 (16) 重点 ─────────────────────────────────
+- id: C1
+  desc: 未提交回退
+  tier: L0
+  coverage: tested
+  test: test_C1_未提交回退
+- id: C2
+  desc: 回溯开新 Run
+  tier: L1
+  coverage: pending
+- id: C3
+  desc: 回溯下游闭包
+  tier: L2
+  coverage: covered
+- id: C4
+  desc: 已提交回退需 revoke
+  tier: L0
+  coverage: tested
+  test: test_C4_已提交回退需revoke
+- id: C5
+  desc: 已离系统回退通知
+  tier: L3
+  coverage: pending
+- id: C6
+  desc: 回溯影响面 BFS
+  tier: L2
+  coverage: covered
+- id: C7
+  desc: 回退后可发更正版
+  tier: L0
+  coverage: tested
+  test: test_C7_回退后可发更正版
+- id: C8
+  desc: 回溯并发冲突
+  tier: L2
+  coverage: pending
+- id: C9
+  desc: 回溯与并行交互
+  tier: L2
+  coverage: pending
+- id: C10
+  desc: 回溯跨 Run
+  tier: L1
+  coverage: pending
+- id: C11
+  desc: 回溯时上游也变了
+  tier: L2
+  coverage: pending
+- id: C12
+  desc: 回溯发现新方案更差
+  tier: L3
+  coverage: pending
+- id: C13
+  desc: 回溯边界 limit
+  tier: L2
+  coverage: pending
+- id: C14
+  desc: 回溯成本控制
+  tier: L2
+  coverage: pending
+- id: C15
+  desc: 批量回溯排序
+  tier: L2
+  coverage: pending
+- id: C16
+  desc: 回溯清理
+  tier: L2
+  coverage: pending
+
+# ── D. 依赖与拓扑 (12) ────────────────────────────────────
+- id: D1
+  desc: 依赖未就绪等待
+  tier: L0
+  coverage: covered
+- id: D2
+  desc: 依赖失败传播
+  tier: L2
+  coverage: covered
+- id: D3
+  desc: 环形依赖检测
+  tier: L0
+  coverage: covered
+- id: D4
+  desc: 条件分支路由变
+  tier: L2
+  coverage: covered
+- id: D5
+  desc: 动态依赖生成
+  tier: L2
+  coverage: pending
+- id: D6
+  desc: 并行节点全部完成
+  tier: L2
+  coverage: covered
+- id: D7
+  desc: 并行节点部分失败
+  tier: L2
+  coverage: covered
+- id: D8
+  desc: 可选依赖
+  tier: L2
+  coverage: pending
+- id: D9
+  desc: 依赖结果变换
+  tier: L2
+  coverage: covered
+- id: D10
+  desc: 依赖过期 artifact 有效期
+  tier: L2
+  coverage: pending
+- id: D11
+  desc: 依赖循环引用
+  tier: L0
+  coverage: covered
+- id: D12
+  desc: 依赖图拓扑变更
+  tier: L1
+  coverage: pending
+
+# ── E. 数据与质量 (13) ────────────────────────────────────
+- id: E1
+  desc: schema 校验
+  tier: L0
+  coverage: covered
+- id: E2
+  desc: 语义校验 LLM 评估
+  tier: L3
+  coverage: covered
+- id: E3
+  desc: 数据完整性
+  tier: L2
+  coverage: pending
+- id: E4
+  desc: 版本一致性
+  tier: L1
+  coverage: covered
+- id: E5
+  desc: 数据血缘
+  tier: L1
+  coverage: covered
+- id: E6
+  desc: 数据脱敏
+  tier: L3
+  coverage: pending
+- id: E7
+  desc: 增量更新
+  tier: L2
+  coverage: pending
+- id: E8
+  desc: 数据冲突
+  tier: L2
+  coverage: pending
+- id: E9
+  desc: 结果与历史不一致
+  tier: L3
+  coverage: pending
+- id: E10
+  desc: batch_hold 从 review
+  tier: L0
+  coverage: tested
+  test: test_E10_batch_hold从review
+- id: E11
+  desc: 批次隔离
+  tier: L2
+  coverage: pending
+- id: E12
+  desc: 多源数据融合
+  tier: L2
+  coverage: pending
+- id: E13
+  desc: 数据时效
+  tier: L2
+  coverage: pending
+
+# ── F. 并发与并行 (10) ────────────────────────────────────
+- id: F1
+  desc: 并行执行
+  tier: L2
+  coverage: covered
+- id: F2
+  desc: 并行结果汇聚
+  tier: L2
+  coverage: covered
+- id: F3
+  desc: 并行失败处理
+  tier: L2
+  coverage: covered
+- id: F4
+  desc: 并行资源竞争
+  tier: L2
+  coverage: pending
+- id: F5
+  desc: 并行死锁
+  tier: L2
+  coverage: pending
+- id: F6
+  desc: 并行重试放大
+  tier: L2
+  coverage: pending
+- id: F7
+  desc: 并行回溯冲突
+  tier: L2
+  coverage: pending
+- id: F8
+  desc: 并行背压限流
+  tier: L2
+  coverage: pending
+- id: F9
+  desc: 并行顺序保证
+  tier: L1
+  coverage: pending
+- id: F10
+  desc: 并行取消传播
+  tier: L2
+  coverage: pending
+
+# ── G. 时间与超时 (11) ────────────────────────────────────
+- id: G1
+  desc: 节点执行超时
+  tier: L2
+  coverage: covered
+- id: G2
+  desc: 硬超时强制终止
+  tier: L2
+  coverage: covered
+- id: G3
+  desc: 软超时降级
+  tier: L2
+  coverage: pending
+- id: G4
+  desc: 全局超时
+  tier: L2
+  coverage: pending
+- id: G5
+  desc: 重试超时退避
+  tier: L1
+  coverage: covered
+- id: G6
+  desc: 审查超时
+  tier: L0
+  coverage: covered
+  alias_of: O17
+  # O17 是 G6 的具体化, 同一测试覆盖
+- id: G7
+  desc: 暂停超时
+  tier: L0
+  coverage: covered
+  alias_of: B12
+  # B12 是 G7 的具体化, 同一测试覆盖
+- id: G8
+  desc: deadline 截止时间
+  tier: L2
+  coverage: pending
+- id: G9
+  desc: 截止临近加速或降级
+  tier: L3
+  coverage: pending
+- id: G10
+  desc: 时间漂移
+  tier: L1
+  coverage: pending
+- id: G11
+  desc: 时钟同步
+  tier: L1
+  coverage: pending
+
+# ── H. 外部依赖 (10) ──────────────────────────────────────
+- id: H1
+  desc: LLM 不可用
+  tier: L3
+  coverage: covered
+- id: H2
+  desc: LLM 模型下线/变更
+  tier: L1
+  coverage: covered
+- id: H3
+  desc: 外部服务不可用
+  tier: L2
+  coverage: pending
+- id: H4
+  desc: 外部服务慢
+  tier: L2
+  coverage: pending
+- id: H5
+  desc: 外部服务超时
+  tier: L2
+  coverage: pending
+- id: H6
+  desc: 下游消费系统不可用
+  tier: L3
+  coverage: pending
+- id: H7
+  desc: 标准库访问失败
+  tier: L2
+  coverage: pending
+- id: H8
+  desc: 案例库访问失败
+  tier: L2
+  coverage: pending
+- id: H9
+  desc: 配置/密钥过期
+  tier: L2
+  coverage: pending
+- id: H10
+  desc: 外部依赖版本升级
+  tier: L1
+  coverage: pending
+
+# ── I. 状态与一致性 (10) ──────────────────────────────────
+- id: I1
+  desc: crash 后状态未知
+  tier: L1
+  coverage: covered
+- id: I2
+  desc: replay 结果不一致
+  tier: L1
+  coverage: pending
+- id: I3
+  desc: 幂等键冲突
+  tier: L0
+  coverage: covered
+- id: I4
+  desc: 上下文漂移 ContextManifest 冻结
+  tier: L1
+  coverage: covered
+- id: I5
+  desc: 预算跟踪偏差
+  tier: L2
+  coverage: pending
+- id: I6
+  desc: 审计记录缺失
+  tier: L1
+  coverage: covered
+- id: I7
+  desc: 双写不一致
+  tier: L1
+  coverage: pending
+- id: I8
+  desc: 状态机非法迁移
+  tier: L0
+  coverage: tested
+  test: test_invariant_illegal_transition_rejected_and_audited
+  # note: 函数名不含 I8 前缀, 显式声明- id: I9
+  desc: 信号乱序
+  tier: L1
+  coverage: covered
+- id: I10
+  desc: 信号丢失
+  tier: L1
+  coverage: covered
+
+# ── J. 资源与成本 (8) ─────────────────────────────────────
+- id: J1
+  desc: 预算耗尽
+  tier: L3
+  coverage: covered
+- id: J2
+  desc: 配额耗尽
+  tier: L3
+  coverage: covered
+- id: J3
+  desc: 存储耗尽
+  tier: L2
+  coverage: pending
+- id: J4
+  desc: 计算资源不足
+  tier: L2
+  coverage: pending
+- id: J5
+  desc: 成本超预期
+  tier: L3
+  coverage: covered
+- id: J6
+  desc: 长尾成本
+  tier: L3
+  coverage: pending
+- id: J7
+  desc: 重试成本爆炸
+  tier: L3
+  coverage: covered
+- id: J8
+  desc: 资源泄漏
+  tier: L2
+  coverage: pending
+
+# ── K. 治理触发 (7) 🆕 ────────────────────────────────────
+- id: K1
+  desc: 执行中发现标准过时
+  tier: L2
+  coverage: pending
+- id: K2
+  desc: 执行中发现案例误导
+  tier: L2
+  coverage: pending
+- id: K3
+  desc: 执行中发现规则有误
+  tier: L2
+  coverage: pending
+- id: K4
+  desc: 执行中发现审查人配置错
+  tier: L2
+  coverage: pending
+- id: K5
+  desc: 执行中发现已提交决策误判
+  tier: L0
+  coverage: covered
+- id: K6
+  desc: 执行中发现批次系统性误判
+  tier: L0
+  coverage: pending
+- id: K7
+  desc: 执行中发现上游根因误判
+  tier: L0
+  coverage: pending
+
+# ── L. 上下文补充与版本更迭 (16) ─────────────────────────
+- id: L1
+  desc: 注入事实修正
+  tier: L2
+  coverage: covered
+- id: L2
+  desc: 注入约束变更
+  tier: L2
+  coverage: pending
+- id: L3
+  desc: 注入临时注记
+  tier: L2
+  coverage: covered
+- id: L4
+  desc: 注入上游结果修正
+  tier: L2
+  coverage: pending
+- id: L5
+  desc: ContextManifest 版本更迭
+  tier: L1
+  coverage: pending
+- id: L6
+  desc: 已执行节点不回滚
+  tier: L0
+  coverage: tested
+  test: test_L6_注入不改态
+- id: L7
+  desc: 未执行节点用新上下文
+  tier: L0
+  coverage: covered
+- id: L8
+  desc: 进行中节点处理
+  tier: L0
+  coverage: covered
+- id: L9
+  desc: 注入与暂停叠加
+  tier: L2
+  coverage: pending
+  # 注: 组合测试 test_combination_B6_L10_C11 只含 B6/L10/C11, 未直接测 L9
+- id: L10
+  desc: 注入与回溯叠加
+  tier: L2
+  coverage: tested
+  test: test_combination_B6_L10_C11_arbitrary_order
+  # note: 函数名 test_combination_B6_L10_C11, 显式声明
+- id: L11
+  desc: 多次注入冲突
+  tier: L2
+  coverage: pending
+- id: L12
+  desc: 注入过时失效
+  tier: L2
+  coverage: pending
+- id: L13
+  desc: 注入撤销
+  tier: L2
+  coverage: pending
+- id: L14
+  desc: 注入致超预算
+  tier: L3
+  coverage: covered
+- id: L15
+  desc: 注入改变下游路由
+  tier: L2
+  coverage: pending
+- id: L16
+  desc: 注入影响 Specialist 选择
+  tier: L2
+  coverage: pending
+
+# ── M. 中断与节点重做 (14) ───────────────────────────────
+- id: M1
+  desc: 用户要求中断重做
+  tier: L2
+  coverage: pending
+- id: M2
+  desc: 发现参数错中断
+  tier: L0
+  coverage: covered
+- id: M3
+  desc: 发现上下文过期中断
+  tier: L2
+  coverage: pending
+- id: M4
+  desc: 中断在 PREPARE
+  tier: L0
+  coverage: pending
+- id: M5
+  desc: 中断在 EXECUTE
+  tier: L2
+  coverage: pending
+- id: M6
+  desc: 中断在 VALIDATE
+  tier: L2
+  coverage: pending
+- id: M7
+  desc: 重做保留旧结果参考
+  tier: L1
+  coverage: covered
+- id: M8
+  desc: 重做用新参数 vs 旧参数
+  tier: L2
+  coverage: pending
+- id: M9
+  desc: 中断丢弃未提交 draft
+  tier: L0
+  coverage: tested
+  test: test_M9_中断丢弃draft
+- id: M10
+  desc: 中断副作用补偿 Saga
+  tier: L0
+  coverage: covered
+- id: M11
+  desc: 中断单节点 vs 子树
+  tier: L2
+  coverage: pending
+- id: M12
+  desc: 中断与并行兄弟
+  tier: L2
+  coverage: pending
+- id: M13
+  desc: 中断后重做 vs 回溯重做
+  tier: L1
+  coverage: pending
+- id: M14
+  desc: 中断与 checkpoint
+  tier: L1
+  coverage: covered
+
+# ── N. 工作流更改 (17) ──────────────────────────────────
+- id: N1
+  desc: 改参数不改拓扑
+  tier: L2
+  coverage: covered
+- id: N2
+  desc: 改拓扑加节点
+  tier: L2
+  coverage: covered
+- id: N3
+  desc: 改拓扑删节点
+  tier: L2
+  coverage: covered
+- id: N4
+  desc: 改节点 capability
+  tier: L2
+  coverage: pending
+- id: N5
+  desc: 改 Prompt/参数模板
+  tier: L2
+  coverage: covered
+- id: N6
+  desc: 改 review_policy 运行时生效
+  tier: L2
+  coverage: pending
+- id: N7
+  desc: 改依赖关系
+  tier: L2
+  coverage: covered
+- id: N8
+  desc: 改条件分支逻辑
+  tier: L2
+  coverage: covered
+- id: N9
+  desc: 改预算
+  tier: L2
+  coverage: pending
+- id: N10
+  desc: 改执行顺序
+  tier: L2
+  coverage: covered
+- id: N11
+  desc: 已完成节点保留改时
+  tier: L0
+  coverage: covered
+- id: N12
+  desc: 进行中节点如何处理
+  tier: L2
+  coverage: pending
+- id: N13
+  desc: 下游如何感知新 spec
+  tier: L1
+  coverage: covered
+- id: N14
+  desc: 新 PlanVersion 版本管理
+  tier: L1
+  coverage: pending
+- id: N15
+  desc: 部分改 vs 全改
+  tier: L2
+  coverage: covered
+- id: N16
+  desc: 改的审批流程
+  tier: L2
+  coverage: covered
+- id: N17
+  desc: 改后 replay 一致性
+  tier: L1
+  coverage: pending
+
+# ── O. 人工审查 (20) ─────────────────────────────────────
+- id: O1
+  desc: 被动 REQUIRED 强制审查
+  tier: L0
+  coverage: covered
+- id: O2
+  desc: 被动 CONDITIONAL 触发
+  tier: L0
+  coverage: covered
+- id: O3
+  desc: 被动失败 escalate
+  tier: L0
+  coverage: covered
+- id: O4
+  desc: 主动人发起审查某节点
+  tier: L2
+  coverage: pending
+- id: O5
+  desc: 主动人介入审查整批
+  tier: L2
+  coverage: pending
+- id: O6
+  desc: 审查时机执行前
+  tier: L2
+  coverage: pending
+- id: O7
+  desc: 审查时机执行中
+  tier: L2
+  coverage: pending
+- id: O8
+  desc: 审查时机提交后 revoke_approval
+  tier: L0
+  coverage: covered
+- id: O9
+  desc: 审查范围单节点
+  tier: L0
+  coverage: covered
+- id: O10
+  desc: 审查范围子树
+  tier: L2
+  coverage: pending
+- id: O11
+  desc: 审查结论五决策
+  tier: L0
+  coverage: covered
+- id: O12
+  desc: 审查结论 override 强制
+  tier: L0
+  coverage: covered
+- id: O13
+  desc: 审查结论 delegate 转交
+  tier: L0
+  coverage: pending
+- id: O14
+  desc: 审查人变更
+  tier: L0
+  coverage: pending
+- id: O15
+  desc: 审查与暂停叠加
+  tier: L2
+  coverage: pending
+- id: O16
+  desc: 多人会签审查
+  tier: L2
+  coverage: pending
+- id: O17
+  desc: 审查超时无人响应
+  tier: L0
+  coverage: tested
+  test: test_O17_审查超时escalate
+- id: O18
+  desc: 多审查人意见冲突
+  tier: L3
+  coverage: pending
+- id: O19
+  desc: 审查追溯留痕
+  tier: L1
+  coverage: covered
+- id: O20
+  desc: 审查责任归属
+  tier: L1
+  coverage: covered
+
+# ── P. 工作流重新评估 (31) 🆕 ─────────────────────────────
+- id: P1
+  desc: 质量趋势下降触发重评
+  tier: L3
+  coverage: covered
+- id: P2
+  desc: 标准更新触发重评
+  tier: L2
+  coverage: pending
+- id: P3
+  desc: 案例纠错触发重评
+  tier: L2
+  coverage: pending
+- id: P4
+  desc: 批量异常触发重评
+  tier: L0
+  coverage: pending
+- id: P5
+  desc: 根因追溯触发重评
+  tier: L0
+  coverage: pending
+- id: P6
+  desc: 模型漂移触发重评
+  tier: L1
+  coverage: covered
+- id: P7
+  desc: 累计偏差触发重评
+  tier: L3
+  coverage: pending
+- id: P8
+  desc: 外部环境变更触发重评
+  tier: L3
+  coverage: pending
+- id: P9
+  desc: 周期性审计触发重评
+  tier: L1
+  coverage: pending
+- id: P10
+  desc: 抽检发现触发重评
+  tier: L3
+  coverage: pending
+- id: P11
+  desc: 用户投诉触发重评
+  tier: L3
+  coverage: pending
+- id: P12
+  desc: 版本回归触发重评
+  tier: L1
+  coverage: covered
+- id: P13
+  desc: 重评范围单节点
+  tier: L2
+  coverage: covered
+- id: P14
+  desc: 重评范围子树
+  tier: L2
+  coverage: pending
+- id: P15
+  desc: 重评范围整工作流
+  tier: L2
+  coverage: pending
+- id: P16
+  desc: 重评范围跨工作流
+  tier: L1
+  coverage: covered
+- id: P17
+  desc: 重评方法重放重评
+  tier: L1
+  coverage: covered
+- id: P18
+  desc: 重评方法基准对比
+  tier: L3
+  coverage: pending
+- id: P19
+  desc: 重评方法回归测试
+  tier: L3
+  coverage: covered
+- id: P20
+  desc: 重评方法影响面分析
+  tier: L2
+  coverage: covered
+- id: P21
+  desc: 重评时间窗口全历史
+  tier: L1
+  coverage: pending
+- id: P22
+  desc: 重评时间窗口最近N次
+  tier: L1
+  coverage: pending
+- id: P23
+  desc: 重评时间窗口特定时段
+  tier: L1
+  coverage: pending
+- id: P24
+  desc: 重评版本旧标准评历史
+  tier: L1
+  coverage: covered
+- id: P25
+  desc: 重评版本新标准评历史
+  tier: L2
+  coverage: pending
+- id: P26
+  desc: 重评结论维持
+  tier: L2
+  coverage: covered
+- id: P27
+  desc: 重评结论局部修
+  tier: L0
+  coverage: pending
+- id: P28
+  desc: 重评结论全重审
+  tier: L0
+  coverage: pending
+- id: P29
+  desc: 重评结论废弃
+  tier: L2
+  coverage: pending
+- id: P30
+  desc: 重评成本控制
+  tier: L3
+  coverage: pending
+- id: P31
+  desc: 重评优先级排序
+  tier: L3
+  coverage: pending
+
+# ── Q. 经验回流 (25) 🆕 ──────────────────────────────────
+- id: Q1
+  desc: 单次经验回流
+  tier: L1
+  coverage: covered
+- id: Q2
+  desc: 批量经验回流
+  tier: L1
+  coverage: covered
+- id: Q3
+  desc: 成功经验固化
+  tier: L1
+  coverage: covered
+- id: Q4
+  desc: 失败教训回流
+  tier: L1
+  coverage: covered
+- id: Q5
+  desc: 回流注入时机
+  tier: L2
+  coverage: covered
+- id: Q6
+  desc: 回流注入哪个账本
+  tier: L2
+  coverage: covered
+- id: Q7
+  desc: 经验置信度
+  tier: L1
+  coverage: covered
+- id: Q8
+  desc: 经验置信度阈值
+  tier: L3
+  coverage: pending
+- id: Q9
+  desc: 新旧经验冲突
+  tier: L3
+  coverage: pending
+- id: Q10
+  desc: 经验过时淘汰
+  tier: L1
+  coverage: pending
+- id: Q11
+  desc: 经验分级通用
+  tier: L1
+  coverage: covered
+- id: Q12
+  desc: 经验分级特定
+  tier: L1
+  coverage: covered
+- id: Q13
+  desc: 经验副作用污染
+  tier: L2
+  coverage: pending
+- id: Q14
+  desc: 经验回流审批
+  tier: L2
+  coverage: pending
+- id: Q15
+  desc: 跨工作流共享经验
+  tier: L1
+  coverage: covered
+- id: Q16
+  desc: 经验与标准更新联动
+  tier: L2
+  coverage: pending
+- id: Q17
+  desc: 经验与案例纠错联动
+  tier: L2
+  coverage: pending
+- id: Q18
+  desc: 经验与 revoke 联动
+  tier: L2
+  coverage: pending
+- id: Q19
+  desc: 经验回流成本控制
+  tier: L3
+  coverage: pending
+- id: Q20
+  desc: 经验影响模型路由
+  tier: L3
+  coverage: pending
+- id: Q21
+  desc: 经验影响 Specialist 选择
+  tier: L3
+  coverage: pending
+- id: Q22
+  desc: 经验影响工具选择
+  tier: L3
+  coverage: pending
+- id: Q23
+  desc: 经验版本管理
+  tier: L1
+  coverage: pending
+- id: Q24
+  desc: 经验可解释性
+  tier: L1
+  coverage: pending
+- id: Q25
+  desc: 经验审计
+  tier: L1
+  coverage: covered
+
+# ── R. 前沿设计思想 (24+18) 🆕 ───────────────────────────
+# R 类是设计参考非执行情况, 标记借鉴状态而非测试覆盖
+- id: R1
+  desc: ReWOO 单脚本编排
+  tier: L0
+  coverage: pending
+- id: R2
+  desc: Speculative Execution
+  tier: L0
+  coverage: pending
+- id: R3
+  desc: Plan-and-Execute
+  tier: L0
+  coverage: pending
+- id: R4
+  desc: Reflexion
+  tier: L0
+  coverage: pending
+- id: R5
+  desc: Constitutional AI
+  tier: L0
+  coverage: pending
+- id: R6
+  desc: Generative Agents Memory
+  tier: L0
+  coverage: pending
+- id: R7
+  desc: Agentic Workflow
+  tier: L0
+  coverage: pending
+- id: R8
+  desc: 工作流版本迁移
+  tier: L1
+  coverage: pending
+- id: R9
+  desc: ContinueAsNew
+  tier: L1
+  coverage: pending
+- id: R10
+  desc: 工作流 Reset
+  tier: L1
+  coverage: pending
+- id: R11
+  desc: Determinism
+  tier: L1
+  coverage: pending
+- id: R12
+  desc: Agentic RAG
+  tier: L0
+  coverage: pending
+- id: R13
+  desc: Eval Driven
+  tier: L0
+  coverage: pending
+- id: R14
+  desc: 工作流即状态机
+  tier: L0
+  coverage: pending
+- id: R15
+  desc: 事件溯源 CQRS
+  tier: L1
+  coverage: pending
+- id: R16
+  desc: 背压限流
+  tier: L2
+  coverage: pending
+- id: R17
+  desc: 快照隔离
+  tier: L1
+  coverage: pending
+- id: R18
+  desc: ToolEffect Ledger
+  tier: L1
+  coverage: pending
+- id: R19
+  desc: DynamicWorkflow
+  tier: L0
+  coverage: pending
+- id: R20
+  desc: max_agent_calls 预算硬上限
+  tier: L3
+  coverage: pending
+- id: R21
+  desc: defer 加载保护 cache
+  tier: L0
+  coverage: pending
+- id: R22
+  desc: CodeMode 工具收口
+  tier: L0
+  coverage: pending
+- id: R23
+  desc: ACP Agent Client Protocol
+  tier: L0
+  coverage: pending
+- id: R24
+  desc: 小模型编排分工
+  tier: L0
+  coverage: pending
+
+# ── S. 跨工作流编排与长跑 (15) ───────────────────────────
+- id: S1
+  desc: 子工作流调用
+  tier: L2
+  coverage: pending
+- id: S2
+  desc: 子工作流失败传播
+  tier: L2
+  coverage: pending
+- id: S3
+  desc: 子工作流取消波及父
+  tier: L2
+  coverage: pending
+- id: S4
+  desc: 工作流组合
+  tier: L2
+  coverage: pending
+- id: S5
+  desc: 长跑 checkpoint
+  tier: L1
+  coverage: covered
+- id: S6
+  desc: 长跑状态持久化
+  tier: L1
+  coverage: covered
+- id: S7
+  desc: 长跑内存控制
+  tier: L2
+  coverage: covered
+- id: S8
+  desc: 长跑信号累积
+  tier: L1
+  coverage: pending
+- id: S9
+  desc: 长跑事件归档
+  tier: L1
+  coverage: pending
+- id: S10
+  desc: 跨工作流共享状态
+  tier: L1
+  coverage: pending
+- id: S11
+  desc: 工作流版本升级
+  tier: L1
+  coverage: pending
+- id: S12
+  desc: 旧版本兼容
+  tier: L1
+  coverage: pending
+- id: S13
+  desc: 版本升级时旧 Run 用旧还是新 spec
+  tier: L1
+  coverage: pending
+- id: S14
+  desc: 工作流迁移
+  tier: L1
+  coverage: pending
+- id: S15
+  desc: 工作流废弃
+  tier: L1
+  coverage: pending
+
+# ── T. 安全合规与可观测 (14) ─────────────────────────────
+- id: T1
+  desc: 敏感数据进 LLM 脱敏
+  tier: L3
+  coverage: pending
+- id: T2
+  desc: 权限控制 RBAC
+  tier: L2
+  coverage: covered
+- id: T3
+  desc: 审计日志
+  tier: L1
+  coverage: covered
+- id: T4
+  desc: 可观测性 metrics
+  tier: L1
+  coverage: covered
+- id: T5
+  desc: 可观测性 tracing
+  tier: L1
+  coverage: covered
+- id: T6
+  desc: 告警
+  tier: L1
+  coverage: pending
+- id: T7
+  desc: 合规报告
+  tier: L1
+  coverage: covered
+- id: T8
+  desc: 数据保留策略
+  tier: L1
+  coverage: pending
+- id: T9
+  desc: 数据销毁
+  tier: L1
+  coverage: pending
+- id: T10
+  desc: 访问日志
+  tier: L1
+  coverage: pending
+- id: T11
+  desc: 速率限制
+  tier: L2
+  coverage: pending
+- id: T12
+  desc: 防重放
+  tier: L0
+  coverage: pending
+- id: T13
+  desc: 输入消毒
+  tier: L0
+  coverage: pending
+- id: T14
+  desc: 输出过滤
+  tier: L0
+  coverage: covered
+
+# ── U. 启动前边界态 (8) ───────────────────────────────────
+- id: U1
+  desc: 工作流不存在
+  tier: L0
+  coverage: covered
+- id: U2
+  desc: 权限不足
+  tier: L2
+  coverage: pending
+- id: U3
+  desc: 依赖能力未注册
+  tier: L0
+  coverage: pending
+- id: U4
+  desc: 预算未配或不足
+  tier: L0
+  coverage: covered
+- id: U5
+  desc: 输入数据校验不过
+  tier: L0
+  coverage: covered
+- id: U6
+  desc: spec 与代码版本不匹配
+  tier: L1
+  coverage: pending
+- id: U7
+  desc: 资源预检失败
+  tier: L2
+  coverage: pending
+- id: U8
+  desc: 冻结版本冲突
+  tier: L1
+  coverage: pending
+
+# ── V. 交付后与终态边界态 (10) ───────────────────────────
+- id: V1
+  desc: 结果交付失败
+  tier: L3
+  coverage: pending
+- id: V2
+  desc: 交付格式转换
+  tier: L2
+  coverage: pending
+- id: V3
+  desc: 下游拒收结果
+  tier: L3
+  coverage: pending
+- id: V4
+  desc: 交付回执缺失
+  tier: L3
+  coverage: pending
+- id: V5
+  desc: 终态清理
+  tier: L2
+  coverage: pending
+- id: V6
+  desc: 临时 artifact 归档
+  tier: L1
+  coverage: pending
+- id: V7
+  desc: 终态导出报告
+  tier: L1
+  coverage: covered
+- id: V8
+  desc: 终态经验回流触发
+  tier: L1
+  coverage: covered
+- id: V9
+  desc: 终态成功但质量存疑
+  tier: L3
+  coverage: pending
+- id: V10
+  desc: 部分完成即交付
+  tier: L2
+  coverage: pending

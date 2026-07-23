@@ -65,12 +65,11 @@ class UploadImageToDatasetTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "上传图片到标注平台数据集。\n"
-            "**何时使用**：需要将当前会话的图片上传到 Label Studio 数据集进行标注。\n"
+            "上传当前会话的图片到标注平台数据集。\n"
+            "**标注流程中的位置**：第 3 步（在 list_datasets → get_dataset 之后，create_job 之前）。\n"
             "**用法**：传 image_ref（格式 PENDING:session_id:index）+ "
-            "version_id（从 get_dataset 的 latestVersionId 获取）。\n"
-            "**注意**：不要尝试直接调 MCP upload_images（需要 base64，你拿不到），"
-            "用本工具即可，内部自动从 ImageStore 取图。"
+            "version_id（从上一步 get_dataset 的 latestVersionId 获取）。\n"
+            "**注意**：不要直接调 MCP upload_images（需要 base64，你拿不到），用本工具即可。"
         )
 
     @property

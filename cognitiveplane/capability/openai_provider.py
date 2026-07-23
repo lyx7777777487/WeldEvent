@@ -75,10 +75,11 @@ class OpenAIProvider(LLMProvider):
 
         self._ensure_client()
         model = request.model or self._config.resolve_model(request.purpose)
+        messages = self._build_messages(request, model)
         try:
             kwargs = dict(
                 model=model,
-                messages=self._inject_json_hint(request),
+                messages=messages,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
                 top_p=request.top_p,
@@ -193,6 +194,51 @@ class OpenAIProvider(LLMProvider):
                 return await self._fallback_complete(request, str(e))
             raise
 
+    def _build_messages(self, request: LLMRequest, model: str) -> list[dict]:
+        """Op 36: 构造 messages - JSON hint + prompt-prefix cache_control.
+
+        DeepSeek/OpenAI 后端服务端自动缓存(客户端无需声明); 仅 Anthropic
+        Claude 后端需显式 cache_control 标记前缀. 按模型名分发, 避免给不支持
+        的后端塞非法字段导致 API 报错.
+        """
+        messages = self._inject_json_hint(request)
+        if request.cache_prefix_tokens and model.startswith("claude"):
+            messages = self._apply_cache_control(messages, request.cache_prefix_tokens)
+        if request.cache_prefix_tokens:
+            logger.debug(
+                "cache_prefix_tokens=%d model=%s (%s)",
+                request.cache_prefix_tokens, model,
+                "cache_control injected" if model.startswith("claude")
+                else "server-side auto-cache",
+            )
+        return messages
+
+    def _apply_cache_control(
+        self, messages: list[dict], prefix_tokens: int,
+    ) -> list[dict]:
+        """Op 36: 给稳定前缀消息打 Anthropic cache_control 标记.
+
+        仅 Claude 后端生效(由 _build_messages 按模型名门控).
+        从前往后累加 content 估算 token 数(//4 近似), 标记覆盖 prefix_tokens
+        的消息; Anthropic 推荐标记最后一个前缀消息, 故 boundary 处也打标.
+        """
+        out: list[dict] = []
+        accumulated = 0
+        boundary = len(messages)
+        for i, msg in enumerate(messages):
+            accumulated += len(str(msg.get("content", ""))) // 4
+            if accumulated >= prefix_tokens:
+                boundary = i + 1
+                break
+        for i, msg in enumerate(messages):
+            if i < boundary:
+                m = dict(msg)
+                m["cache_control"] = {"type": "ephemeral"}
+                out.append(m)
+            else:
+                out.append(msg)
+        return out
+
     @staticmethod
     def _inject_json_hint(request: LLMRequest) -> list[dict]:
         """When JSON output is requested, ensure the prompt mentions JSON.
@@ -271,7 +317,7 @@ class OpenAIProvider(LLMProvider):
         model = request.model or self._config.resolve_model(request.purpose)
         stream = await self._client.chat.completions.create(
             model=model,
-            messages=request.messages,
+            messages=self._build_messages(request, model),
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stream=True,

@@ -12,6 +12,7 @@ Extracted from react.py. Contains:
 import json
 import logging
 from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
 
 from cognitiveplane.control.skills import Skill
@@ -22,6 +23,90 @@ if TYPE_CHECKING:
     from cognitiveplane.control.deps import CognitiveDependencies
     from cognitiveplane.control.event_log import EventLog
     from cognitiveplane.interaction.workflow_events import WorkflowEventBus
+
+
+
+# ── Op 10: AgentWorkPlan + cache boundary (Op 36) ──
+# Source: Claude Code cache-tail reminder + Anthropic prompt caching API (2024)
+# The plan is injected at the TAIL of the system prompt to keep the
+# cache prefix stable. NOT in durable history - rebuilt each run() call.
+
+CACHE_BOUNDARY_MARKER = "<!-- weldevent:cache_boundary -->"
+
+
+@dataclass
+class AgentWorkPlan:
+    """Op 10: Runtime work plan injected at prompt tail (cache-tail reminder).
+
+    Source: Claude Code cache-tail reminder + Anthropic prompt caching API.
+
+    This is NOT durable history -- it is rebuilt from session state on each
+    run() call and injected at the END of the system prompt. By placing
+    dynamic content at the tail, the cache prefix (stable sections before
+    the CACHE_BOUNDARY_MARKER) stays identical across calls, enabling
+    Anthropic prompt caching cache hits (cached tokens billed at 10%).
+
+    Fields are intentionally simple -- the LLM uses this as a reminder of
+    what it's working on and what to do next, not as a rigid plan.
+    """
+    objective: str = ""
+    current_step: str = ""
+    next_actions: list[str] = field(default_factory=list)
+    context_hint: str = ""
+
+    def to_prompt_section(self) -> str:
+        """Render as a prompt section for injection at the system prompt tail."""
+        lines = ["## 当前工作计划 (AgentWorkPlan)\n"]
+        if self.objective:
+            lines.append(f"**目标**: {self.objective}")
+        if self.current_step:
+            lines.append(f"**当前步骤**: {self.current_step}")
+        if self.next_actions:
+            lines.append("\n**下一步**:")
+            for action in self.next_actions[:5]:
+                lines.append(f"- {action}")
+        if self.context_hint:
+            lines.append(f"\n**上下文提示**: {self.context_hint}")
+        return "\n".join(lines)
+
+
+def build_work_plan_from_session(session: dict[str, Any] | None) -> AgentWorkPlan:
+    """Build an AgentWorkPlan from session state.
+
+    Extracts the current objective, step, and next actions from session data.
+    Returns an empty plan if no relevant session state exists.
+    """
+    if not session:
+        return AgentWorkPlan()
+
+    plan = AgentWorkPlan()
+
+    # Objective from user input or session
+    user_msg = session.get("last_user_input", "")
+    if user_msg:
+        plan.objective = str(user_msg)[:200]
+
+    # Current step from notes
+    notes = session.get("notes", [])
+    if notes:
+        plan.current_step = str(notes[-1])[:200]
+
+    # Next actions from current_plan
+    current_plan = session.get("current_plan")
+    if current_plan and isinstance(current_plan, dict):
+        wf_id = current_plan.get("workflow_id", "")
+        if wf_id:
+            plan.next_actions.append(f"launch_workflow(workflow_id={wf_id})")
+        plan.context_hint = f"已有工作流方案: {current_plan.get('objective', '?')}"
+
+    # Workflow status
+    wf_status = session.get("workflow_status")
+    if wf_status and isinstance(wf_status, dict):
+        state = wf_status.get("state", "")
+        if state:
+            plan.context_hint += f" | 工作流状态: {state}"
+
+    return plan
 
 
 # Plan §5.1 line 894-902: Worldview files to auto-inject
@@ -101,6 +186,66 @@ def _build_activity_catalog_section() -> str:
         "- on_failure 默认 'retry'，关键节点可显式设为 'escalate'\n"
     )
 
+
+def _build_governance_section() -> str:
+    """Build governance intervention section - 教 LLM 把自然语言意图映射到 governance action.
+
+    这是"用自然语言介入工作流"的最后一公里: 工具已接好(control_workflow 的 7 个
+    governance action), 但 LLM 需要知道自己有这能力 + 意图->action 的映射规则,
+    否则用户说"把这个批次扣住"时 LLM 不会想到调 control_workflow(action="batch_hold").
+
+    设计原则:
+      - 用业务语言描述 (不暴露 sig_type/batch_signals 等内部词)
+      - 区分易混淆意图 (暂停 vs 扣留 vs 撤回)
+      - 标明哪些需确认门 (agent 提议后架构会弹确认卡等用户拍板)
+    """
+    return (
+        "# 工作流人工干预 (Governance)\n\n"
+        "当工作流正在运行时，用户可能用自然语言要求干预执行过程。"
+        "你应把用户的意图映射到 `control_workflow` 工具的对应 action。"
+        "**工作流界面只展示，不操作——所有干预都通过你在对话中发起。**\n\n"
+        "## 意图映射表\n\n"
+        "| 用户说的话 | action | 关键参数 | 说明 |\n"
+        "|:---|:---|:---|:---|\n"
+        "| \"工作流到哪了\" / \"进度怎样\" | `query` | workflow_id | 查询当前进度 |\n"
+        "| \"暂停一下\" / \"停一下\" | `pause` | workflow_id | 暂停整个工作流 |\n"
+        "| \"继续\" / \"恢复\" | `resume` | workflow_id | 恢复暂停的工作流 |\n"
+        "| \"取消工作流\" | `cancel` | workflow_id | 终止整个工作流 |\n"
+        "| \"只暂停X工位/节点\" / \"X暂停其他继续\" | `pause_scope` | scope_type=station, scope_id=节点ID | 分级暂停，其余继续 |\n"
+        "| \"这个批次扣住别动\" / \"可疑批次待查\" | `batch_hold` | batch_id | 批次冻结，隔离结果不阻塞其他批次 |\n"
+        "| \"标签标错了重新标\" / \"标注错了但结果没问题\" | `relabel_request` | node_id, original_label, corrected_label | 只回标注环节，复用执行结果 |\n"
+        "| \"让X来审\" / \"换个人审查\" | `delegate_review` | target, new_reviewer_id | 转移审查权 |\n"
+        "| \"标准升级了\" / \"D1.1出新版了\" | `standard_update` | standard_id, old_version, new_version | 登记标准更新，标记历史判定待复查 |\n"
+        "| \"这个判定撤回\" / \"刚批的作废重跑\" | `revoke_approval` | node_id, revoker_id, reason | **[需确认]** 撤回已批准，下游重跑 |\n"
+        "| \"这块我拍板是NG\" / \"质检员说这条算不合格\" | `ground_truth_override` | node_id, inspector_id, forced_verdict | **[需确认]** 质检员强制覆盖机器裁决 |\n"
+        "| \"这个案例库错了\" / \"历史案例有误\" | `case_library_correction` | case_id, error_type, correction | **[需确认]** 纠正案例库，波及未来所有引用 |\n\n"
+        "## 参数取值指引\n\n"
+        "governance action 的关键参数怎么取值:\n\n"
+        "- **batch_id** (batch_hold): 焊检域里**批次 = case_id**。即 launch_workflow 时传入的 case_id，或用户消息上下文里的 case 标识。用户说\"这个批次\"时，指当前 case_id。\n"
+        "- **node_id** (pause_scope scope_id / revoke_approval / relabel_request / ground_truth_override): 节点 ID。先调 control_workflow(action=\"query\", workflow_id=...) 拿到节点列表，再选用户要干预的节点。用户说\"这个节点\"时先 query 拿列表。\n"
+        "- **scope_type + scope_id** (pause_scope): station 时 scope_id=node_id；batch 时 scope_id=batch_id(=case_id)；workflow 时 scope_id=workflow_id。\n"
+        "- **workflow_id**: 当前对话中已启动的工作流 ID。先 query 确认，或从 launch_workflow 结果取。\n\n"
+        "**重要 - 参数提取规则**:\n"
+        "1. 如果用户要干预但没说具体 ID，先调 control_workflow(action=\"query\", workflow_id=...) 查出当前节点/批次信息，再决定 action 参数。不要因为缺少 ID 就放弃干预。\n"
+        "2. 用户消息里**明确提到的编号要直接填进对应参数**，不要留空：\n"
+        "   - 用户说\"批次 B-12\" / \"批次 weld-batch-008\" / \"case xxx\" -> 直接填入 batch_id=\"B-12\" (或对应值)\n"
+        "   - 用户说\"节点 n-3\" / \"weld_iqa 工位\" -> 先 query 拿节点列表，匹配后填入 node_id/scope_id\n"
+        "   - 用户说\"工作流 wf-xxx\" -> 直接填入 workflow_id\n"
+        "3. 当前会话的 case_id 通常是 batch_id 的来源（焊检域 batch=case）。如果用户说\"这个批次\"而没给编号，用当前 case_id 作为 batch_id。\n"
+        "4. **用户消息里出现的任何批次/节点名称都要填进参数，不要留空**：用户说\"批次 default\" -> batch_id=\"default\"；说\"批次 B-12\" -> batch_id=\"B-12\"；说\"weld_iqa 工位\" -> scope_id=\"weld_iqa\"。即使看起来像普通词(default/weld_iqa)，只要用户用它指代干预对象，就必须填进对应参数。\n\n"
+        "## 易混淆意图区分\n\n"
+        "- **暂停 vs 扣留**: 暂停(pause_scope)是停止执行；扣留(batch_hold)是隔离结果但继续跑其他批次。"
+        "用户说\"扣住\"/\"扣留\"/\"待查\" -> batch_hold；说\"停\"/\"暂停\" -> pause_scope 或 pause。\n"
+        "- **撤回 vs 重做**: 撤回(revoke_approval)针对已批准的节点(已提交)；重做(rework_node)针对未提交的节点。"
+        "用户说\"刚批的作废\" -> revoke_approval；说\"这个重跑\" -> 用 rework_node。\n"
+        "- **重新标注 vs 重做节点**: 重新标注(relabel_request)只回标注环节、保留执行结果；重做节点(rework_node)整个重跑。"
+        "用户说\"标签错了但结果对\" -> relabel_request；说\"这个节点整个重来\" -> rework_node。\n\n"
+        "## 确认门 [需确认] 的 action\n\n"
+        "标 **[需确认]** 的三个 action (revoke_approval / ground_truth_override / case_library_correction) "
+        "是不可逆或责任敏感的操作。你调这些 action 时，架构会自动弹出确认卡片让用户拍板——"
+        "用户确认后才真正执行。你不需要自己问用户确认，架构会处理。"
+        "但你要在发起前用一句话告诉用户你打算做什么、为什么。\n"
+    )
 
 def _format_case_brief(context: ContextSnapshot) -> str | None:
     """Format CASE_BRIEF from ContextSnapshot. Return None if context is empty."""
@@ -375,16 +520,19 @@ class SystemPromptBuilder:
         context: ContextSnapshot,
         session: dict[str, Any],
         skill: Skill | None = None,
+        work_plan: AgentWorkPlan | None = None,
     ) -> list[dict[str, str]]:
         """Build system prompt — 精简版，对齐 Claude Code 风格。
 
         核心理念：Base prompt 只定义角色+核心原则，场景规则全部放在
         Skill MD 文件和工具 description 中，按需注入不塞满上下文。
         """
-        allowed_tools = skill.allowed_tools if skill else None
+        # Modernized: main agent sees all phase-visible tools regardless of skill.
+        # skill only injects specialized prompt; it does NOT restrict tool access.
+        # (Aligned with Claude Code / Codex progressive disclosure pattern)
         tools_desc = "\n".join(
             f"- {name}: {self._tools.get_tool(name).description}"
-            for name in self._tools.list_llm_tools(allowed_tools=allowed_tools)
+            for name in self._tools.list_llm_tools()
             if self._tools.get_tool(name) is not None
         )
 
@@ -393,6 +541,8 @@ class SystemPromptBuilder:
         # ── 1. 场景专业化指令（SubAgent override 或 Skill MD 注入）──
         # SubAgent 运行时 skill=None，专业化 prompt 从 session["subagent"] 读取；
         # 主 Agent 运行时无 subagent 配置，从 skill.system_prompt 读取。
+        # 注入时带 token 预算控制：默认上限 6000 chars，防止大 skill 挤压对话上下文。
+        SKILL_PROMPT_MAX_CHARS = 6000
         subagent_cfg = session.get("subagent") if session else None
         subagent_override = (
             subagent_cfg.get("system_prompt_override")
@@ -400,9 +550,14 @@ class SystemPromptBuilder:
             else None
         )
         if subagent_override:
+            if len(subagent_override) > SKILL_PROMPT_MAX_CHARS:
+                subagent_override = subagent_override[:SKILL_PROMPT_MAX_CHARS] + "\n\n... (截断: 专业化指令过长)"
             sections.append(subagent_override)
         elif skill is not None and skill.system_prompt:
-            sections.append(skill.system_prompt)
+            skill_prompt = skill.system_prompt
+            if len(skill_prompt) > SKILL_PROMPT_MAX_CHARS:
+                skill_prompt = skill_prompt[:SKILL_PROMPT_MAX_CHARS] + "\n\n... (截断: skill prompt 过长)"
+            sections.append(skill_prompt)
 
         # ── 2. Worldview（项目规约/操作员偏好/当前Case/历史记忆）──
         worldview, injected_meta = await self._worldview_builder.build_section(context)
@@ -410,13 +565,23 @@ class SystemPromptBuilder:
             sections.append(worldview)
             record_worldview_injection(self._event_log, injected_meta)
 
-        # ── 2.5 项目诊断状态注入（对齐 §17.12 回答改变决策）──
+        # ── 3. L3 Activity Catalog（编排能力边界）── [stable: before cache boundary]
+        sections.append(_build_activity_catalog_section())
+
+        # ── 3.5 Governance 干预能力（意图映射）── [stable: before cache boundary]
+        # 教 LLM 把自然语言意图映射到 control_workflow 的 governance action.
+        sections.append(_build_governance_section())
+
+        # ── Op 10/36: Cache boundary marker ──
+        # Sections above this marker are stable across calls (cache prefix).
+        # Sections below are dynamic (rebuilt each run() call = cache tail).
+        # Provider can use this marker to set cache_control on the prefix.
+        sections.append(CACHE_BOUNDARY_MARKER)
+
+        # ── 2.5 项目诊断状态注入（对齐 §17.12 回答改变决策）── [dynamic: after boundary]
         project_state = self._build_project_state_section(session)
         if project_state:
             sections.append(project_state)
-
-        # ── 3. L3 Activity Catalog（编排能力边界）──
-        sections.append(_build_activity_catalog_section())
 
         # ── 4. Plan 持久化（已设计方案，防止重复设计）──
         current_plan = session.get("current_plan") if session else None
@@ -481,101 +646,58 @@ class SystemPromptBuilder:
                     "| **诊断类** | \"能不能做自动质检\"\"这个项目怎么搞\"\"帮我看看\" | 进入项目诊断流程，逐轮追问，不直接给答案 |\n"
                     "| **反馈类** | 用户对上一步结果的修正、补充、否定 | 更新已确认事实，调整路线，不要忽略 |\n\n"
                     "**关键区分**：诊断类 ≠ 执行类。用户说\"能不能做\"不是在要求你\"现在就做\"。\n\n"
-                    "## 何时询问用户 — 决策分叉模型\n\n"
-                    "你被赋予了\"不确定时主动询问\"的职责。这不是弱智的表现，而是工业场景的必要安全网。\n"
-                    "在以下情况，**你必须停下来用 `request_confirmation` 弹窗问用户**，不要静默猜测：\n\n"
-                    "1. **意图有歧义** — 用户的话有两种以上合理解释。呈现选项让用户选，不要替用户拍板。\n"
-                    "2. **关键业务参数缺失** — 作业名、标签 schema、标注员、质检范围、验收阈值等\n"
-                    "   业务参数必须由用户提供。不要硬编码默认值。\n"
-                    "3. **遇到决策分叉点** — 存在多条可行路线且各有取舍时，给出你的建议 + 选项\n"
-                    "   让用户决策。例如：\"只做 IQA 还是 IQA+PPA 全流程？\"\"用现有数据集还是新建？\"\n"
-                    "4. **LLM 知识不足** — 先查内部知识库（search_standards/search_cases/\n"
-                    "   search_vision_knowledge/search_reasoning_knowledge，1-2次），仍不足时调\n"
-                    "   web_search 联网查证（1次），还不够再弹窗问用户。不要用不同 query 穷举式反复查同一工具。\n"
-                    "5. **用户回答暴露新风险** — 用户说\"标准在老师傅脑子里\"\"数据没有批次信息\"\n"
-                    "   等阻断性信息时，不要假装没问题继续推进，要停下来确认应对方案。\n\n"
-                    "### 何时不需要询问\n\n"
-                    "- 信息类查询（list_datasets/get_job 等）直接调，不要问\"我可以查吗\"\n"
-                    "- 架构 approval gate 拦截的工具（launch_workflow/create_job/upload_images/\n"
-                    "  create_task/trigger_ai/assign_task），直接调用即可，架构会自动弹窗让用户确认。\n"
-                    "  **不要在调这些工具前再调 request_confirmation 问\"是否执行\"——会双重弹窗。**\n"
-                    "- 同一会话已问过的问题不重复问（已确认事实记在 session notes / case_data 中）\n"
-                    "- 能用工具自己查到的信息不问用户\n\n"
-                    "### 询问时的姿态\n\n"
-                    "- **每次只问最关键的一个问题** — 按优先级逐轮追问，不要一次性列出 10 个问题\n"
-                    "- **给出你的建议** — 选项中第一个应是你的推荐方案，并说明推荐理由\n"
-                    "- **允许用户输入自由意见** — 弹窗包含文本输入框，用户可输入选项之外的内容\n"
-                    "- **声明你的假设** — 如果你决定基于某种假设行动，先说明假设，\n"
-                    "  让用户有机会否决。例如：\"我先假设你只需要焊缝外观检测，如果还需要尺寸测量请告诉我。\"\n\n"
-                    "### 询问节奏硬约束（防止体验轰炸）\n\n"
-                    "**绝对禁止以下行为**：\n"
-                    "1. 在一个 request_confirmation 里塞多个问题（如\"产品是什么？标准是什么？数据有多少？\"）——\n"
-                    "   每次只问一个维度，用户回答后再决定下一个问题。\n"
-                    "2. 选项中嵌套子问题（如\"焊接件 — 你做的是平板焊还是角焊？\"）——\n"
-                    "   选项只能是简短的选择项（2-6字），不能是复合问句。\n"
-                    "3. 同一轮 ReAct 里连续调 2 次以上 request_confirmation ——\n"
-                    "   问完一个问题拿到答案后，应先基于已有信息推进或给初步诊断，\n"
-                    "   再决定是否需要问下一个。\n"
-                    "4. 在用户刚回答完一个问题后立即追问同一维度的新问题 ——\n"
-                    "   应先确认\"已收到你的回答：X\"，给一句简短判断或下一步说明，\n"
-                    "   再问下一个。\n\n"
-                    "**正确的询问节奏**：问1个问题 → 收到答案 → 给一句话反馈/初步判断 →\n"
-                    "推进到能推进的步骤 → 确实缺下一个关键信息时再问。每两次询问之间\n"
-                    "至少穿插一个工具调用或一段分析，让用户感受到进展而非审问。\n\n"
-                    "## 思考框架（基线逻辑 — 回答任何问题都遵循）\n\n"
-                    "以下逻辑来自工业质检 Agent 决策报告，是处理任何请求的思考基线。\n"
-                    "问题可能不同，但思考方式必须一致。\n\n"
-                    "### 第一原则：不把用户的问题直接翻译成模型任务\n\n"
-                    "用户说\"帮我识别不良品\"\"判断焊缝合不合格\"\"看看有没有缺陷\"时，\n"
-                    "不能立刻回答\"用 YOLO\"\"用分类模型\"\"用异常检测\"。这些表达还没定义清楚：\n"
-                    "合格边界是什么？缺陷是否可测量？是否有灰区？漏检和误检代价是否相同？\n"
-                    "数据中是否真的包含缺陷？是否有历史判定结果可作弱标签？\n"
-                    "你的第一职责是把模糊业务需求拆成可执行问题。\n\n"
-                    "### 标准优先序：判定标准 → 标注标准 → 模型标准\n\n"
-                    "三类标准不能混在一起：\n"
-                    "- **业务判定标准**（什么算合格/返修/报废/让步接收）— 质检负责人主导\n"
-                    "- **标注执行标准**（标注员看到图像该标什么类别、框哪里）— Agent+专家+标注负责人\n"
-                    "- **模型验收标准**（漏检率/误检率/召回率/节拍/稳定性）— 业务+算法负责人\n\n"
-                    "业务判定标准不清 → 标注标准漂移 → 模型学习噪声。\n"
-                    "不要跳过标准直接做标注或训练。\n\n"
-                    "### 四种动作切换 — 判断当前最缺什么\n\n"
-                    "| 动作 | 使用时机 | 对应能力 |\n"
-                    "|:-----|:---------|:---------|\n"
-                    "| 咨询用户 | 业务背景/风险/标准/资源不清 | request_confirmation |\n"
-                    "| 理解数据 | 数据质量/分布/缺陷比例不清 | delegate('data-understanding') 或 analyze_image |\n"
-                    "| 外部查证 | 标准/行业缺陷定义/相似方案不清 | 内部知识库 → web_search |\n"
-                    "| 决策推进 | 信息足够时 | design_workflow/launch_workflow 或直接给方案 |\n\n"
-                    "成熟 Agent 不应一直问、不应一直查、不应一直做实验。判断瓶颈在哪，选对应动作。\n\n"
-                    "### 动态循环决策 — 每次获取信息后做四步判断\n\n"
-                    "拿到用户回答/工具结果/查证资料后，不要直接推进，先做四步判断：\n"
-                    "1. **补齐前提？** — 这个回答是否补齐了当前阶段缺失的前提条件？\n"
-                    "2. **暴露阻断？** — 是否暴露阻断性问题（标准在老师傅脑子里、数据无批次信息）？\n"
-                    "   阻断则回退到标准/数据探索阶段。\n"
-                    "3. **改变路线？** — 是否改变后续技术路线（如缺陷率<1% 改走异常检测）？\n"
-                    "4. **预防后续？** — 是否预判后续风险（标注一致性不足、部署环境变化）？\n\n"
-                    "信息不足时坚决回退，不要硬推。标准不清不做标注，数据没体检不定模型路线。\n\n"
+                    "## 何时询问用户\n\n"
+                    "**当专业 Skill 处于激活状态时，Skill 的交互规则优先于本节的默认规则。**\n"
+                    "如果 Skill 要求\"每步都询问用户\"，则必须遵循，即使你认为可以合理假设。\n\n"
+                    "**无 Skill 或通用模式时**，优先用工具查询获取信息，查不到的再问用户。\n"
+                    "以下情况应主动弹窗询问：\n"
+                    "1. 关键业务参数缺失且无法合理推断（如作业名、标签集、标注员、标准来源）\n"
+                    "2. 存在多条路线且各有重大取舍（如只做IQA vs 全流程）\n"
+                    "3. 用户的回答暴露了阻断性问题（如标准在老师傅脑子里）\n"
+                    "4. 设计方案时，每个关键决策点都应停下来让用户确认\n\n"
+                    "**不需要问的情况**：\n"
+                    "- 能用工具查到的信息直接查，不要问用户\n"
+                    "- 架构 approval gate 拦截的工具直接调，架构自动弹窗确认，不要在调之前再调 request_confirmation\n"
+                    "- 同一会话已问过的问题不重复问\n\n"
+                    "每次只问最关键的一个问题。问完 -> 收到答案 -> 给一句话反馈 -> 推进。\n\n"
+                    "## 渐进式方案设计 — 禁止一次性输出完整方案\n\n"
+                    "当用户要求设计质检方案、标注方案、工作流时，**绝对不要一次性输出完整方案**。\n"
+                    "信息缺失时，逐轮收集、逐轮确认，每一步都停下来让用户确认关键决策。\n\n"
+                    "**禁止的行为**：\n"
+                    "- ❌ 用户说\"帮我设计一个质检方案\"，你直接输出一个包含所有节点的工作流\n"
+                    "- ❌ 用户说\"帮我标注\"，你直接说\"好的，我帮你创建作业、上传图片、分配任务\"而不调任何工具\n"
+                    "- ❌ 在未确认标准/标签/数据集/标注员之前就 design_workflow 或 create_job\n\n"
+                    "**正确的做法**：\n"
+                    "- 先调工具查看现状（list_datasets / search_standards / analyze_image 等）\n"
+                    "- 展示结果后，用 request_confirmation 问用户下一步决策\n"
+                    "- 收到答案后再推进，每轮只推进一个步骤\n"
+                    "- 原则：**先看、再问、再创建。不要猜、不要跳、不要一把梭。**\n\n"
                     "## 何时委派 subagent\n\n"
-                    "主 agent 不必自己做所有事。以下场景应 delegate 给专用 subagent：\n"
-                    "- **数据理解/体检** → delegate('data-understanding')：数据集级统计分析、\n"
-                    "  分布探索、标签质量评估。脏数据不要直接进标注。\n"
-                    "- **复杂工作流设计** → delegate('weld-architect')：多节点编排、\n"
-                    "  依赖关系复杂的流程设计\n"
-                    "- **标注质量审查** → delegate('weld-reviewer')：标注完成后的一致性检查、\n"
-                    "  置信度评估\n"
-                    "- **并行信息搜索** → delegate('weld-explorer')：需同时查多个数据源时\n\n"
-                    "判断标准：子任务需要多轮工具调用+独立上下文+专门能力 → delegate；\n"
-                    "单次查询 → 自己直接调工具。\n\n"
-                    "## 知识获取 — 三层 fallback\n\n"
-                    "遇到知识不足时，按以下顺序获取，不要跳层：\n"
-                    "1. **内部知识库（1-2次）**：\n"
-                    "   - 查工业图像数据集元信息 → search_vision_knowledge\n"
-                    "   - 查标准条款/推理模式/VQA模板/工艺文档 → search_reasoning_knowledge\n"
-                    "   - 查基础标准/案例/工艺 → search_standards/search_cases/search_process\n"
-                    "2. **联网搜索（1次）**：内部查不到时 → web_search\n"
-                    "   （查国标全文/论文/开源数据集/缺陷分类/部署方案）\n"
-                    "3. **弹窗问用户**：以上都不足时 → request_confirmation\n\n"
-                    "不要用不同 query 穷举式反复查同一工具（架构会拦截第3次）。\n\n"
-                    "## 核心原则\n\n"
+                    "delegate 启动完整子 agent（独立 LLM ReAct 循环），成本高延迟大。\n"
+                    "**能用直接工具调用完成的任务，禁止 delegate。**\n\n"
+                    "| 场景 | 正确做法 | 错误做法 |\n"
+                    "|:-----|:---------|:---------|\n"
+                    "| 查数据集列表 | 直接调 list_datasets | delegate weld-explorer |\n"
+                    "| 查作业状态 | 直接调 get_job / list_tasks | delegate weld-explorer |\n"
+                    "| 查标准条款 | 直接调 search_standards | delegate weld-explorer |\n"
+                    "| 读工作流进度 | 直接调 read_weldmap / control_workflow | delegate weld-explorer |\n"
+                    "| 同时查3+个不相关数据源 | delegate weld-explorer OK | 串行调5次工具 |\n"
+                    "| 需多轮探索+分析的数据理解 | delegate data-understanding OK | 自己一步步查 |\n\n"
+                    "**一轮 ReAct 内 delegate 不超过 1 次。** 多次 delegate = 在逃避直接调用工具。\n\n"
+                    "## 知识获取 - retrieval budget\n\n"
+                    "不要每次都查知识库。先判断你是否已经知道答案：\n"
+                    "- 问题涉及行业常识/通用焊接知识 -> 直接回答，不查\n"
+                    "- 问题涉及具体标准条款/历史案例/工艺参数 -> 查对应知识库工具\n"
+                    "- 内部查不到且需要最新信息 -> web_search（一次够了就停）\n\n"
+                    "工具选择指南：\n"
+                    "- search_standards: 查基础焊接标准（NB/T47014等）\n"
+                    "- search_cases: 查历史缺陷处理案例\n"
+                    "- search_vision_knowledge: 查工业图像数据集元信息\n"
+                    "- search_reasoning_knowledge: 查标准条款/推理模式/VQA模板/工艺文档\n"
+                    "- web_search: 查国标全文/论文/开源数据集/缺陷分类/部署方案\n\n"
+                    "retrieval budget 规则：一次检索已获得足够证据就立即回答，不要穷举式反复查。\n"
+                    "不要用不同 query 反复查同一工具（架构会拦截第3次）。\n\n"
+                                        "## 核心原则\n\n"
                     "1. **先理解再行动** — 不确定时用工具查或 delegate 子 agent，不要猜。\n"
                     "2. **短路径走问答，长路径走工作流** — \n"
                     "   问答类请求（看图/查询/了解情况）直接调工具回答；\n"

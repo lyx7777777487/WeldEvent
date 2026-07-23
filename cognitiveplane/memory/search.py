@@ -61,6 +61,13 @@ class HybridMemorySearch:
         vec = await self._vector.search(MemorySearchInput(query=query))
         fts = await self._fts.search(MemorySearchInput(query=query))
         merged = self._fuse(vec.results, fts.results)
+        # Op 8.1: Filter by memory_type if specified
+        if query.memory_type is not None:
+            merged = [
+                r for r in merged
+                if getattr(r.content, "memory_type", None) == query.memory_type
+                or getattr(r, "memory_type", None) == query.memory_type
+            ]
         return merged[: self._config.top_k]
 
     def _fuse(

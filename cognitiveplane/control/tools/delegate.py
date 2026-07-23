@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
 from cognitiveplane.control.tools import BrainTool, ToolResult
+from cognitiveplane.control.declaration import DeclarationLoader
 
 if TYPE_CHECKING:
     from cognitiveplane.control.subagent import SubAgentRunner
@@ -26,7 +27,9 @@ class DelegateTool(BrainTool):
     """
 
     phase = 3  # L3 执行层工具
-    always_available = True  # 委派是核心调度能力，豁免 skill 白名单，任何场景下都可委派子 agent
+    # delegate 不再 always_available - 当 skill 锁定时，delegate 受白名单约束。
+    # 这防止 LLM 在缺工具时走 delegate 绕路而非切换 skill 或直接调可用工具。
+    # 需要委派的场景（多步骤探索/复杂设计）应在 skill 白名单中显式包含 delegate。
 
     def __init__(self, runner: "SubAgentRunner") -> None:
         self._runner = runner
@@ -37,31 +40,38 @@ class DelegateTool(BrainTool):
 
     @property
     def description(self) -> str:
-        return (
-            "委派子任务到专用 subagent。可用 subagent：\n"
-            "- weld-explorer: 只读搜索（list_datasets/get_dataset/list_jobs/get_job/list_tasks/"
-            "read_weldmap/search_standards/search_cases/search_process/web_search）\n"
-            "- weld-architect: 工作流设计（design_workflow + 搜索类）\n"
-            "- weld-reviewer: 标注审查（list_tasks/get_job/get_dataset/list_datasets）\n"
-            "- data-understanding: 数据集理解（analyze_dataset/analyze_image，"
-            "做统计CV分析+多模态语义理解+标签质量评估）\n\n"
-            "使用示例：\n"
+        # 动态加载 subagent 声明，避免硬编码工具列表
+        loader = DeclarationLoader()
+        agents = loader.load_agents()
+
+        parts = [
+            "委派子任务到专用 subagent。可用 subagent：",
+        ]
+        for name, decl in sorted(agents.items()):
+            parts.append(f"- {name}: {decl.description}（工具: {', '.join(decl.tools[:5])}）")
+
+        parts.append(
+            "\n使用示例：\n"
             "- delegate('weld-explorer', '列出所有可用的数据集')\n"
             "- delegate('weld-architect', '设计一个焊缝质量检测工作流，先做 IQA 再做 PPA')\n"
-            "- delegate('weld-reviewer', '检查作业 weld-iqa-20260706 的标注质量')\n"
-            "- delegate('data-understanding', '分析 /path/to/images 数据集质量，无标注数据')\n\n"
+            "- delegate('weld-reviewer', '检查作业的标注质量')\n"
+            "- delegate('data-understanding', '分析数据集质量')\n\n"
             "注意：子 agent 独立执行，不会影响主 agent 的上下文。执行完成后返回结果。"
         )
+        return "\n".join(parts)
 
     @property
     def parameters_schema(self) -> dict[str, Any]:
+        loader = DeclarationLoader()
+        agents = loader.load_agents()
+        agent_names = sorted(agents.keys()) if agents else ["weld-explorer", "weld-architect", "weld-reviewer", "data-understanding"]
         return {
             "type": "object",
             "properties": {
                 "subagent": {
                     "type": "string",
                     "description": "委派的 subagent 名称",
-                    "enum": ["weld-explorer", "weld-architect", "weld-reviewer", "data-understanding"],
+                    "enum": agent_names,
                 },
                 "task": {
                     "type": "string",

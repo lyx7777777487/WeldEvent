@@ -28,6 +28,10 @@ class LLMRequest(BaseModel):
     caller: str = ""
     case_id: str | None = None
     purpose: str = ""
+    # Op 36: Prompt caching - number of tokens in the stable cache prefix.
+    # Provider can use this to set cache_control on the prefix messages.
+    # 0 = no caching (default). Set by _make_llm_request when CACHE_BOUNDARY found.
+    cache_prefix_tokens: int = 0
 
 
 class LLMResponse(BaseModel):

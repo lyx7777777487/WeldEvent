@@ -94,3 +94,52 @@ class TestOpenAIProviderStatic:
         """health_check returns False when client not initialized."""
         provider = OpenAIProvider(_make_config())
         assert provider.health_check() is False
+
+
+class TestCacheControl:
+    """Op 36: prompt-prefix caching 按后端门控."""
+
+    def _provider(self):
+        return OpenAIProvider(_make_config())
+
+    def test_deepseek_skips_cache_control(self):
+        """DeepSeek 服务端自动缓存: cache_prefix_tokens>0 也不注入 cache_control."""
+        p = self._provider()
+        req = LLMRequest(
+            messages=[
+                {"role": "system", "content": "x" * 200},
+                {"role": "user", "content": "hi"},
+            ],
+            purpose="reasoning",
+            cache_prefix_tokens=40,
+        )
+        msgs = p._build_messages(req, "deepseek-chat")
+        assert all("cache_control" not in m for m in msgs)
+
+    def test_claude_injects_cache_control_on_prefix(self):
+        """Claude 后端: cache_prefix_tokens>0 时前缀消息打 cache_control."""
+        p = self._provider()
+        sys_msg = "stable system prompt " * 50
+        req = LLMRequest(
+            messages=[
+                {"role": "system", "content": sys_msg},
+                {"role": "user", "content": "q"},
+            ],
+            purpose="reasoning",
+            cache_prefix_tokens=40,
+        )
+        msgs = p._build_messages(req, "claude-3-5-sonnet")
+        assert msgs[0].get("cache_control") == {"type": "ephemeral"}
+
+    def test_no_cache_prefix_tokens_skips(self):
+        """cache_prefix_tokens=0 时无论模型都不注入."""
+        p = self._provider()
+        req = LLMRequest(
+            messages=[{"role": "user", "content": "hi"}],
+            purpose="reasoning",
+            cache_prefix_tokens=0,
+        )
+        msgs_claude = p._build_messages(req, "claude-3-5-sonnet")
+        msgs_ds = p._build_messages(req, "deepseek-chat")
+        assert all("cache_control" not in m for m in msgs_claude)
+        assert all("cache_control" not in m for m in msgs_ds)

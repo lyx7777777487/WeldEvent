@@ -3,7 +3,7 @@
 纯计算模块，使用 OpenCV + numpy，不依赖 LLM。
 覆盖指标：
   - 图片尺寸分布 / 高宽比分布
-  - 灰度分布 / 亮度 / 对比度
+  - 灰度分布（32-bin 像素直方图）/ 亮度 / 对比度
   - 清晰度（Laplacian 方差）/ 模糊样本
   - 噪声估计
   - 重复样本检测（感知哈希）
@@ -145,6 +145,10 @@ class StatisticalCVAnalyzer:
             sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
             # 噪声估计（高频能量占比）
             noise = self._estimate_noise(gray)
+            # 灰度直方图（32 bin，归一化为比例）
+            hist = cv2.calcHist([gray], [0], None, [32], [0, 256]).flatten()
+            hist_total = float(hist.sum())
+            grayscale_hist = (hist / hist_total).tolist() if hist_total > 0 else [0.0] * 32
 
             stats = ImageCVStats(
                 filename=img_path.name,
@@ -157,6 +161,7 @@ class StatisticalCVAnalyzer:
                 contrast=round(contrast, 2),
                 sharpness=round(sharpness, 2),
                 noise_level=round(noise, 4),
+                grayscale_histogram=[round(v, 4) for v in grayscale_hist],
                 is_blurry=sharpness < self._blurry_threshold,
                 is_dark=mean_brightness < self._dark_threshold,
                 is_bright=mean_brightness > self._bright_threshold,
@@ -259,6 +264,18 @@ class StatisticalCVAnalyzer:
         sharpness_vals = [s.sharpness for s in per_image]
         noise_vals = [s.noise_level for s in per_image]
 
+        # 灰度直方图聚合（跨图平均，输出 bin 区间 -> 平均占比）
+        grayscale_hist_agg: dict[str, float] = {}
+        hist_lists = [s.grayscale_histogram for s in per_image if s.grayscale_histogram]
+        if hist_lists:
+            num_bins = len(hist_lists[0])
+            for i in range(num_bins):
+                bin_values = [h[i] for h in hist_lists if i < len(h)]
+                avg = sum(bin_values) / len(bin_values)
+                lo = i * 8
+                hi = min((i + 1) * 8 - 1, 255)
+                grayscale_hist_agg[f"{lo}-{hi}"] = round(avg, 4)
+
         # 异常样本
         blurry_files = [s.filename for s in per_image if s.is_blurry]
         dark_files = [s.filename for s in per_image if s.is_dark]
@@ -283,6 +300,7 @@ class StatisticalCVAnalyzer:
             contrast_stats=self._percentile_stats(contrast_vals),
             sharpness_stats=self._percentile_stats(sharpness_vals),
             noise_stats=self._percentile_stats(noise_vals),
+            grayscale_histogram=grayscale_hist_agg,
             blurry_count=len(blurry_files),
             dark_count=len(dark_files),
             bright_count=len(bright_files),

@@ -61,7 +61,8 @@ class HookRunner:
         """
         for hook in self._hooks:
             result = await hook.before_execute(tool_name, arguments, context, session_id=session_id)
-            if result.decision == HookDecision.DENY:
+            # Op 11: DENY blocks; RETRY rejects with instruction for LLM to retry
+            if result.decision in (HookDecision.DENY, HookDecision.RETRY):
                 return result
         return HookResult(decision=HookDecision.ALLOW)
 
@@ -369,6 +370,26 @@ class ToolCallValidator:
                     {"role": "assistant", "content": None, "tool_calls": [tool_call], "reasoning_content": reasoning_content},
                     {"role": "tool", "tool_call_id": tool_call_id,
                      "content": json.dumps({"rejected": True, "reason": reason})},
+                ],
+            }
+
+        if hook_result.decision == HookDecision.RETRY:
+            # Op 11: RETRY - reject with instruction for LLM to retry
+            instruction = hook_result.retry_instruction or hook_result.reason or "before-tool hook requested retry"
+            return {
+                "kind": "rejected_retry",
+                "tool_name": tool_name,
+                "tool_call_id": tool_call_id,
+                "arguments": arguments,
+                "tool_call": tool_call,
+                "event_data": {
+                    "tool": tool_name, "arguments": arguments,
+                    "rejected": True, "reason": instruction, "retry": True,
+                },
+                "messages": [
+                    {"role": "assistant", "content": None, "tool_calls": [tool_call], "reasoning_content": reasoning_content},
+                    {"role": "tool", "tool_call_id": tool_call_id,
+                     "content": json.dumps({"error": instruction, "hint": "Before-tool hook requested retry. Adjust arguments and retry."})},
                 ],
             }
 

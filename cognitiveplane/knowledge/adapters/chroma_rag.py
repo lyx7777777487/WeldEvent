@@ -24,12 +24,17 @@ from typing import TYPE_CHECKING
 import httpx
 
 from cognitiveplane.shared.dto.knowledge import (
+    CaseLibraryQuery,
+    CaseLibraryResult,
     ReasoningKnowledgeQuery,
     ReasoningKnowledgeResult,
     VisionKnowledgeQuery,
     VisionKnowledgeResult,
 )
 from cognitiveplane.shared.ports.knowledge import (
+    CaseLibraryQueryInput,
+    CaseLibraryQueryOutput,
+    CaseLibraryQueryPort,
     ReasoningKnowledgeInput,
     ReasoningKnowledgeOutput,
     ReasoningKnowledgePort,
@@ -50,7 +55,7 @@ _OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 _OLLAMA_EMBEDDING_MODEL = os.environ.get("OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:4b")
 
 
-class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort):
+class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort, CaseLibraryQueryPort):
     """Chroma 向量库 RAG 适配器 — 视觉理解 + 文本推理双 collection。
 
     Embedding 优先级：Ollama（本地零成本）> LLMProvider.embed() > Chroma 内置。
@@ -76,8 +81,10 @@ class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort):
         self._client = None
         self._vision_collection = None
         self._reasoning_collection = None
+        self._case_collection = None  # Op-新: CBR 案例库 collection (L2_CASE)
         self._vision_seeded = False
         self._reasoning_seeded = False
+        self._case_seeded = False
 
     # ── 延迟初始化 ──
 
@@ -95,6 +102,10 @@ class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort):
             self._reasoning_collection = self._client.get_or_create_collection(
                 name="weld_reasoning",
                 metadata={"description": "工业流程/标准/推理模式语料（文本推理 RAG）"},
+            )
+            self._case_collection = self._client.get_or_create_collection(
+                name="weld_cases",
+                metadata={"description": "CBR 案例库（缺陷处置案例，L2_CASE 分层记忆）"},
             )
             logger.info("[chroma_rag] 初始化完成 path=%s", self._chroma_path)
         except Exception:
@@ -172,9 +183,72 @@ class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort):
             logger.warning("[chroma_rag] reasoning seed 失败", exc_info=True)
             self._reasoning_seeded = True
 
+    def _seed_case(self) -> None:
+        """填充 CBR 案例库 collection 的种子数据 (L2_CASE 分层记忆).
+
+        案例结构: 缺陷类型 -> 处置方案 -> 结果. 供 case_library_correction 纠错、
+        design_workflow 检索参考. 案例错误时由 case_library_correction 剔除/修正.
+        """
+        if self._case_seeded or self._case_collection is None:
+            return
+        if self._case_collection.count() > 0:
+            self._case_seeded = True
+            return
+        # 内置典型案例种子 (焊检域 CBR)
+        cases = [
+            {"case_id": "case_001", "defect_type": "porosity",
+             "defect_description": "气孔密集分布于焊缝中心，直径0.5-2mm",
+             "resolution": "打磨清除后重新焊接，增加保护气体流量",
+             "outcome": "PASS", "search_text": "气孔 porosity 焊缝中心 保护气体不足"},
+            {"case_id": "case_002", "defect_type": "crack",
+             "defect_description": "纵向裂纹沿焊缝走向延伸约15mm",
+             "resolution": "碳弧气刨清除裂纹+预热后重焊，控制层间温度",
+             "outcome": "REWORK", "search_text": "裂纹 crack 纵向 预热 层间温度"},
+            {"case_id": "case_003", "defect_type": "undercut",
+             "defect_description": "焊趾处咬边深度0.8mm，连续长度20mm",
+             "resolution": "补焊焊趾，降低电流/提高速度重新走道",
+             "outcome": "REWORK", "search_text": "咬边 undercut 焊趾 电流过大"},
+            {"case_id": "case_004", "defect_type": "incomplete_penetration",
+             "defect_description": "根部未熔透，X光显示黑影连续",
+             "resolution": "背面清根后重焊，增大根部间隙",
+             "outcome": "REWORK", "search_text": "未熔透 incomplete_penetration 根部 清根"},
+            {"case_id": "case_005", "defect_type": "slag_inclusion",
+             "defect_description": "夹渣呈条状分布于焊缝内部",
+             "resolution": "清除夹渣区域，改进焊道间清理工艺",
+             "outcome": "REWORK", "search_text": "夹渣 slag_inclusion 层间清理"},
+        ]
+        try:
+            texts = [c["search_text"] for c in cases]
+            embeddings = self._ollama_embed_sync(texts)
+            self._case_collection.add(
+                ids=[c["case_id"] for c in cases],
+                documents=texts,
+                metadatas=[{
+                    "case_id": c["case_id"], "defect_type": c["defect_type"],
+                    "defect_description": c["defect_description"],
+                    "resolution": c["resolution"], "outcome": c["outcome"],
+                } for c in cases],
+                embeddings=embeddings,
+            )
+            self._case_seeded = True
+            logger.info("[chroma_rag] case collection seeded: %d 条 (embedding=%s)",
+                        len(cases), "ollama" if embeddings else "none")
+        except Exception:
+            logger.warning("[chroma_rag] case seed 失败", exc_info=True)
+            self._case_seeded = True
+
     # ── Port 实现 ──
 
-    async def query(self, input_data) -> VisionKnowledgeOutput | ReasoningKnowledgeOutput:
+    async def query(self, input_data):
+        """统一 query 入口 - 按 input 类型分派到对应 collection."""
+        if isinstance(input_data, VisionKnowledgeInput):
+            return await self._query_vision(input_data)
+        elif isinstance(input_data, ReasoningKnowledgeInput):
+            return await self._query_reasoning(input_data)
+        elif isinstance(input_data, CaseLibraryQueryInput):
+            return await self._query_case(input_data)
+        else:
+            raise ValueError(f"Unsupported input type: {type(input_data)}")
         """统一 query 入口 — 按 input 类型分派到对应 collection。"""
         if isinstance(input_data, VisionKnowledgeInput):
             return await self._query_vision(input_data)
@@ -252,6 +326,64 @@ class ChromaRAGAdapter(VisionKnowledgePort, ReasoningKnowledgePort):
             return ReasoningKnowledgeOutput(results=[])
 
         return self._parse_reasoning_results(results)
+
+    async def _query_case(self, input_data: CaseLibraryQueryInput) -> CaseLibraryQueryOutput:
+        """CBR 案例库检索 (L2_CASE). defect_type + similarity_context 拼 search text."""
+        query = input_data.query
+        self._ensure_collections()
+        if self._case_collection is None:
+            return CaseLibraryQueryOutput(results=[])
+        if not self._case_seeded:
+            self._seed_case()
+
+        # 拼 search text: defect_type + similarity_context
+        parts = [query.defect_type or ""]
+        ctx = query.similarity_context or {}
+        for k, v in ctx.items():
+            parts.append(f"{k}: {v}")
+        search_text = " ".join(p for p in parts if p)
+        if not search_text:
+            search_text = "weld defect case"
+
+        query_embedding = await self._embed_query(search_text)
+        n_results = query.max_results
+        # 按 defect_type 过滤 (若有)
+        where = {"defect_type": query.defect_type} if query.defect_type else None
+        try:
+            if query_embedding is not None:
+                results = self._case_collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=n_results, where=where,
+                )
+            else:
+                results = self._case_collection.query(
+                    query_texts=[search_text], n_results=n_results, where=where,
+                )
+        except Exception:
+            logger.warning("[chroma_rag] case query 失败", exc_info=True)
+            return CaseLibraryQueryOutput(results=[])
+        return self._parse_case_results(results)
+
+    def _parse_case_results(self, results) -> CaseLibraryQueryOutput:
+        """解析 Chroma 案例检索结果 -> CaseLibraryResult."""
+        if not results or not results.get("ids") or not results["ids"][0]:
+            return CaseLibraryQueryOutput(results=[])
+        out = []
+        ids = results["ids"][0]
+        metas = results.get("metadatas", [[]])[0]
+        dists = results.get("distances", [[]])[0]
+        for i, mid in enumerate(ids):
+            m = metas[i] if i < len(metas) else {}
+            dist = dists[i] if i < len(dists) else 1.0
+            sim = max(0.0, 1.0 - dist)  # distance -> similarity
+            out.append(CaseLibraryResult(
+                case_id=m.get("case_id", mid),
+                defect_description=m.get("defect_description", ""),
+                resolution=m.get("resolution", ""),
+                outcome=m.get("outcome", ""),
+                similarity_score=round(sim, 3),
+            ))
+        return CaseLibraryQueryOutput(results=out)
 
     # ── 辅助方法 ──
 

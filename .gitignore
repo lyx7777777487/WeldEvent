@@ -1,36 +1,28 @@
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-*.egg-info/
-dist/
-build/
-.venv/
+# Secrets
 .env
+.env.*
+!.env.example
 
-# macOS
-.DS_Store
-
-# IDE
-.idea/
-.vscode/
-*.iml
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # OS
+.DS_Store
 Thumbs.db
 
-# Test fixtures — real weld images are test material, not source code.
-# Keep directory structure (.gitkeep) but ignore actual image files.
-cognitiveplane/tests/fixtures/weld_images/**/*.jpg
-cognitiveplane/tests/fixtures/weld_images/**/*.jpeg
-cognitiveplane/tests/fixtures/weld_images/**/*.png
-cognitiveplane/tests/fixtures/weld_images/**/*.tif
-cognitiveplane/tests/fixtures/weld_images/**/*.tiff
-cognitiveplane/tests/fixtures/weld_images/**/*.bmp
-cognitiveplane/tests/fixtures/weld_images/**/*.webp
+# IDE
+.vscode/
+.idea/
+*.swp
 
-# Runtime data — vector DB is generated at runtime, not source code
-data/
-
-# Claude Code local config
-.claude/
+# Codex agent
+.codex/
+.weldevent/

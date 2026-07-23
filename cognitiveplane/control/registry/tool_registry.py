@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import jsonschema
 
+from cognitiveplane.adapters.observability.tracing import get_langfuse, NoOpTracer
 from cognitiveplane.control.deps import CognitiveDependencies
 from cognitiveplane.control.tools import BrainTool, ToolResult
 
@@ -82,6 +83,7 @@ class ToolRegistry:
         from cognitiveplane.control.tools.web_search import WebSearchTool
         from cognitiveplane.control.tools.analyze_image import AnalyzeImageTool
         from cognitiveplane.control.tools.analyze_dataset import AnalyzeDatasetTool
+        from cognitiveplane.control.tools.analyze_dataset_stats import AnalyzeDatasetStatsTool
         from cognitiveplane.control.tools.upload_image_to_dataset import UploadImageToDatasetTool
 
         # Knowledge tools
@@ -113,6 +115,10 @@ class ToolRegistry:
         if image_store is not None:
             from cognitiveplane.control.tools.split_image import SplitImageTool
             self.register(SplitImageTool(image_store=image_store))
+
+        # Dataset stats tool — 数据集级统计与 CV 特征分析（轻量，主 Agent 直接可用）
+        # 仅跑确定性算子，不调视觉大模型。与 analyze_dataset（完整管线）互补。
+        self.register(AnalyzeDatasetStatsTool())
 
         # Dataset understanding tool — 数据集级统计分析 + 多模态语义理解
         # 与 analyze_image（单张图）互补：做分布统计、异常检测、重复检测、语义理解
@@ -147,7 +153,7 @@ class ToolRegistry:
             # P1-6: 工作流控制工具 — query/pause/resume/cancel 正在执行的 workflow
             # 让 LLM 能通过自然语言介入工作流执行过程
             from cognitiveplane.control.tools.workflow_control import WorkflowControlTool
-            self.register(WorkflowControlTool(deps))
+            self.register(WorkflowControlTool(deps, approval_store=self._approval_store))
 
         # Human interaction tools
         if deps.gateway.write is not None:
@@ -182,11 +188,10 @@ class ToolRegistry:
     ) -> list[dict]:
         """Return tool definitions in LLM Function Calling format.
 
-        Boundary-pinning 2026-06-25: 过滤 phase > current_phase 的工具 — 它们仍
-        在注册表里 (execute() 可显式调用), 但不出现在 LLM 工具表里, 防止未就绪
-        工具被 LLM 误调用.
-
-        Phase 5 Agent Skills: 传入 allowed_tools 可进一步按 skill 白名单过滤。
+        Phase gate: phase > current_phase 的工具不暴露给 LLM.
+        Skill visibility (modernized 2026-07-15): 主 agent 不受 skill 白名单限制,
+        所有 phase 可见工具始终可见。对齐 Claude Code / Codex progressive disclosure.
+        SubAgent 仍受白名单约束（权限隔离）。
         """
         allowed = set(allowed_tools) if allowed_tools is not None else None
         # allowed_tools 非空 = subagent 白名单模式，subagent_only 工具需可见
@@ -270,7 +275,21 @@ class ToolRegistry:
                 error=schema_error,
                 error_type=SCHEMA_INVALID_ERROR_TYPE,
             )
-        return await tool.execute(**arguments)
+        # Langfuse: 工具调用包 span, 前端可看每次工具入参/出参/耗时
+        client = get_langfuse()
+        if client is None or isinstance(client, NoOpTracer):
+            return await tool.execute(**arguments)
+        with client.start_as_current_observation(name=f"tool.{tool_name}", as_type="tool") as span:
+            safe_args = {k: (str(v)[:500] if len(str(v)) > 500 else v)
+                         for k, v in (arguments or {}).items()}
+            span.update(input=safe_args)
+            result = await tool.execute(**arguments)
+            out = result.output if hasattr(result, "output") else None
+            if out is not None:
+                span.update(output=str(out)[:2000] if len(str(out)) > 2000 else out)
+            if result.error:
+                span.update(level="ERROR", status_message=result.error[:500])
+            return result
 
     def get_tool(self, tool_name: str) -> BrainTool | None:
         return self._tools.get(tool_name)

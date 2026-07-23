@@ -10,8 +10,11 @@ Prompt design (2026-07): 参考 Anthropic Context Engineering 公开思路——
 """
 
 import json
+import logging
 from enum import Enum
 from typing import Any
+
+logger = logging.getLogger("compaction")
 
 
 # ── Compaction prompts（参考 Anthropic Context Engineering）──
@@ -112,6 +115,102 @@ class ContextCompactor:
         self._max_tokens = max_tokens
         self._default_strategy = default_strategy
 
+
+    # ── Op 12: Safe compaction enhancements ───────────────────
+    # Source: Pydantic AI Harness compaction (调研报告 §5.5)
+    #         + Anthropic Context Engineering
+
+    @staticmethod
+    def _find_safe_compaction_boundary(messages: list[dict]) -> int:
+        """Op 12: Find the safe compaction boundary.
+
+        Returns the index AFTER the last complete tool-call/result pair.
+        Messages before this index can be safely compacted; messages from
+        this index onward must be kept intact (they form an incomplete
+        tool-call/return pair that would break the provider API if split).
+
+        A "complete pair" = assistant msg with tool_calls followed by
+        tool result msgs for ALL tool_call_ids.
+        """
+        if not messages:
+            return 0
+
+        # Walk backwards to find the last complete pair
+        last_safe = 0
+        pending_tool_call_ids: set[str] = set()
+
+        for i, msg in enumerate(messages):
+            role = msg.get("role", "")
+            if role == "assistant":
+                tool_calls = msg.get("tool_calls") or []
+                if tool_calls:
+                    # New tool calls - check if previous ones were resolved
+                    if pending_tool_call_ids:
+                        # Previous pair incomplete - boundary is before this msg
+                        break
+                    pending_tool_call_ids = {
+                        tc.get("id", "") for tc in tool_calls if tc.get("id")
+                    }
+                    # If this is the last message, pair is incomplete
+                    if i == len(messages) - 1:
+                        break
+                else:
+                    # Assistant without tool_calls - safe to compact up to here
+                    if not pending_tool_call_ids:
+                        last_safe = i + 1
+            elif role == "tool":
+                tool_call_id = msg.get("tool_call_id", "")
+                pending_tool_call_ids.discard(tool_call_id)
+                if not pending_tool_call_ids:
+                    # All tool results received - pair complete
+                    last_safe = i + 1
+
+        return last_safe
+
+    def _warn_budget(self, messages: list[dict]) -> None:
+        """Op 12: Warn when approaching token budget limits."""
+        estimated = self._estimate_tokens(messages)
+        ratio = estimated / self._max_tokens if self._max_tokens > 0 else 0
+        if ratio >= 1.0:
+            logger.warning(
+                "[compaction] Token budget EXCEEDED: %d/%d tokens (%.0f%%) - compaction triggered",
+                estimated, self._max_tokens, ratio * 100,
+            )
+        elif ratio >= 0.8:
+            logger.warning(
+                "[compaction] Token budget approaching limit: %d/%d tokens (%.0f%%) - compaction soon",
+                estimated, self._max_tokens, ratio * 100,
+            )
+
+    @staticmethod
+    def _strip_large_outputs(messages: list[dict], max_output_chars: int = 2000) -> list[dict]:
+        """Op 12: Strip large tool outputs before compaction.
+
+        Replaces oversized tool result content with truncated versions,
+        keeping only the first/last portions and a truncation marker.
+        This is a pre-compaction step that reduces token count cheaply
+        (no LLM call) before the more expensive summarization strategies.
+        """
+        result = []
+        for msg in messages:
+            if msg.get("role") == "tool":
+                content = msg.get("content", "")
+                if isinstance(content, str) and len(content) > max_output_chars:
+                    # Keep first 30% and last 30%, mark middle as truncated
+                    keep = max_output_chars // 3
+                    truncated = (
+                        content[:keep]
+                        + f"\n... [truncated by compaction: original {len(content)} chars, "
+                        + f"removed {len(content) - 2 * keep} chars] ...\n"
+                        + content[-keep:]
+                    )
+                    msg_copy = dict(msg)
+                    msg_copy["content"] = truncated
+                    result.append(msg_copy)
+                    continue
+            result.append(msg)
+        return result
+
     async def compact(self, messages: list[dict], event_log: Any = None) -> list[dict]:
         """Apply compaction with fallback chain. Direction: expensive → cheap on failure."""
         estimated = self._estimate_tokens(messages)
@@ -189,6 +288,7 @@ class ContextCompactor:
                 "content": _SUMMARY_PROMPT.format(history=json.dumps(older, ensure_ascii=False))
             }],
             caller="compactor",
+            purpose="compaction",
         ))
         return system + [{"role": "assistant", "content": f"[Previous context summary]: {response.content}"}] + recent
 
@@ -204,6 +304,7 @@ class ContextCompactor:
                 "content": _SELF_COMPACT_ALL_PROMPT.format(history=json.dumps(messages, ensure_ascii=False))
             }],
             caller="compactor",
+            purpose="compaction",
         ))
         system = [m for m in messages if m.get("role") == "system"]
         return system + [{"role": "assistant", "content": f"[Compacted context]: {compacted.content}"}]
@@ -228,6 +329,7 @@ class ContextCompactor:
                 "content": _SELF_COMPACT_SLIDING_PROMPT.format(history=json.dumps(older, ensure_ascii=False))
             }],
             caller="compactor",
+            purpose="compaction",
         ))
         return system + [{"role": "assistant", "content": f"[Compacted older context]: {compacted.content}"}] + recent
 

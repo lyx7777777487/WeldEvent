@@ -26,6 +26,10 @@ from cognitiveplane.control.data_understanding.models import (
     ModelInferenceResult,
     SemanticUnderstanding,
 )
+from cognitiveplane.control.data_understanding.visualizer import (
+    encode_image_for_llm,
+    render_annotated_image,
+)
 
 if TYPE_CHECKING:
     from cognitiveplane.capability.ports import LLMProvider
@@ -84,10 +88,12 @@ class MultimodalSemanticAnalyzer:
         sampled = self._sample_representative(image_files, cv_report)
         logger.info("[DSA-Semantic] Sampling %d/%d images for LLM", len(sampled), len(image_files))
 
-        # 构建 LLM 请求
+        # 构建 LLM 请求 (有标注/推理结果时叠加可视化)
         images_b64 = []
         for img_path in sampled:
-            b64 = self._encode_image(img_path)
+            b64 = self._encode_image_with_overlay(
+                img_path, annotations, model_inference, labels
+            )
             if b64:
                 images_b64.append(b64)
 
@@ -127,19 +133,40 @@ class MultimodalSemanticAnalyzer:
 
         parts.append("你是工业图像数据理解专家。请分析以下采样图片，从语义层面理解这批数据。")
 
-        # CV 上下文
+        # CV 上下文 (完整统计注入, 让 LLM 有量化依据)
         if cv_report:
-            parts.append("\n## CV 统计上下文（仅供参考，你需要做更深入的语义理解）")
-            parts.append(f"- 总图片数: {cv_report.total_images}")
+            parts.append("\n## CV 统计上下文（量化指标，你需做更深入的语义理解）")
+            parts.append(f"- 总图片数: {cv_report.total_images} (有效: {cv_report.valid_images})")
             parts.append(f"- 模糊样本: {cv_report.blurry_count}")
             parts.append(f"- 过暗样本: {cv_report.dark_count}")
             parts.append(f"- 过亮样本: {cv_report.bright_count}")
             parts.append(f"- 重复样本: {cv_report.duplicate_count}")
             if cv_report.brightness_stats:
-                parts.append(f"- 亮度均值: {cv_report.brightness_stats.get('mean', '?')}")
+                parts.append(f"- 亮度: mean={cv_report.brightness_stats.get('mean','?')}, "
+                             f"std={cv_report.brightness_stats.get('std','?')}, "
+                             f"范围[{cv_report.brightness_stats.get('min','?')}, "
+                             f"{cv_report.brightness_stats.get('max','?')}]")
+            if cv_report.contrast_stats:
+                parts.append(f"- 对比度: mean={cv_report.contrast_stats.get('mean','?')}, "
+                             f"std={cv_report.contrast_stats.get('std','?')}")
             if cv_report.sharpness_stats:
-                parts.append(f"- 清晰度均值: {cv_report.sharpness_stats.get('mean', '?')}")
-            parts.append(f"- 尺寸分布: {cv_report.width_distribution}")
+                parts.append(f"- 清晰度(Laplacian方差): mean={cv_report.sharpness_stats.get('mean','?')}, "
+                             f"std={cv_report.sharpness_stats.get('std','?')}")
+            if cv_report.noise_stats:
+                parts.append(f"- 噪声水平: mean={cv_report.noise_stats.get('mean','?')}, "
+                             f"std={cv_report.noise_stats.get('std','?')}")
+            if cv_report.grayscale_histogram:
+                nonzero = {k: v for k, v in cv_report.grayscale_histogram.items() if v > 0.01}
+                parts.append(f"- 灰度分布(非零bin): {nonzero}")
+            parts.append(f"- 尺寸分布(宽): {cv_report.width_distribution}")
+            parts.append(f"- 高宽比分布: {cv_report.aspect_ratio_distribution}")
+            parts.append(f"- 采集视角分布: {cv_report.acquisition_view_distribution}")
+            parts.append(f"- 数据来源分布: {cv_report.source_distribution}")
+            if cv_report.foreground_background_contrast:
+                parts.append(f"- 前景/背景对比度(有标注时): "
+                             f"{list(cv_report.foreground_background_contrast.items())[:5]}")
+            if cv_report.anomaly_files:
+                parts.append(f"- 异常样本文件: {cv_report.anomaly_files[:10]}")
 
         # 标签上下文
         if data_kind == DataKind.LABELED and labels:
@@ -258,33 +285,57 @@ class MultimodalSemanticAnalyzer:
         image_files: list[Path],
         cv_report: Any | None,
     ) -> list[Path]:
-        """采样代表性图片：异常样本优先 + 均匀分布。
+        """分层采样代表性图片：异常/边界/正常三层, 比例 4:3:3。
 
         策略：
-          1. 如果有 CV 报告，优先取异常样本（模糊/过暗/过亮）
-          2. 再从正常样本中均匀采样补足
-          3. 总数不超过 MAX_IMAGES_FOR_SEMANTIC
+          1. 异常层 (40%): 模糊/过暗/过亮/重复样本
+          2. 边界层 (30%): 置信度接近阈值的样本 (sharpness 接近 50, brightness 接近边界)
+          3. 正常层 (30%): 从剩余样本均匀采样
+          4. 总数不超过 MAX_IMAGES_FOR_SEMANTIC
+
+        分层采样的好处: LLM 看到的样本覆盖各种质量梯度, 能更好判断
+        "数据整体质量" 和 "潜在类别", 而不是只看极端样本或只看正常样本。
         """
         if len(image_files) <= MAX_IMAGES_FOR_SEMANTIC:
             return image_files
 
         sampled: list[Path] = []
+        normal_files: list[Path] = []
 
-        # 异常样本优先
-        if cv_report and cv_report.anomaly_files:
+        # ── 异常层 (40%) ──
+        anomaly_quota = int(MAX_IMAGES_FOR_SEMANTIC * 0.4)
+        boundary_quota = int(MAX_IMAGES_FOR_SEMANTIC * 0.3)
+        normal_quota = MAX_IMAGES_FOR_SEMANTIC - anomaly_quota - boundary_quota
+
+        if cv_report and cv_report.per_image:
             anomaly_set = set(cv_report.anomaly_files)
-            anomaly_paths = [p for p in image_files if p.name in anomaly_set]
-            sampled.extend(anomaly_paths[:MAX_IMAGES_FOR_SEMANTIC // 2])
+            for stats in cv_report.per_image:
+                path = next((p for p in image_files if p.name == stats.filename), None)
+                if path is None:
+                    continue
+                if stats.is_anomaly:
+                    if len(sampled) < anomaly_quota:
+                        sampled.append(path)
+                # ── 边界层: sharpness 接近阈值 (50-100), brightness 接近边界 ──
+                elif (50 <= stats.sharpness <= 100
+                      or 30 <= stats.mean_brightness <= 45
+                      or 210 <= stats.mean_brightness <= 220):
+                    if len(sampled) < anomaly_quota + boundary_quota:
+                        sampled.append(path)
+                else:
+                    normal_files.append(path)
+        else:
+            normal_files = list(image_files)
 
-        # 均匀采样补足
+        # ── 正常层均匀采样补足 ──
         remaining = MAX_IMAGES_FOR_SEMANTIC - len(sampled)
-        if remaining > 0:
-            step = max(1, len(image_files) // remaining)
-            for i in range(0, len(image_files), step):
+        if remaining > 0 and normal_files:
+            step = max(1, len(normal_files) // remaining)
+            for i in range(0, len(normal_files), step):
                 if len(sampled) >= MAX_IMAGES_FOR_SEMANTIC:
                     break
-                if image_files[i] not in sampled:
-                    sampled.append(image_files[i])
+                if normal_files[i] not in sampled:
+                    sampled.append(normal_files[i])
 
         return sampled[:MAX_IMAGES_FOR_SEMANTIC]
 
@@ -294,24 +345,36 @@ class MultimodalSemanticAnalyzer:
 
     @staticmethod
     def _encode_image(img_path: Path) -> str | None:
-        """读取图片并编码为 base64 data URL。"""
-        try:
-            import cv2
-            img = cv2.imread(str(img_path))
-            if img is None:
-                return None
-            # 缩放到合理尺寸
-            h, w = img.shape[:2]
-            if max(h, w) > MAX_IMAGE_SIZE_FOR_LLM:
-                scale = MAX_IMAGE_SIZE_FOR_LLM / max(h, w)
-                img = cv2.resize(img, (int(w * scale), int(h * scale)))
-            # 编码为 JPEG
-            _, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            b64 = base64.b64encode(buffer).decode("utf-8")
-            return f"data:image/jpeg;base64,{b64}"
-        except Exception as e:
-            logger.warning("[DSA-Semantic] Failed to encode %s: %s", img_path.name, e)
-            return None
+        """读取图片并编码为 base64 data URL (原图, 无叠加)。"""
+        return encode_image_for_llm(None, img_path)
+
+    def _encode_image_with_overlay(
+        self,
+        img_path: Path,
+        annotations: dict[str, Any] | None = None,
+        model_inference: ModelInferenceResult | None = None,
+        labels: dict[str, str] | None = None,
+    ) -> str | None:
+        """读取图片 + 叠加标注/推理结果, 编码送 LLM。
+
+        有标注数据: 把 bbox/mask 画到图上, LLM 能看到标注框位置
+        无标注数据: 如有模型推理结果, 把疑似区域画到图上
+        无标注无推理: 送原图
+        """
+        # 取该图的标注
+        ann = None
+        regions = None
+        if annotations and img_path.name in annotations:
+            ann = annotations[img_path.name]
+        if model_inference and model_inference.suspected_regions:
+            regions = model_inference.suspected_regions.get(img_path.name)
+
+        if ann is None and regions is None:
+            # 无叠加内容, 直接送原图
+            return self._encode_image(img_path)
+
+        image = render_annotated_image(img_path, ann, regions)
+        return encode_image_for_llm(image)
 
     @staticmethod
     def _find_images(directory: Path) -> list[Path]:

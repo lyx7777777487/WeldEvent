@@ -70,6 +70,17 @@ class WorkflowLaunchPort(ABC):
         """取消 workflow。"""
         raise NotImplementedError("cancel_workflow not supported by this port")
 
+    # ── Op 16-19: Plan versioning bridge methods ──
+
+    async def send_rework_signal(self, workflow_id: str, node_id: str) -> bool:
+        """Op 20: Send rework_node signal to trigger dependency pollution BFS."""
+        return await self.send_signal(workflow_id, "rework_node", [node_id])
+
+    async def send_batch_signals(self, workflow_id: str, signals: list[dict]) -> bool:
+        """Op 37: Send batch_signals signal."""
+        return await self.send_signal(workflow_id, "batch_signals", [signals])
+
+
 
 class WorkflowLauncher:
     """提交 WorkflowSpec 到 L2 Temporal。
@@ -131,6 +142,17 @@ class WorkflowLauncher:
         except NotImplementedError:
             logger.warning("cancel_workflow: port does not support cancel (workflow=%s)", workflow_id)
             return False
+
+    # ── Op 16-19: Plan versioning bridge methods ──
+
+    async def send_rework_signal(self, workflow_id: str, node_id: str) -> bool:
+        """Op 20: Send rework_node signal."""
+        return await self.send_signal(workflow_id, "rework_node", [node_id])
+
+    async def send_batch_signals(self, workflow_id: str, signals: list[dict]) -> bool:
+        """Op 37: Send batch_signals signal."""
+        return await self.send_signal(workflow_id, "batch_signals", [signals])
+
 
 
 class _NullWorkflowLaunchPort(WorkflowLaunchPort):

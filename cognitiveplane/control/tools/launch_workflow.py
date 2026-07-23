@@ -479,6 +479,57 @@ class LaunchWorkflowTool(BrainTool):
                 f"pass. Investigate L3 ActivityPool registration before trusting this workflow."
             )
 
+        # Op 8.2/29: Store episode in TrajectoryMemoryStore for learning
+        try:
+            from cognitiveplane.control.tools.design_workflow import get_trajectory_memory
+            exec_record = node_results.get("execution_record")
+            trajectory_mem = get_trajectory_memory()
+            node_outcomes = [
+                {"node_id": nid, "status": node_results.get("node_results", {}).get(nid, {}).get("status", "unknown")}
+                for nid in node_results.get("completed_nodes", []) + node_results.get("failed_nodes", [])
+            ]
+            wf_status = node_results.get("status", "unknown")
+            await trajectory_mem.store_episode(
+                goal=spec.objective,
+                spec_summary={"node_count": len(spec.nodes), "capabilities": [n.capability for n in spec.nodes]},
+                node_outcomes=node_outcomes,
+                outcome=wf_status,
+                quality_score=exec_record.get("quality_score", 0.0) if exec_record else 0.0,
+                session_id=session_id,
+            )
+            # Op 32: Extract Reflexion notes from failures
+            failed = node_results.get("failed_nodes", [])
+            if failed:
+                trajectory_mem.add_reflexion_note(
+                    task=spec.objective,
+                    failure=f"Nodes failed: {failed}",
+                    lesson=f"Check L3 activity registration and node parameters for {failed}",
+                )
+        except Exception as e:
+            logger.warning("Failed to store episode: %s", e)
+
+        # Op 8.3: Zero-cost self-evaluation of workflow execution quality
+        try:
+            from cognitiveplane.capability.evaluation import ZeroCostEvaluator
+            evaluator = ZeroCostEvaluator(
+                llm_provider=self._deps.capability.llm_provider
+                if self._deps and hasattr(self._deps, 'capability') else None,
+            )
+            node_outcomes_eval = [
+                {"node_id": nid, "status": node_results.get("node_results", {}).get(nid, {}).get("status", "unknown")}
+                for nid in node_results.get("completed_nodes", []) + node_results.get("failed_nodes", [])
+            ]
+            quality_eval = await evaluator.evaluate(
+                goal=spec.objective,
+                node_outcomes=node_outcomes_eval,
+            )
+            # Store quality score in trajectory memory
+            trajectory_mem = get_trajectory_memory()
+            if trajectory_mem._episodic:
+                trajectory_mem._episodic[-1].quality_score = quality_eval.quality_score
+        except Exception as e:
+            logger.warning("Zero-cost evaluation failed: %s", e)
+
         return ToolResult(
             output={
                 "status": node_results.get("status", "unknown"),

@@ -118,6 +118,11 @@ class MemoryType(str, Enum):
     STANDARD_PARAMETER = "STANDARD_PARAMETER"
     DEFECT_PATTERN = "DEFECT_PATTERN"
     CHECKPOINT = "CHECKPOINT"
+    # Op 8.1: 三层记忆类型 (episodic/semantic/procedural)
+    # Source: Generative Agents (Park et al., 2023) + Letta/MemGPT memory block
+    EPISODIC = "EPISODIC"           # 具体经验: WorkflowExecutionRecord (L2_CASE + L3_EXPERIENCE)
+    SEMANTIC = "SEMANTIC"           # 泛化知识: 从多次 Episodic 提取的规则 (L4_KNOWLEDGE)
+    PROCEDURAL = "PROCEDURAL"       # 学会的流程: 用户标记"以后都用这个"的 WorkflowSpec 模板 (L4_KNOWLEDGE)
 
 
 class KnowledgeType(str, Enum):

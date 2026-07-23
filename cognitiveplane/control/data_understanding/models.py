@@ -30,6 +30,7 @@ class ImageCVStats:
     contrast: float = 0.0           # RMS 对比度
     sharpness: float = 0.0          # Laplacian 方差
     noise_level: float = 0.0        # 噪声估计（高频能量占比）
+    grayscale_histogram: list[float] = field(default_factory=list)  # 32-bin 归一化灰度直方图
     is_blurry: bool = False         # 模糊样本（sharpness < 阈值）
     is_dark: bool = False           # 过暗样本
     is_bright: bool = False         # 过亮样本
@@ -53,6 +54,7 @@ class DatasetCVReport:
     contrast_stats: dict[str, float] = field(default_factory=dict)
     sharpness_stats: dict[str, float] = field(default_factory=dict)
     noise_stats: dict[str, float] = field(default_factory=dict)
+    grayscale_histogram: dict[str, float] = field(default_factory=dict)  # {"0-7": 0.05, ...} 跨图平均灰度分布
     # ── 异常样本 ──
     blurry_count: int = 0
     dark_count: int = 0

@@ -39,10 +39,24 @@ logger = logging.getLogger("guardrails")
 # ── 护栏决策 ──
 
 class GuardrailAction(Enum):
-    """护栏动作。"""
-    PASS = "pass"        # 放行
-    WARN = "warn"        # 记录警告但放行
-    REJECT = "reject"    # 阻断（替换为安全回复或拒绝执行）
+    """护栏动作 - Op 11 统一枚举.
+
+    Source: Pydantic AI guardrails RETRY + existing PASS/WARN/REJECT.
+    This is the canonical unified verdict enum (GuardrailVerdict = GuardrailAction).
+    - PASS:   放行
+    - WARN:   记录警告但放行
+    - REJECT: 阻断（替换为安全回复或拒绝执行）
+    - RETRY:  重试（带 instruction 修正后重试工具调用或 LLM 生成）
+    """
+    PASS = "pass"
+    WARN = "warn"
+    REJECT = "reject"
+    RETRY = "retry"
+
+
+# Op 11: GuardrailVerdict is the canonical unified name.
+# GuardrailAction is kept as backward-compatible alias.
+GuardrailVerdict = GuardrailAction
 
 
 @dataclass
@@ -54,6 +68,8 @@ class GuardrailResult:
     replacement: str | None = None
     # 命中的规则列表（用于审计/trace）
     triggered_rules: list[str] = field(default_factory=list)
+    # RETRY 时给工具/LLM 的修正指令（Op 11）
+    retry_instruction: str | None = None
 
 
 # ── AfterToolHook（工具结果护栏）──
@@ -251,6 +267,7 @@ def _extract_text(result: Any) -> str:
 
 __all__ = [
     "GuardrailAction",
+    "GuardrailVerdict",
     "GuardrailResult",
     "AfterToolHook",
     "OutputGuardrail",

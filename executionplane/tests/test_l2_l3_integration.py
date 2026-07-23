@@ -90,6 +90,8 @@ class TestActivityPoolCreation:
         pool = create_default_pool()
         assert pool.supports("iqa") is True
         assert pool.supports("ppa") is True
+        assert pool.supports("mea") is True  # MEA 已实现
+        assert pool.supports("rda") is True  # RDA 已实现
         # 别名也能解析
         assert pool.supports("defect_detection") is True
         assert pool.supports("preprocess") is True
@@ -106,10 +108,11 @@ class TestActivityPoolCreation:
         assert iqa._weldmap is pool.weldmap
 
     def test_unregistered_capability_returns_none(self):
-        """未注册的 capability（如 mea）resolve 返回 None。"""
+        """未注册的 capability（如 vda）resolve 返回 None。"""
+        # 注：mea/rda 已实现并注册为真实 activity，改用仍未实现的 vda 验证未注册路径
         pool = create_default_pool()
-        assert pool.supports("mea") is False
-        assert pool.resolve("mea") is None
+        assert pool.supports("vda") is False
+        assert pool.resolve("vda") is None
 
 
 class TestExecuteNodeDispatch:
@@ -242,28 +245,31 @@ class TestFallbackBehavior:
 
     @pytest.mark.asyncio
     async def test_unregistered_capability_falls_back_to_mock(self):
-        """未注册的 capability（mea）应走 mock fallback。"""
+        """未注册的 capability（vda）应走 mock fallback（P0-2: mock 返回 MARGINAL）。"""
+        # 注：mea/rda 已实现并注册为真实 activity，改用仍未实现的 vda 验证 mock fallback
         node_input = _make_node_input(
-            capability="mea",
+            capability="vda",
             workflow_id="wf-mock-test",
         )
         result = await execute_node(node_input)
-        # mock 路径返回 mock_result
-        assert result["status"] == "OK"
+        # P0-2: mock 路径返回 MARGINAL（非 OK）+ mock=True，绝不假合格
+        assert result["status"] == "MARGINAL"
+        assert result["data"]["mock"] is True
         assert "mock_result" in result.get("data", {})
-        assert result["data"]["mock_result"] == "mea_activity_executed"
+        assert result["data"]["mock_result"] == "vda_activity_executed"
 
     @pytest.mark.asyncio
     async def test_pool_cleared_falls_back_to_mock(self):
-        """configure_activity_pool(None) 后 IQA 应走 mock。"""
+        """configure_activity_pool(None) 后 IQA 应走 mock（P0-2: 返回 MARGINAL）。"""
         configure_activity_pool(None)
         node_input = _make_node_input(
             capability="iqa",
             workflow_id="wf-no-pool",
         )
         result = await execute_node(node_input)
-        # pool 清除后走 mock
-        assert result["status"] == "OK"
+        # pool 清除后走 mock；P0-2 契约：MARGINAL + mock=True
+        assert result["status"] == "MARGINAL"
+        assert result["data"]["mock"] is True
         assert "mock_result" in result.get("data", {})
 
     @pytest.mark.asyncio

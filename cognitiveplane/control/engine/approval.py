@@ -23,7 +23,6 @@ from typing import Any
 # 而不是黑盒自动执行。查询类工具（list_datasets/get_dataset/list_jobs/
 # get_job/list_tasks）不在此集合 — LLM 可直接调用获取上下文。
 APPROVAL_REQUIRED_TOOLS = frozenset({
-    "launch_workflow",
     # ── 标注写入类 ──
     "create_job",     # 创建标注作业（含数据集/作业名/标签集等关键决策）
     "create_task",    # 创建标注任务（含图片选择/标注员等关键决策）

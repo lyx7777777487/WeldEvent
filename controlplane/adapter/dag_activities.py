@@ -19,6 +19,8 @@ from temporalio import activity
 
 from controlplane.domain.activity import ActivityOutput, ActivityStatus
 
+from cognitiveplane.adapters.observability.tracing import observe as _lf_observe
+
 if TYPE_CHECKING:
     from executionplane.pool import ActivityPool
 
@@ -61,6 +63,33 @@ def reset_activity_pool() -> None:
     _activity_pool = None
 
 
+# ── LLM quality eval provider 注入点 ─────────────────────────────────
+# Op 34: evaluate_node_quality 用注入的 LLMProvider 做语义评估.
+# worker.py 启动时注入 (与 bootstrap_llm 装配的同一个 provider).
+# 未注入时 (测试/无 LLM 环境) -> 回退启发式打分, 不报错.
+_eval_provider = None  # type: "LLMProvider | None"
+_eval_model = None  # type: str | None
+
+
+def configure_eval_provider(provider, model=None):
+    """注入 LLMProvider 供 evaluate_node_quality 使用 (worker 启动时调)."""
+    global _eval_provider, _eval_model
+    _eval_provider = provider
+    _eval_model = model
+    if provider is not None:
+        logger.info("evaluate_node_quality bound to LLMProvider (model=%s)", model or "default")
+    else:
+        logger.info("evaluate_node_quality provider cleared (heuristic fallback)")
+
+
+def reset_eval_provider():
+    """显式重置 eval provider (测试隔离用, 对称 reset_activity_pool)."""
+    global _eval_provider, _eval_model
+    _eval_provider = None
+    _eval_model = None
+
+
+
 # ── capability → mock activity 分派表（fallback 路径）─────────────────
 # boundary-pinning §1.5: 工业执行 MCP（detect_defects、annotate_label）归 L3
 # 仓库，受 L2 activity pool 调用。当前 Phase 4 用 ActivityPool 走真实实现；
@@ -87,7 +116,11 @@ _CAPABILITY_DISPATCH: dict[str, str] = {
 }
 
 
+
+
+
 @activity.defn(name="execute_node")
+@_lf_observe(name="dag.execute_node")
 async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
     """执行单个 WorkflowNode。
 
@@ -112,16 +145,16 @@ async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
     capability = node_input.get("capability") or ""
     node_type = node_input.get("type", "tool_task")
     node_input_data = node_input.get("input", {})
-
     # human_task: 审批由 workflow 层 HumanGateSignal 处理（P2-10）。
     # P2-6 fix: activity 校验 gate_approved 字段，防止 workflow 层 bug 未等 signal 就调 activity
     if node_type == "human_task":
-        gate_approved = node_input.get("gate_approved", False)
+        review_result = node_input.get("review_result", {})
+        gate_approved = review_result.get("decision") == "approve" or node_input.get("gate_approved", False)
         if not gate_approved:
             return _to_dict(ActivityOutput(
                 status=ActivityStatus.ERROR,
                 data={"node_id": node_id},
-                error="human_task called without gate_approved=True (workflow layer bug)",
+                error="human_task called without review_result.approve (workflow layer bug)",
             ))
         return _to_dict(ActivityOutput(
             status=ActivityStatus.OK,
@@ -145,8 +178,21 @@ async def execute_node(node_input: dict[str, Any]) -> dict[str, Any]:
     # tool_task: 优先调 L3 ActivityPool（真实执行）
     if _activity_pool is not None and _activity_pool.supports(capability):
         try:
+            # Op 6: heartbeat 进度推送 - activity 开始
+            activity.heartbeat({
+                "progress": 0.1,
+                "stage": "dispatch_start",
+                "message": f"开始执行 {capability}",
+            })
             result = await _activity_pool.dispatch(node_input)
             if result is not None:
+                # Op 6: heartbeat 进度推送 - 执行完成
+                activity.heartbeat({
+                    "progress": 0.9,
+                    "stage": "dispatch_complete",
+                    "message": f"{capability} 执行完成",
+                    "status": result.get("status"),
+                })
                 logger.info(
                     "execute_node dispatched to L3 ActivityPool: node=%s capability=%s → status=%s",
                     node_id, capability, result.get("status"),
@@ -222,6 +268,7 @@ def _to_dict(output: ActivityOutput) -> dict[str, Any]:
 # L1 收到后按 session_id 路由到 WorkflowEventBus,广播给前端 SSE 订阅者。
 
 @activity.defn(name="emit_workflow_event")
+@_lf_observe(name="dag.emit_workflow_event")
 async def emit_workflow_event(event_data: dict[str, Any]) -> dict[str, Any]:
     """向 L1 推送工作流节点事件(HTTP POST)。
 
@@ -277,4 +324,110 @@ async def emit_workflow_event(event_data: dict[str, Any]) -> dict[str, Any]:
 
 
 # 导出供 worker.py 注册
-ALL_DAG_ACTIVITIES = [execute_node, emit_workflow_event]
+@activity.defn(name="evaluate_node_quality")
+@_lf_observe(name="dag.evaluate_node_quality", as_type="generation")
+async def evaluate_node_quality(input: dict[str, Any]) -> dict[str, Any]:
+    """Op 34: LLM 语义质量评估 activity。
+
+    Source: Anthropic "Building Effective Agents" (2024) evaluator-optimizer.
+    workflow 里不能直接调 LLM (determinism), 故包成 activity.
+
+    入参 input:
+        node_id, capability, status, result_data, objective, max_tokens(=512)
+
+    返回:
+        quality_score: float (0.0-1.0)
+        quality_note: str
+        evaluated_by: "llm" | "heuristic_mock" | "heuristic" | "no_provider"
+
+    评估顺序:
+      1. mock 节点 -> 直接 heuristic_mock 低分 (省 LLM 调用)
+      2. 无注入 provider -> no_provider 启发式
+      3. 调注入 provider -> LLM 语义评估; 失败 -> heuristic 回退
+    """
+    import json as _json
+
+    node_id = input.get("node_id", "unknown")
+    capability = input.get("capability", "")
+    status = str(input.get("status", "")).upper()
+    result_data = input.get("result_data", {}) or {}
+    objective = input.get("objective", "")
+    max_tokens = int(input.get("max_tokens", 512))
+
+    # 1. mock 节点直接低分, 不调 LLM
+    if isinstance(result_data, dict) and result_data.get("mock"):
+        return {
+            "quality_score": 0.2,
+            "quality_note": "mock node - heuristic low score (not real execution)",
+            "evaluated_by": "heuristic_mock",
+        }
+
+    # 2. 无注入 provider -> 启发式
+    if _eval_provider is None:
+        return _heuristic_eval(node_id, status, result_data, "no LLM provider injected")
+
+    # 3. 调注入 provider 做 LLM 语义评估
+    data_preview = _json.dumps(result_data, ensure_ascii=False, default=str)[:1500]
+    prompt = (
+        "你是工业焊缝检测的质量评估器。评估单个节点执行结果的质量。\n\n"
+        f"节点: {node_id} (能力={capability})\n"
+        f"工作流目标: {objective}\n"
+        f"执行状态: {status}\n"
+        f"结果数据: {data_preview}\n\n"
+        "请评估:\n"
+        "1. quality_score (0.0-1.0): 该节点结果的可信度与完整性\n"
+        "2. quality_note: 一句话评价\n\n"
+        "严格 JSON 格式回复 (不要 markdown 代码块): "
+        '{"quality_score": float, "quality_note": str}'
+    )
+    try:
+        from cognitiveplane.capability.provider import LLMRequest
+        resp = await _eval_provider.complete(LLMRequest(
+            messages=[{"role": "user", "content": prompt}],
+            caller="node_quality_eval", purpose="reasoning",
+            model=_eval_model, max_tokens=max_tokens, temperature=0.1,
+        ))
+        content = (resp.content or "").strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip()
+            if content.endswith("```"):
+                content = content[:-3].strip()
+        parsed = _json.loads(content)
+        score = max(0.0, min(1.0, float(parsed.get("quality_score", 0.5))))
+        note = str(parsed.get("quality_note", ""))[:300]
+        logger.info("evaluate_node_quality LLM: node=%s score=%.2f", node_id, score)
+        return {"quality_score": score, "quality_note": note, "evaluated_by": "llm"}
+    except Exception as e:
+        logger.warning("evaluate_node_quality LLM failed (node=%s): %s: %s",
+                       node_id, type(e).__name__, e)
+        return _heuristic_eval(node_id, status, result_data, f"LLM error: {type(e).__name__}")
+
+
+def _heuristic_eval(node_id, status, data, reason):
+    """启发式回退打分 (原 _validate_node_result 的逻辑, 保留作 fallback)."""
+    if not isinstance(data, dict):
+        data = {}
+    score = 0.3
+    if status:
+        score += 0.1
+    if len(data) >= 2:
+        score += 0.2
+    elif len(data) == 1:
+        score += 0.1
+    if not (data.get("error") or data.get("mock")):
+        score += 0.1
+    if data.get("mock"):
+        score -= 0.2
+    score = max(0.0, min(1.0, score))
+    return {
+        "quality_score": score,
+        "quality_note": f"heuristic fallback ({reason}, score={score:.1f})",
+        "evaluated_by": "heuristic",
+    }
+
+
+# 导出供 worker.py 注册
+ALL_DAG_ACTIVITIES = [execute_node, emit_workflow_event, evaluate_node_quality]

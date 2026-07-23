@@ -26,7 +26,9 @@ from .activities.base import ActivityInput, ActivityOutput, ActivityStatus
 from .activities.annotation.activity import AnnotationActivity
 from .activities.base import BaseActivity
 from .activities.iqa.activity import IqaActivity
+from .activities.mea.activity import MeaActivity
 from .activities.ppa.activity import PpaActivity
+from .activities.rda.activity import RdaActivity
 from .capabilities.cv_rules import CVRuleChecker
 from .capabilities.mllm_provider import MllmProvider
 from .capabilities.numpy_cv_checker import NumpyCVRuleChecker
@@ -47,6 +49,13 @@ _CAPABILITY_ALIASES: dict[str, str] = {
     "ppa": "ppa",
     "preprocess": "ppa",
     "image_preprocess": "ppa",
+    # MEA（几何测量）
+    "mea": "mea",
+    "geometry": "mea",
+    "measurement": "mea",
+    # RDA（缺陷识别）
+    "rda": "rda",
+    "defect_recognition": "rda",
     # HCA（人工审核）— Phase 4+ 实现真实 activity
     "hca": "hca",
     "human_review": "hca",
@@ -118,6 +127,24 @@ class ActivityPool:
         """便捷注册 PPA Activity。返回实例。"""
         activity = PpaActivity(weldmap=self._weldmap)
         self.register("ppa", activity)
+        return activity
+
+    def register_mea(self) -> MeaActivity:
+        """便捷注册 MEA Activity（几何测量）。返回实例。
+
+        MEA 用确定性 CV 测量焊脚/焊喉/两焊脚差，写入 WeldMap annotations。
+        """
+        activity = MeaActivity(weldmap=self._weldmap)
+        self.register("mea", activity)
+        return activity
+
+    def register_rda(self) -> RdaActivity:
+        """便捷注册 RDA Activity（表面缺陷识别）。返回实例。
+
+        RDA 用确定性 CV 检测气孔/裂纹/咬边/焊瘤，合并写入 WeldMap annotations。
+        """
+        activity = RdaActivity(weldmap=self._weldmap)
+        self.register("rda", activity)
         return activity
 
     def register_annotation(self) -> AnnotationActivity:
@@ -204,14 +231,16 @@ def create_default_pool(
     pool = ActivityPool(weldmap=weldmap)
     pool.register_iqa(cv_checker=cv_checker, mllm=mllm)
     pool.register_ppa()
+    pool.register_mea()
+    pool.register_rda()
 
     # Annotation Activity：默认注册，但可通过环境变量关闭
     annotation_enabled = os.environ.get("ANNOTATION_ACTIVITY_ENABLED", "1").strip()
     if annotation_enabled not in ("0", "false", "False", "no", "NO"):
         pool.register_annotation()
-        registered_msg = "IQA + PPA + Annotation"
+        registered_msg = "IQA + PPA + MEA + RDA + Annotation"
     else:
-        registered_msg = "IQA + PPA (Annotation disabled by env)"
+        registered_msg = "IQA + PPA + MEA + RDA (Annotation disabled by env)"
 
     logger.info(
         "ActivityPool created: %s registered, WeldMap=%s",

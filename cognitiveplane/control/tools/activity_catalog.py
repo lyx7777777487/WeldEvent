@@ -173,6 +173,21 @@ ACTIVITY_CATALOG: list[ActivityDescriptor] = [
         aliases=["human_review", "annotation_write"],
     ),
     ActivityDescriptor(
+        capability="dsa_stats",
+        name="数据集统计 (DSStats)",
+        description=(
+            "数据集统计与 CV 特征分析（轻量快照）。仅跑确定性算子，不调视觉大模型。"
+            "覆盖：尺寸分布/质量分布/异常检测/重复检测/视角来源分布。"
+            "有标注数据额外做标签统计和前景背景分析。"
+            "适用场景：用户问'有多少张图'/'多少张模糊'/'尺寸多大'/'分布怎么样'。"
+        ),
+        implementation="real",
+        inputs=["image_dir", "data_kind", "labels"],
+        outputs=["cv_report", "label_stats", "summary"],
+        depends_on_hint=[],
+        aliases=["dataset_stats_snapshot", "dataset_quick_stats"],
+    ),
+    ActivityDescriptor(
         capability="dsa",
         name="数据集理解 (DSA)",
         description=(

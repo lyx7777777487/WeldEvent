@@ -235,6 +235,19 @@ class TemporalWorkflowLaunchPort(WorkflowLaunchPort):
             self._maybe_invalidate_client(e)
             return False
 
+    async def send_human_review_signal(
+        self, workflow_id: str, node_id: str, review_result: dict
+    ) -> bool:
+        """Op 2: 发送 human_review signal (支持五决策)。"""
+        try:
+            client = await self._ensure_client()
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.signal("human_review", node_id, review_result)
+            return True
+        except Exception as e:
+            self._maybe_invalidate_client(e)
+            return False
+
     async def cancel_workflow(self, workflow_id: str, reason: str = "user requested") -> bool:
         """取消一个正在运行的 Temporal workflow（terminate）。
 

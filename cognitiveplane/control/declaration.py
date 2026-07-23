@@ -23,8 +23,7 @@ from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
-# 默认声明目录
-SKILLS_DIR = Path(".weldevent/skills")
+# 默认声明目录（统一到 agents/，靠 mode 字段区分 inline 和 delegated）
 AGENTS_DIR = Path(".weldevent/agents")
 
 Mode = Literal["inline", "delegated"]
@@ -53,6 +52,7 @@ class Declaration:
     tools: list[str] = field(default_factory=list)
     priority: int = 0
     system_prompt: str = ""
+    references_dir: str = ""           # skill 旁的 references/ 目录路径（L3 按需加载）
     max_iterations: int = 5
     source: str = ""
 
@@ -81,33 +81,33 @@ class DeclarationLoader:
 
     def __init__(
         self,
-        skills_dir: Path = SKILLS_DIR,
         agents_dir: Path = AGENTS_DIR,
     ) -> None:
-        self._skills_dir = skills_dir
         self._agents_dir = agents_dir
         self._cache: dict[str, Declaration] | None = None
 
     # ── 公共 API ──
 
     def load_all(self, force: bool = False) -> dict[str, Declaration]:
-        """加载所有声明（skills + agents）。返回 {name: Declaration}。"""
+        """加载所有声明（skills + agents from 统一 agents/ 目录）。返回 {name: Declaration}。"""
         if self._cache is not None and not force:
             return self._cache
 
         self._cache = {}
-        for md_dir in (self._skills_dir, self._agents_dir):
-            if not md_dir.is_dir():
-                continue
-            for md_file in sorted(md_dir.glob("*.md")):
-                try:
-                    decl = self._parse_file(md_file)
-                    if decl and decl.name:
-                        self._cache[decl.name] = decl
-                except Exception:
-                    logger.debug("Failed to parse declaration: %s", md_file, exc_info=True)
+        if self._agents_dir.is_dir():
+            for skill_md in sorted(self._agents_dir.glob("*/SKILL.md")):
+                self._try_load(skill_md)
 
         return self._cache
+
+    def _try_load(self, md_file: Path) -> None:
+        """Parse a single declaration file into cache."""
+        try:
+            decl = self._parse_file(md_file)
+            if decl and decl.name:
+                self._cache[decl.name] = decl
+        except Exception:
+            logger.debug("Failed to parse declaration: %s", md_file, exc_info=True)
 
     def load_skills(self) -> dict[str, Declaration]:
         """加载 mode=inline 的声明（Skill）。"""
@@ -141,6 +141,11 @@ class DeclarationLoader:
         if not name:
             return None
 
+        # L3 references: SKILL.md 同级目录下的 references/ (Codex progressive disclosure)
+        references_dir = str(path.parent / "references")
+        if not Path(references_dir).is_dir():
+            references_dir = ""
+
         return Declaration(
             name=name,
             description=frontmatter.get("description", ""),
@@ -150,6 +155,7 @@ class DeclarationLoader:
             priority=frontmatter.get("priority", 0),
             max_iterations=frontmatter.get("max_iterations", 5),
             system_prompt=body.strip(),
+            references_dir=references_dir,
             source=str(path),
         )
 

@@ -26,10 +26,14 @@ from uuid import uuid4
 NodeType = Literal["brain_task", "tool_task", "human_task", "wait_task"]
 OnFailure = Literal["abort", "continue", "escalate", "retry"]
 CallerType = Literal["brain_direct", "activity", "system"]
+ReviewPolicy = Literal["auto", "required", "conditional", "never"]
 
 # OnFailure 默认值常量 — 必须与 cognitiveplane/shared/dto_workflow.py 的
 # ON_FAILURE_DEFAULT 保持相同字符串值。
 ON_FAILURE_DEFAULT: OnFailure = "escalate"
+
+# ReviewPolicy 默认值 - 必须与 cognitiveplane/shared/dto_workflow.py 一致
+REVIEW_POLICY_DEFAULT: ReviewPolicy = "conditional"
 
 # SSOT 一致性锚点:测试断言此 tuple 与 cognitiveplane 侧一致
 _SSOT_CHECKSUM = {
@@ -37,6 +41,8 @@ _SSOT_CHECKSUM = {
     "on_failure": ("abort", "continue", "escalate", "retry"),
     "caller_type": ("brain_direct", "activity", "system"),
     "on_failure_default": "escalate",
+    "review_policy": ("auto", "required", "conditional", "never"),
+    "review_policy_default": "conditional",
 }
 
 
@@ -67,6 +73,7 @@ class WorkflowNode:
     input: dict[str, Any] = field(default_factory=dict)
     condition: str | None = None
     on_failure: OnFailure = ON_FAILURE_DEFAULT
+    review_policy: ReviewPolicy = REVIEW_POLICY_DEFAULT
     caller_context: CallerContext = field(default_factory=CallerContext)
 
 
@@ -99,6 +106,7 @@ def workflow_spec_from_dict(data: dict[str, Any]) -> WorkflowSpec:
             input=dict(n.get("input", {})),
             condition=n.get("condition"),
             on_failure=n.get("on_failure", ON_FAILURE_DEFAULT),
+            review_policy=n.get("review_policy", REVIEW_POLICY_DEFAULT),
             caller_context=CallerContext(
                 caller_type=n.get("caller_context", {}).get("caller_type", "brain_direct"),
                 case_id=n.get("caller_context", {}).get("case_id"),
@@ -150,6 +158,7 @@ def workflow_spec_to_dict(spec: WorkflowSpec) -> dict[str, Any]:
                 "input": dict(n.input),
                 "condition": n.condition,
                 "on_failure": n.on_failure,
+                "review_policy": n.review_policy,
                 "caller_context": {
                     "caller_type": n.caller_context.caller_type,
                     "case_id": n.caller_context.case_id,
@@ -203,3 +212,42 @@ def topological_sort(nodes: list[WorkflowNode]) -> list[WorkflowNode]:
         visit(n.node_id, [])
 
     return result
+
+def topological_sort_layered(nodes: list[WorkflowNode]) -> list[list[WorkflowNode]]:
+    """按依赖层级分组拓扑排序。同层节点无互相依赖，可并行执行。
+
+    Returns: list of layers, each layer is a list of WorkflowNode.
+    """
+    seen_ids: set[str] = set()
+    for n in nodes:
+        if n.node_id in seen_ids:
+            raise ValueError(f"Duplicate node_id: '{n.node_id}'")
+        seen_ids.add(n.node_id)
+    node_map = {n.node_id: n for n in nodes}
+    for n in nodes:
+        for dep in n.depends_on:
+            if dep not in node_map:
+                raise ValueError(
+                    f"Node '{n.node_id}' depends on unknown node '{dep}'"
+                )
+
+    # Kahn's algorithm - BFS by dependency level
+    in_degree: dict[str, int] = {n.node_id: len(n.depends_on) for n in nodes}
+    layers: list[list[WorkflowNode]] = []
+
+    remaining = set(node_map.keys())
+    while remaining:
+        layer = [node_map[nid] for nid in remaining if in_degree[nid] == 0]
+        if not layer:
+            raise ValueError("Cycle detected in workflow spec")
+        layers.append(layer)
+        for n in layer:
+            remaining.discard(n.node_id)
+        # Decrease in_degree for nodes that depend on this layer
+        for n in nodes:
+            if n.node_id in remaining:
+                for dep in [m.node_id for m in layer]:
+                    if dep in n.depends_on:
+                        in_degree[n.node_id] -= 1
+
+    return layers

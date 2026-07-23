@@ -1,10 +1,16 @@
 import asyncio
+import os
 import logging
 
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from controlplane.adapter.dag_activities import ALL_DAG_ACTIVITIES, configure_activity_pool
+from controlplane.adapter.dag_activities import (
+    ALL_DAG_ACTIVITIES,
+    configure_activity_pool,
+    configure_eval_provider,
+    reset_eval_provider,
+)
 from controlplane.adapter.mocks import ALL_MOCK_ACTIVITIES
 from controlplane.config import ControlPlaneConfig
 from controlplane.runtime.dag_runner_workflow import RunWorkflowSpec
@@ -64,6 +70,28 @@ async def run_worker(config: ControlPlaneConfig | None = None) -> None:
         pool_status = "DEGRADED: all mock (executionplane import failed) — NOT production-safe"
         l3_degraded = True
 
+    # ── Op 34: LLM provider 装配 + 注入 (供 evaluate_node_quality activity) ──
+    # 与 L1 app.py 用同一个 bootstrap_llm; eval activity 通过注入拿 provider,
+    # 不在 activity 内自取 env (注入模式, 对称 configure_activity_pool).
+    try:
+        from cognitiveplane.bootstrap.llm_setup import bootstrap_llm
+        from cognitiveplane.capability import get_llm
+        llm_ok = bootstrap_llm()
+        if llm_ok:
+            eval_model = os.getenv("DEEPSEEK_MODEL", "") or "deepseek-v4-flash"
+            if eval_model == "deepseek-chat":
+                eval_model = "deepseek-v4-flash"  # .env 失效模型兜底
+            configure_eval_provider(get_llm(), model=eval_model)
+            eval_status = f"LLM eval bound (model={eval_model})"
+        else:
+            configure_eval_provider(None)
+            eval_status = "DEGRADED: eval heuristic only (LLM bootstrap failed)"
+            logger.error("LLM bootstrap failed - Op34 eval will use heuristic only")
+    except ImportError as e:
+        configure_eval_provider(None)
+        eval_status = f"DEGRADED: eval heuristic only (bootstrap import failed: {e})"
+        logger.error("cognitiveplane bootstrap unavailable - Op34 eval degraded: %s", e)
+
     # 注册所有 activities:
     #   - 8 个 mock activity（iqa/ppa/mea/rda/vda/rva/mta/hca）— TemplateWorkflow 用
     #   - execute_node activity — RunWorkflowSpec DAG runner 用（boundary-pinning §6.2）
@@ -89,6 +117,7 @@ async def run_worker(config: ControlPlaneConfig | None = None) -> None:
     print(f"  workflows: RunWorkflowSpec")
     print(f"  activities: {len(activities)} (8 mock + execute_node)")
     print(f"  L3 ActivityPool: {pool_status}")
+    print(f"  Op34 LLM eval: {eval_status}")
     if l3_degraded:
         print(f"  ⚠️  DEGRADED MODE — production deployment MUST NOT run in this state")
     print(f"  note: TemplateWorkflow removed — RunWorkflowSpec is the sole production workflow (2026-07-02 audit fix)")

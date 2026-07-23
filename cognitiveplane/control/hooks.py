@@ -11,18 +11,34 @@ from dataclasses import dataclass
 
 from cognitiveplane.shared.dto.context import ContextSnapshot
 from cognitiveplane.shared.enums import SafetyStatus
+from cognitiveplane.governance.guardrails import GuardrailAction
 
 
 class HookDecision(Enum):
     """Hook verdict. Only ALLOW/DENY — neither OpenHands nor Cline supports argument modification."""
     ALLOW = "allow"
     DENY = "deny"
+    RETRY = "retry"
 
 
 @dataclass
 class HookResult:
     decision: HookDecision
     reason: str | None = None
+    # Op 11: RETRY 时给工具的修正指令
+    retry_instruction: str | None = None
+
+    def to_guardrail_action(self) -> GuardrailAction:
+        """Op 11: Convert HookDecision to unified GuardrailAction.
+
+        ALLOW -> PASS, DENY -> REJECT, RETRY -> RETRY.
+        """
+        _MAP = {
+            HookDecision.ALLOW: GuardrailAction.PASS,
+            HookDecision.DENY: GuardrailAction.REJECT,
+            HookDecision.RETRY: GuardrailAction.RETRY,
+        }
+        return _MAP[self.decision]
 
 
 class BeforeToolHook(ABC):

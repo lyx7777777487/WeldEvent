@@ -15,8 +15,8 @@ Activity流水线:
 子模块结构:
   - iqa: 图像质量评估
   - ppa: 图像预处理
-  - mea: 缺陷检测（待实现）
-  - rda: 缺陷识别（待实现）
+  - mea: 几何测量（已实现）
+  - rda: 表面缺陷识别（已实现）
 """
 
 from .base import (
@@ -29,7 +29,9 @@ from .base import (
 
 # 导入子模块
 from .iqa import IqaActivity
+from .mea import MeaActivity
 from .ppa import PpaActivity
+from .rda import RdaActivity
 
 __all__ = [
     "BaseActivity",
@@ -38,5 +40,7 @@ __all__ = [
     "ActivityStatus",
     "ActivityMetadata",
     "IqaActivity",
+    "MeaActivity",
     "PpaActivity",
+    "RdaActivity",
 ]

@@ -50,7 +50,11 @@ from cognitiveplane.control.engine.session_notes import (
     derive_failure_reflection,
     build_progress_note,
 )
-from cognitiveplane.control.engine.system_prompt import SystemPromptBuilder
+from cognitiveplane.control.engine.system_prompt import (
+    SystemPromptBuilder,
+    AgentWorkPlan,
+    build_work_plan_from_session,
+)
 from cognitiveplane.control.engine.tool_execution import (
     HookRunner,
     RatchetRecorder,
@@ -461,7 +465,9 @@ class ReActEngine:
 
         session["_runtime_event_callback"] = runtime_event_callback
 
-        messages = await self._prompt_builder.build(context, session, skill=skill)
+        # Op 10: Build AgentWorkPlan from session state for cache-tail injection
+        work_plan = build_work_plan_from_session(session)
+        messages = await self._prompt_builder.build(context, session, skill=skill, work_plan=work_plan)
         # 注入历史对话（含 Context Compaction：超阈值时让 LLM 自己总结压缩）
         messages, compaction_meta = await self._inject_history(messages, session)
         if compaction_meta:
@@ -480,11 +486,15 @@ class ReActEngine:
         ask_count_this_round = 0
         ASK_LIMIT = 2
         final_reply = ""
-        allowed_tools = skill.allowed_tools if skill else None
-        # P0-1: Subagent 工具白名单 — 覆盖 skill 的 allowed_tools
+        # Skill-based tool filtering: skill's allowed_tools restricts LLM-visible tools
+        # Subagent mode overrides with its own whitelist (permission isolation)
         subagent_config = session.get("subagent")
         if subagent_config and isinstance(subagent_config, dict):
             allowed_tools = list(subagent_config.get("allowed_tools", []))
+        elif skill and skill.allowed_tools:
+            allowed_tools = list(skill.allowed_tools)
+        else:
+            allowed_tools = None
         # P0-3: 收集本轮工具调用结果（用于轨迹记录）
         stream_tool_calls: list[dict] = []
         stream_tool_results: list[dict] = []
@@ -521,6 +531,9 @@ class ReActEngine:
                 }
 
             if not tool_calls:
+                # Op 8: Take snapshot at final answer
+                if trajectory is not None:
+                    trajectory.take_snapshot(messages, "final_answer")
                 # 最终轮 — LLM 决定不再调工具。
                 # Phase 4 Guardrails: OutputGuardrail — 用 complete() 的 content 预检
                 # REJECT 时不流式输出（token 一旦发出无法撤回），直接发 replacement
@@ -768,6 +781,12 @@ class ReActEngine:
             # 阶段 2：并发执行 — 实际 execute 是最耗时部分，tool_calls 彼此独立可并发
             # 总耗时由最慢的工具决定，而非各工具耗时之和
             if pending_executions:
+                # Op 9: Record tool effect started (before execution, for crash recovery)
+                if self._event_log is not None:
+                    for item in pending_executions:
+                        self._event_log.record_tool_effect_started(
+                            item["tool_call_id"], item["tool_name"],
+                        )
                 execution_tasks = [
                     asyncio.create_task(
                         self._tool_executor.execute_with_timeout(
@@ -827,6 +846,17 @@ class ReActEngine:
                         arguments_preview=self._ratchet_recorder.preview_arguments(arguments),
                         session_id=session_id,
                     )
+                    # Op 9: Record tool effect failed (timeout)
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_failed(tool_call_id, "timeout")
+                elif result.error:
+                    # Op 9: Record tool effect failed
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_failed(tool_call_id, str(result.error))
+                else:
+                    # Op 9: Record tool effect completed
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_completed(tool_call_id)
                 tools_used.append(tool_name)
 
                 if tool_name == "launch_workflow" and result.output:
@@ -947,6 +977,10 @@ class ReActEngine:
                 )
                 trajectory.record_step(step)
 
+                # Op 8: Take ContinuableSnapshot after tool pair completes
+                if stream_tool_calls:
+                    trajectory.take_snapshot(messages, "tool_pair_complete")
+
         # max_iterations reached — 安全兜底
         final_reply = "Max iterations reached. Please refine your request."
         if trajectory is not None:
@@ -982,17 +1016,21 @@ class ReActEngine:
         if llm is None:
             return await self._run_embedding_rules(self._coerce_text(user_input), context, session, tools_used, skill=skill)
 
-        # P0-1: Subagent 工具白名单 — 覆盖 skill 的 allowed_tools
+        # Skill-based tool filtering (same as streaming path)
         subagent_config = session.get("subagent")
         if subagent_config and isinstance(subagent_config, dict):
             allowed_tools = list(subagent_config.get("allowed_tools", []))
+        elif skill and skill.allowed_tools:
+            allowed_tools = list(skill.allowed_tools)
         else:
-            allowed_tools = skill.allowed_tools if skill else None
+            allowed_tools = None
 
         # Real session_id for max_calls_per_session enforcement (plan §4.2 line 761)
         session_id = str(session.get("session_id", "default")) if session else "default"
 
-        messages = await self._prompt_builder.build(context, session, skill=skill)
+        # Op 10: Build AgentWorkPlan from session state for cache-tail injection
+        work_plan = build_work_plan_from_session(session)
+        messages = await self._prompt_builder.build(context, session, skill=skill, work_plan=work_plan)
         # 注入历史对话（含 Context Compaction：超阈值时让 LLM 自己总结压缩）
         # run() 非流式，不 emit compaction 事件；run_stream() 会 emit。
         messages, _compaction_meta = await self._inject_history(messages, session)
@@ -1035,6 +1073,9 @@ class ReActEngine:
 
             tool_calls = response.tool_calls
             if not tool_calls:
+                # Op 8: Take snapshot at final answer
+                if trajectory is not None:
+                    trajectory.take_snapshot(messages, "final_answer")
                 # Plan §2.1 line 291: LLM 自主决定何时结束 — no tool_calls = LLM chose to stop.
                 return InteractionResponse(
                     text_reply=response.content,
@@ -1119,7 +1160,63 @@ class ReActEngine:
 
             # 阶段 2：并发执行 — 实际 execute 是最耗时部分，tool_calls 彼此独立可并发
             # 总耗时由最慢的工具决定，而非各工具耗时之和
+            # ── 架构级 approval gate（非流式路径）──
+            # 与 run_stream 一致：APPROVAL_REQUIRED_TOOLS 执行前阻塞等待用户确认
+            if self._approval_store is not None and pending_executions:
+                still_pending: list[dict] = []
+                for item in pending_executions:
+                    tname = item["tool_name"]
+                    if tname not in APPROVAL_REQUIRED_TOOLS:
+                        still_pending.append(item)
+                        continue
+                    # 需要审批 - 构造请求并阻塞等待
+                    approval_id = f"{session_id}-run-iter{i+1}-{tname}-{id(item) & 0xffffff}"
+                    summary = summarize_for_approval(tname, item["arguments"])
+                    req = self._approval_store.create(
+                        approval_id, session_id, i + 1, tname,
+                        item["arguments"], summary,
+                    )
+                    await self._emit("approval_request", {
+                        "approval_id": approval_id,
+                        "tool": tname,
+                        "summary": summary,
+                        "iteration": i + 1,
+                    })
+                    try:
+                        await asyncio.wait_for(req.event.wait(), timeout=APPROVAL_TIMEOUT_SECONDS)
+                    except asyncio.TimeoutError:
+                        req.decision = "timeout"
+                    self._approval_store.remove(approval_id)
+                    if req.decision == "approved":
+                        still_pending.append(item)
+                    else:
+                        reject_reason = {
+                            "rejected": "用户拒绝执行",
+                            "timeout": "确认超时已取消",
+                        }.get(req.decision or "", f"已取消 ({req.decision})")
+                        fb = req.feedback or ""
+                        messages.append({
+                            "role": "assistant", "content": None,
+                            "tool_calls": [item["tool_call"]],
+                            "reasoning_content": response.reasoning_content,
+                        })
+                        messages.append({
+                            "role": "tool", "tool_call_id": item["tool_call_id"],
+                            "content": json.dumps({
+                                "status": "rejected",
+                                "error": reject_reason,
+                                "feedback": fb,
+                            }, ensure_ascii=False),
+                        })
+                pending_executions = still_pending
+
             if pending_executions:
+                # Op 9: Record tool effect started (before execution, for crash recovery)
+                if self._event_log is not None:
+                    for item in pending_executions:
+                        self._event_log.record_tool_effect_started(
+                            item["tool_call_id"], item["tool_name"],
+                        )
                 results = await asyncio.gather(
                     *[self._tool_executor.execute_with_timeout(item["tool_name"], item["arguments"], session=session) for item in pending_executions],
                     return_exceptions=False,
@@ -1143,6 +1240,17 @@ class ReActEngine:
                         arguments_preview=self._ratchet_recorder.preview_arguments(arguments),
                         session_id=session_id,
                     )
+                    # Op 9: Record tool effect failed (timeout)
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_failed(tool_call_id, "timeout")
+                elif result.error:
+                    # Op 9: Record tool effect failed
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_failed(tool_call_id, str(result.error))
+                else:
+                    # Op 9: Record tool effect completed
+                    if self._event_log is not None:
+                        self._event_log.record_tool_effect_completed(tool_call_id)
                 tools_used.append(tool_name)
 
                 # P3-5 fix: launch_workflow 成功时收集 workflow_id 到 workflow_ids
@@ -1205,6 +1313,10 @@ class ReActEngine:
                     } if hasattr(response, "usage") else None,
                 )
                 trajectory.record_step(step)
+
+                # Op 8: Take ContinuableSnapshot after tool pair completes
+                if tool_calls:
+                    trajectory.take_snapshot(messages, "tool_pair_complete")
 
         # max_iterations reached — safety guardrail, not LLM choice.
         return InteractionResponse(
@@ -1349,10 +1461,8 @@ class ReActEngine:
             "monitoring": "read_weldmap",
         }
         tool_name = tool_map.get(intent)
-        allowed_tools = set(skill.allowed_tools) if skill else None
-        if tool_name and self._tools.is_llm_visible(tool_name) and (
-            allowed_tools is None or tool_name in allowed_tools
-        ):
+        # Modernized: 主 agent 不受 skill 白名单限制
+        if tool_name and self._tools.is_llm_visible(tool_name):
             # design_workflow 入口形状是 WorkflowSpec 草案 (objective + reason),
             # 不是旧 query 形状 — fallback 路径必须用新入口, 否则 schema 校验拒绝.
             # 其它工具仍走 query 形状.
@@ -1407,14 +1517,15 @@ class ReActEngine:
             "web_search": ["搜索", "查询", "最新", "网上", "search", "web", "latest"],
         }
 
-        allowed_tools = set(skill.allowed_tools) if skill else None
         best_match = None
         best_score = 0
+        # Skill whitelist: if skill is selected, only allow its tools
+        skill_allowed = set(skill.allowed_tools) if skill and skill.allowed_tools else None
         for tool_name, keywords in keyword_map.items():
             score = sum(1 for kw in keywords if kw in text)
-            if score > best_score and self._tools.is_llm_visible(tool_name) and (
-                allowed_tools is None or tool_name in allowed_tools
-            ):
+            if score > best_score and self._tools.is_llm_visible(tool_name):
+                if skill_allowed is not None and tool_name not in skill_allowed:
+                    continue
                 best_score = score
                 best_match = tool_name
 
@@ -1486,11 +1597,24 @@ class ReActEngine:
         """
         from cognitiveplane.capability.provider import LLMRequest
         tool_defs = self._tools.get_llm_tool_definitions(allowed_tools=allowed_tools)
+        # Op 36: Prompt caching - detect cache boundary marker and estimate prefix tokens
+        cache_prefix_tokens = 0
+        from cognitiveplane.control.engine.system_prompt import CACHE_BOUNDARY_MARKER
+        for msg in messages:
+            content_str = str(msg.get("content", ""))
+            if CACHE_BOUNDARY_MARKER in content_str:
+                # Estimate tokens in all messages up to and including the one with the marker
+                prefix_msgs = messages[:messages.index(msg) + 1]
+                cache_prefix_tokens = sum(len(str(m.get("content", ""))) for m in prefix_msgs) // 4
+                break
+
         return LLMRequest(
             messages=messages,
             tools=tool_defs if tool_defs else None,
             caller="react_engine",
+            purpose="reasoning",
             max_tokens=8192,
+            cache_prefix_tokens=cache_prefix_tokens,
             temperature=0.3,  # 0.3 而非 0.7：Agent 场景需要高 system prompt 遵从度，
             # 0.7 下 LLM 容易忽略后段引导（委派 subagent / 知识库 fallback / 询问节奏）。
             # 0.3 既保留一定探索性，又确保 LLM 遵守 system prompt 中的决策框架。

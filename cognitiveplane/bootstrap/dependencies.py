@@ -67,6 +67,9 @@ def build_dependencies(llm_available: bool) -> "CognitiveDependencies":
             chroma_adapter = ChromaRAGAdapter(llm_provider=llm_provider)
             knowledge_deps.vision_knowledge = chroma_adapter
             knowledge_deps.reasoning_knowledge = chroma_adapter
+            # Op-新: case_library 接入向量检索 (CBR 案例库, L2_CASE 分层记忆)
+            # 替换默认 StubKnowledgeAdapter - case_library_correction 纠错的真实案例库
+            knowledge_deps.case_library = chroma_adapter
         except Exception:
             import logging as _logging
             _logging.getLogger(__name__).warning(

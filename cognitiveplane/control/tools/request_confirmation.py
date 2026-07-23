@@ -65,12 +65,18 @@ class RequestConfirmationTool(BrainTool):
     @property
     def description(self) -> str:
         return (
-            "Request confirmation from a human operator. "
-            "Pops up a dialog with the question and option buttons. "
-            "**Blocks until the user clicks an option** — your next iteration "
-            "will see the user's selection in tool result 'user_selection' field. "
-            "Use this when you lack business parameters (label set / annotator name / "
-            "dataset choice) or need a decision direction from the user."
+            "向用户弹窗询问关键业务决策。\n"
+            "**何时必须使用**：\n"
+            "- 标注流程中需要用户选择数据集、作业名、标签集、标注员、图片数量\n"
+            "- 质检方案设计中需要用户确认标准来源、缺陷类型、判定阈值\n"
+            "- 工作流设计中存在多条路线且用户需要拍板\n"
+            "- 任何无法从工具查询中获取的业务参数（如'这批货的验收标准是哪个？'）\n\n"
+            "**何时不需要**：\n"
+            "- 能用工具查到的信息直接查（如 list_datasets 查数据集列表）\n"
+            "- 架构 approval gate 已拦截的工具直接调，架构自动弹窗\n\n"
+            "**用法**：传 question（问题）+ options（2-4个选项按钮）。\n"
+            "工具会阻塞等待用户点击，你的下一轮会收到 user_selection 字段。\n"
+            "**每轮只问一个问题**，不要一次弹窗问多个。"
         )
 
     @property
